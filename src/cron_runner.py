@@ -29,7 +29,7 @@ class LifeOSCronRunner:
         print(f"🔄 LIFE OS CRON - {now.strftime('%Y-%m-%d %H:%M:%S')} EST")
         print(f"{'='*60}\n")
         
-        # 1. Run FOCUS monitoring
+        # 1. Run focus monitoring
         print("🧠 Running FOCUS Monitor...")
         interventions = self.monitor.run_monitoring_cycle()
         print(f"   Generated {len(interventions)} interventions")
