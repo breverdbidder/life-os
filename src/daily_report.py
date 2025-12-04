@@ -1,6 +1,6 @@
 """
 Life OS Daily Report Generator
-Generates comprehensive end-of-day reports with ADHD insights
+Generates comprehensive end-of-day reports with FOCUS insights
 """
 import os
 import json
@@ -188,7 +188,7 @@ class DailyReportGenerator:
         return timeline
     
     def generate_insights(self, metrics: dict, timeline: List[dict]) -> List[str]:
-        """Generate ADHD-specific insights from the day's data"""
+        """Generate FOCUS-specific insights from the day's data"""
         insights = []
         
         # Completion rate insight
@@ -317,7 +317,7 @@ class DailyReportGenerator:
   Estimated: {m['total_estimated_minutes']} minutes
   Actual: {m['total_actual_minutes']} minutes
   
-🧠 ADHD METRICS
+🧠 FOCUS METRICS
 ───────────────────────────────────────────────────────────────
   Focus Quality: {m['avg_focus_quality']}/10
   Energy Level: {m['avg_energy_level']}/10
@@ -353,7 +353,7 @@ class DailyReportGenerator:
         
         text += "\n\n═══════════════════════════════════════════════════════════════\n"
         text += f"Generated: {report['generated_at']}\n"
-        text += "Life OS v2.0 - ADHD-Optimized Task Management\n"
+        text += "Life OS v2.0 - FOCUS-Optimized Task Management\n"
         
         return text
 

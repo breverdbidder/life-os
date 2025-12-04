@@ -1,5 +1,5 @@
 """
-Life OS ADHD Monitor
+Life OS Focus Monitor
 XGBoost-based abandonment prediction and intervention system
 """
 import os
@@ -9,7 +9,7 @@ import numpy as np
 from datetime import datetime, timedelta
 from typing import List, Dict, Tuple, Optional
 
-# XGBoost feature weights (pre-trained on ADHD patterns)
+# XGBoost feature weights (pre-trained on FOCUS patterns)
 XGBOOST_WEIGHTS = {
     'complexity': 0.15,
     'clarity_inverse': 0.12,
@@ -38,7 +38,7 @@ MICRO_COMMITMENT_PROMPTS = [
     "One tiny thing: {action}. Nothing more.",
 ]
 
-class ADHDMonitor:
+class FocusMonitor:
     def __init__(self):
         self.supabase_url = os.getenv("SUPABASE_URL", "https://mocerqjnksmhcjzxrewo.supabase.co")
         self.supabase_key = os.getenv("SUPABASE_KEY", "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1vY2VycWpua3NtaGNqenhyZXdvIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2NDUzMjUyNiwiZXhwIjoyMDgwMTA4NTI2fQ.fL255mO0V8-rrU0Il3L41cIdQXUau-HRQXiamTqp9nE")
@@ -282,6 +282,6 @@ class ADHDMonitor:
         }
 
 if __name__ == "__main__":
-    monitor = ADHDMonitor()
+    monitor = FocusMonitor()
     interventions = monitor.run_monitoring_cycle()
     print(f"\n✅ Generated {len(interventions)} interventions")

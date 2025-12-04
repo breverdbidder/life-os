@@ -1,4 +1,4 @@
-name: Life OS - 30 Minute ADHD Monitor
+name: Life OS - 30 Minute FOCUS Monitor
 
 on:
   schedule:
@@ -7,7 +7,7 @@ on:
   workflow_dispatch:  # Allow manual trigger
 
 jobs:
-  adhd-monitor:
+  focus-monitor:
     runs-on: ubuntu-latest
     
     steps:
@@ -23,11 +23,11 @@ jobs:
         run: |
           pip install requests pandas numpy scikit-learn xgboost
           
-      - name: Run ADHD Monitor
+      - name: Run FOCUS Monitor
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
-        run: python scripts/adhd_monitor.py
+        run: python scripts/focus_monitor.py
         
       - name: Generate Daily Report
         env:

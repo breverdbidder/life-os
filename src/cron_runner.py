@@ -6,7 +6,7 @@ import os
 import json
 import requests
 from datetime import datetime
-from adhd_monitor import ADHDMonitor
+from focus_monitor import FocusMonitor
 from daily_report import DailyReportGenerator
 
 class LifeOSCronRunner:
@@ -19,7 +19,7 @@ class LifeOSCronRunner:
             "Content-Type": "application/json",
             "Prefer": "return=representation"
         }
-        self.monitor = ADHDMonitor()
+        self.monitor = FocusMonitor()
         self.report_generator = DailyReportGenerator()
     
     def run_30min_cycle(self):
@@ -29,8 +29,8 @@ class LifeOSCronRunner:
         print(f"🔄 LIFE OS CRON - {now.strftime('%Y-%m-%d %H:%M:%S')} EST")
         print(f"{'='*60}\n")
         
-        # 1. Run ADHD monitoring
-        print("🧠 Running ADHD Monitor...")
+        # 1. Run FOCUS monitoring
+        print("🧠 Running FOCUS Monitor...")
         interventions = self.monitor.run_monitoring_cycle()
         print(f"   Generated {len(interventions)} interventions")
         

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-LIFE OS - ADHD Monitor V2.1 (Runs every 30 minutes)
+LIFE OS - FOCUS Monitor V2.1 (Runs every 30 minutes)
 Created by: Ariel Shapira, Solo Founder - Everest Capital USA
 
 V2.1 FIXES:
@@ -178,7 +178,7 @@ def create_intervention(task, level, risk, minutes_active):
     return r.status_code in [200, 201]
 
 def main():
-    print(f"🧠 LIFE OS ADHD MONITOR V2.1 - {datetime.now().strftime('%Y-%m-%d %H:%M')}")
+    print(f"🧠 LIFE OS FOCUS MONITOR V2.1 - {datetime.now().strftime('%Y-%m-%d %H:%M')}")
     print("="*60)
     
     stale_closed = close_stale_interventions()

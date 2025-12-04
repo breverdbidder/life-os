@@ -13,7 +13,7 @@ Functions:
 - log_task(): Log new task from conversation
 - update_task(): Update task status
 - complete_task(): Mark task complete + close interventions
-- log_context_switch(): Track ADHD context switches
+- log_context_switch(): Track FOCUS context switches
 - end_session(): Summarize session activity
 """
 
@@ -236,7 +236,7 @@ class ClaudeSessionBridge:
     def log_context_switch(self, from_task: str = None, to_task: str = None, 
                            reason: str = None) -> dict:
         """
-        Log an ADHD context switch. Important for pattern detection.
+        Log an FOCUS context switch. Important for pattern detection.
         """
         self.context_switches += 1
         now = datetime.now(timezone.utc).isoformat()

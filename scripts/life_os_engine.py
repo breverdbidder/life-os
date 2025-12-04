@@ -1,6 +1,6 @@
 """
 LIFE OS ENGINE v1.0
-Real-time ADHD-optimized task tracking with XGBoost predictions
+Real-time FOCUS-optimized task tracking with XGBoost predictions
 Created by: Ariel Shapira, Solo Founder - Everest Capital USA
 """
 
@@ -88,16 +88,16 @@ class DailyMetrics:
     domains: Dict[str, int] = None
 
 # ============================================================
-# XGBOOST-STYLE ADHD PREDICTOR
+# XGBOOST-STYLE FOCUS PREDICTOR
 # ============================================================
 
-class ADHDPredictor:
+class FocusPredictor:
     """
-    XGBoost-inspired ADHD abandonment predictor
+    XGBoost-inspired FOCUS abandonment predictor
     Uses weighted features to predict task abandonment probability
     """
     
-    # Feature weights (trained on ADHD patterns)
+    # Feature weights (trained on FOCUS patterns)
     WEIGHTS = {
         'time_elapsed_ratio': 0.35,      # time_elapsed / estimated_time
         'complexity_score': 0.20,         # Higher complexity = higher risk
@@ -107,7 +107,7 @@ class ADHDPredictor:
         'historical_completion': 0.10     # Past performance
     }
     
-    # Time of day risk factors (ADHD energy patterns)
+    # Time of day risk factors (FOCUS energy patterns)
     TIME_RISK = {
         range(6, 9): 0.3,    # Early morning - moderate
         range(9, 12): 0.1,   # Peak focus - low risk
@@ -194,7 +194,7 @@ class ADHDPredictor:
         if switch_score > 0.3:
             reasons.append(f"{context_switches} context switches detected")
         if time_risk > 0.4:
-            reasons.append("Current time is in ADHD low-focus window")
+            reasons.append("Current time is in FOCUS low-focus window")
         if energy_score > 0.5:
             reasons.append(f"Low energy level ({energy_level}/10)")
         
@@ -219,7 +219,7 @@ class ADHDPredictor:
 # ============================================================
 
 class InterventionGenerator:
-    """Generates ADHD-appropriate interventions based on risk level"""
+    """Generates FOCUS-appropriate interventions based on risk level"""
     
     MESSAGES = {
         1: [
@@ -283,10 +283,10 @@ class InterventionGenerator:
 # ============================================================
 
 class LifeOSEngine:
-    """Main engine for Life OS task tracking and ADHD management"""
+    """Main engine for Life OS task tracking and FOCUS management"""
     
     def __init__(self):
-        self.predictor = ADHDPredictor()
+        self.predictor = FocusPredictor()
         self.intervention_gen = InterventionGenerator()
     
     def _api_call(self, method: str, endpoint: str, data: dict = None) -> dict:
@@ -372,7 +372,7 @@ class LifeOSEngine:
         
         return result if isinstance(result, list) else []
     
-    # -------------------- ADHD MONITORING --------------------
+    # -------------------- FOCUS MONITORING --------------------
     
     def check_tasks_for_intervention(self) -> List[Dict]:
         """Check all active tasks and generate interventions if needed"""

@@ -1,6 +1,6 @@
 # 🏠 Life OS - Shapira Family Command Center
 
-**Real-Time ADHD-Optimized Life Tracking & Management**
+**Real-Time FOCUS-Optimized Life Tracking & Management**
 
 Created by: **Ariel Shapira, Solo Founder - Everest Capital USA**
 
@@ -10,7 +10,7 @@ Created by: **Ariel Shapira, Solo Founder - Everest Capital USA**
 
 ## ✨ Features
 
-### 🧠 XGBoost ADHD Monitor
+### 🧠 XGBoost FOCUS Monitor
 - Real-time abandonment risk prediction
 - Focus quality tracking
 - Energy level monitoring
@@ -45,7 +45,7 @@ Created by: **Ariel Shapira, Solo Founder - Everest Capital USA**
 
 - **Frontend**: HTML5, TailwindCSS, Chart.js
 - **Backend**: Python + Supabase
-- **ML**: XGBoost-style ADHD predictor
+- **ML**: XGBoost-style FOCUS predictor
 - **Automation**: GitHub Actions (30-min cron)
 - **Hosting**: Vercel (auto-deploy)
 
@@ -68,4 +68,4 @@ life-os/
 
 ---
 
-*Life OS v2.0 - Built with ❤️ for ADHD optimization*
+*Life OS v2.0 - Built with ❤️ for FOCUS optimization*
