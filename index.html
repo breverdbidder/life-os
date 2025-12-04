@@ -7,43 +7,24 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
-        :root { 
-            --purple: #8b5cf6; --blue: #3b82f6; --green: #10b981; 
-            --orange: #f59e0b; --red: #ef4444; --whatsapp: #25D366; 
-        }
-        body { 
-            background: linear-gradient(135deg, #0f0f1a 0%, #1a1a2e 50%, #0f172a 100%); 
-            min-height: 100vh; 
-            font-family: system-ui, -apple-system, sans-serif; 
-        }
-        .glass { 
-            background: rgba(30, 30, 50, 0.85); 
-            backdrop-filter: blur(12px); 
-            border: 1px solid rgba(139, 92, 246, 0.2); 
-        }
+        :root { --purple: #8b5cf6; --blue: #3b82f6; --green: #10b981; --orange: #f59e0b; --red: #ef4444; --whatsapp: #25D366; }
+        body { background: linear-gradient(135deg, #0f0f1a 0%, #1a1a2e 50%, #0f172a 100%); min-height: 100vh; font-family: system-ui, -apple-system, sans-serif; }
+        .glass { background: rgba(30, 30, 50, 0.85); backdrop-filter: blur(12px); border: 1px solid rgba(139, 92, 246, 0.2); }
         .glow { box-shadow: 0 0 25px rgba(139, 92, 246, 0.3); }
+        .glow-red { box-shadow: 0 0 20px rgba(239, 68, 68, 0.4); animation: pulse-red 2s infinite; }
+        .glow-yellow { box-shadow: 0 0 20px rgba(245, 158, 11, 0.4); }
         .glow-green { box-shadow: 0 0 20px rgba(16, 185, 129, 0.3); }
-        .glow-red { box-shadow: 0 0 20px rgba(239, 68, 68, 0.3); }
-        .glow-blue { box-shadow: 0 0 20px rgba(59, 130, 246, 0.3); }
-        .status-badge { padding: 2px 8px; border-radius: 12px; font-size: 0.65rem; font-weight: 600; text-transform: uppercase; }
-        .pulse { animation: pulse 2s infinite; }
-        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.6; } }
-        .timeline-line { position: relative; padding-left: 24px; }
-        .timeline-line::before { 
-            content: ''; position: absolute; left: 8px; top: 0; bottom: 0; 
-            width: 2px; background: linear-gradient(to bottom, #8b5cf6, #3b82f6); 
-        }
-        .timeline-dot { 
-            position: absolute; left: 4px; top: 6px; width: 10px; height: 10px; 
-            border-radius: 50%; background: #8b5cf6; border: 2px solid #0f0f1a;
-        }
+        @keyframes pulse-red { 0%, 100% { box-shadow: 0 0 20px rgba(239, 68, 68, 0.4); } 50% { box-shadow: 0 0 30px rgba(239, 68, 68, 0.6); } }
+        .status-badge { padding: 2px 8px; border-radius: 12px; font-size: 0.7rem; font-weight: 600; }
+        .timeline-dot { width: 12px; height: 12px; border-radius: 50%; }
+        .risk-bar { height: 8px; border-radius: 4px; background: linear-gradient(90deg, #10b981 0%, #f59e0b 50%, #ef4444 100%); }
+        .risk-indicator { width: 8px; height: 16px; background: white; border-radius: 2px; position: absolute; top: -4px; }
         .whatsapp-btn { background: #25D366; }
         .whatsapp-btn:hover { background: #128C7E; }
-        .intervention-alert { animation: shake 0.5s ease-in-out; }
-        @keyframes shake { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-5px); } 75% { transform: translateX(5px); } }
-        .progress-ring { transform: rotate(-90deg); }
-        .driving-animation { animation: drive 3s ease-in-out infinite; }
-        @keyframes drive { 0%, 100% { transform: translateX(0); } 50% { transform: translateX(10px); } }
+        .tab-btn { padding: 8px 16px; border-radius: 8px; cursor: pointer; transition: all 0.3s; }
+        .tab-btn.active { background: rgba(139, 92, 246, 0.3); color: white; }
+        .tab-btn:not(.active) { color: #9ca3af; }
+        .tab-btn:hover:not(.active) { background: rgba(139, 92, 246, 0.1); }
     </style>
 </head>
 <body class="text-gray-100">
@@ -51,238 +32,255 @@
         <!-- Header -->
         <div class="glass rounded-2xl p-4 mb-4 glow">
             <div class="flex items-center justify-between flex-wrap gap-4">
-                <div class="flex items-center gap-3">
+                <div class="flex items-center gap-4">
                     <div class="text-4xl">🏠</div>
                     <div>
                         <h1 class="text-xl md:text-2xl font-bold bg-gradient-to-r from-purple-400 to-blue-400 bg-clip-text text-transparent">
                             Life OS Command Center
                         </h1>
-                        <p class="text-gray-400 text-xs">Real-Time ADHD-Optimized Tracking • Auto-updates every 30s</p>
+                        <p class="text-gray-400 text-xs mt-1">Real-Time ADHD Tracking • XGBoost Predictions • Auto-Updates 30min</p>
                     </div>
                 </div>
                 <div class="flex items-center gap-4">
-                    <div id="last-cron" class="text-xs text-gray-500">Last sync: --</div>
-                    <button onclick="shareFullStatus()" class="whatsapp-btn text-white px-3 py-1.5 rounded-lg flex items-center gap-2 text-sm font-semibold">
-                        📱 Share
-                    </button>
+                    <div id="connection-status" class="flex items-center gap-2 text-sm">
+                        <span class="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
+                        <span class="text-green-400">Live</span>
+                    </div>
                     <div class="text-right">
                         <div id="current-time" class="text-xl font-mono text-white"></div>
-                        <div id="current-date" class="text-xs text-purple-400"></div>
+                        <div id="next-update" class="text-xs text-gray-500">Next update: --</div>
                     </div>
                 </div>
             </div>
         </div>
 
-        <!-- Alert Banner for Interventions -->
-        <div id="intervention-banner" class="hidden glass rounded-xl p-3 mb-4 border-l-4 border-red-500 glow-red intervention-alert">
+        <!-- ADHD Alert Banner (shows when intervention needed) -->
+        <div id="alert-banner" class="glass rounded-xl p-4 mb-4 border-l-4 border-red-500 glow-red hidden">
             <div class="flex items-center justify-between">
-                <div class="flex items-center gap-3">
-                    <div class="text-2xl">⚠️</div>
+                <div class="flex items-center gap-4">
+                    <div class="text-3xl">⚠️</div>
                     <div>
-                        <div class="text-sm font-semibold text-red-400" id="intervention-title">Intervention Alert</div>
-                        <div class="text-xs text-gray-400" id="intervention-message"></div>
+                        <div class="text-lg font-semibold text-red-400">ADHD Intervention Needed</div>
+                        <div id="alert-message" class="text-sm text-gray-300">Task at risk of abandonment</div>
                     </div>
                 </div>
-                <button onclick="dismissIntervention()" class="text-gray-500 hover:text-white">✕</button>
-            </div>
-        </div>
-
-        <!-- Active Trip Banner -->
-        <div id="trip-banner" class="hidden glass rounded-xl p-3 mb-4 border-l-4 border-blue-500 glow-blue">
-            <div class="flex items-center justify-between flex-wrap gap-3">
-                <div class="flex items-center gap-3">
-                    <div class="text-3xl driving-animation">🚗</div>
-                    <div>
-                        <div class="text-sm font-semibold text-blue-400" id="trip-title">Trip</div>
-                        <div class="text-xs text-gray-400" id="trip-route"></div>
-                    </div>
-                </div>
-                <div class="flex items-center gap-4 text-center">
-                    <div><div class="text-lg font-bold text-white" id="trip-miles">--</div><div class="text-xs text-gray-500">MI</div></div>
-                    <div><div class="text-lg font-bold text-white" id="trip-eta">--</div><div class="text-xs text-gray-500">ETA</div></div>
-                    <div><div class="text-lg font-bold text-green-400" id="trip-status">--</div><div class="text-xs text-gray-500">STATUS</div></div>
+                <div class="flex gap-2">
+                    <button onclick="respondIntervention('continue')" class="bg-green-600 text-white px-4 py-2 rounded-lg text-sm font-semibold">Continue</button>
+                    <button onclick="respondIntervention('defer')" class="bg-yellow-600 text-white px-4 py-2 rounded-lg text-sm font-semibold">Defer</button>
+                    <button onclick="respondIntervention('abandon')" class="bg-gray-600 text-white px-4 py-2 rounded-lg text-sm font-semibold">Abandon</button>
                 </div>
             </div>
         </div>
 
-        <!-- Main Grid -->
-        <div class="grid grid-cols-1 lg:grid-cols-4 gap-4 mb-4">
-            <!-- Left: Productivity Score + Quick Stats -->
-            <div class="space-y-4">
-                <!-- Productivity Score Circle -->
+        <!-- Tabs -->
+        <div class="flex gap-2 mb-4 overflow-x-auto">
+            <button class="tab-btn active" onclick="switchTab('dashboard')">📊 Dashboard</button>
+            <button class="tab-btn" onclick="switchTab('tasks')">📋 Tasks</button>
+            <button class="tab-btn" onclick="switchTab('timeline')">⏱️ Timeline</button>
+            <button class="tab-btn" onclick="switchTab('travel')">🚗 Travel</button>
+            <button class="tab-btn" onclick="switchTab('michael')">🏊 Michael</button>
+        </div>
+
+        <!-- Tab Content: Dashboard -->
+        <div id="tab-dashboard" class="tab-content">
+            <!-- ADHD Metrics Row -->
+            <div class="grid grid-cols-2 md:grid-cols-5 gap-3 mb-4">
                 <div class="glass rounded-xl p-4 text-center">
-                    <div class="relative inline-block">
-                        <svg class="w-28 h-28 progress-ring">
-                            <circle cx="56" cy="56" r="50" stroke="#1f2937" stroke-width="8" fill="none"/>
-                            <circle id="score-ring" cx="56" cy="56" r="50" stroke="#8b5cf6" stroke-width="8" fill="none"
-                                    stroke-dasharray="314" stroke-dashoffset="314" stroke-linecap="round"/>
-                        </svg>
-                        <div class="absolute inset-0 flex items-center justify-center">
-                            <div>
-                                <div id="productivity-score" class="text-2xl font-bold text-white">--</div>
-                                <div class="text-xs text-gray-500">SCORE</div>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="text-xs text-gray-400 mt-2">Productivity Score</div>
+                    <div class="text-3xl font-bold text-white" id="tasks-today">0</div>
+                    <div class="text-xs text-gray-400">Tasks Today</div>
                 </div>
-
-                <!-- Quick Stats -->
-                <div class="grid grid-cols-2 gap-2">
-                    <div class="glass rounded-lg p-3 text-center">
-                        <div id="stat-completed" class="text-xl font-bold text-green-400">0</div>
-                        <div class="text-xs text-gray-500">Completed</div>
-                    </div>
-                    <div class="glass rounded-lg p-3 text-center">
-                        <div id="stat-active" class="text-xl font-bold text-blue-400">0</div>
-                        <div class="text-xs text-gray-500">Active</div>
-                    </div>
-                    <div class="glass rounded-lg p-3 text-center">
-                        <div id="stat-abandoned" class="text-xl font-bold text-red-400">0</div>
-                        <div class="text-xs text-gray-500">Abandoned</div>
-                    </div>
-                    <div class="glass rounded-lg p-3 text-center">
-                        <div id="stat-interventions" class="text-xl font-bold text-orange-400">0</div>
-                        <div class="text-xs text-gray-500">Interventions</div>
-                    </div>
+                <div class="glass rounded-xl p-4 text-center">
+                    <div class="text-3xl font-bold text-green-400" id="completed-count">0</div>
+                    <div class="text-xs text-gray-400">Completed</div>
                 </div>
+                <div class="glass rounded-xl p-4 text-center">
+                    <div class="text-3xl font-bold text-yellow-400" id="in-progress-count">0</div>
+                    <div class="text-xs text-gray-400">In Progress</div>
+                </div>
+                <div class="glass rounded-xl p-4 text-center">
+                    <div class="text-3xl font-bold text-red-400" id="abandoned-count">0</div>
+                    <div class="text-xs text-gray-400">Abandoned</div>
+                </div>
+                <div class="glass rounded-xl p-4 text-center">
+                    <div class="text-3xl font-bold" id="completion-rate">--%</div>
+                    <div class="text-xs text-gray-400">Completion Rate</div>
+                </div>
+            </div>
 
-                <!-- ADHD Metrics -->
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-4">
+                <!-- XGBoost ADHD Monitor -->
                 <div class="glass rounded-xl p-4">
-                    <h3 class="text-sm font-semibold mb-3 flex items-center gap-2">🧠 ADHD Metrics</h3>
+                    <h3 class="text-sm font-semibold mb-3 flex items-center gap-2">
+                        <span>🧠</span> XGBoost ADHD Monitor
+                    </h3>
                     <div class="space-y-3">
                         <div>
                             <div class="flex justify-between text-xs mb-1">
-                                <span class="text-gray-400">Focus Quality</span>
-                                <span id="focus-value" class="text-white">7/10</span>
+                                <span class="text-gray-400">Abandonment Risk</span>
+                                <span id="risk-value" class="font-bold">0%</span>
                             </div>
-                            <div class="h-2 bg-gray-700 rounded-full">
-                                <div id="focus-bar" class="h-full bg-purple-500 rounded-full" style="width: 70%"></div>
+                            <div class="relative h-2 bg-gray-700 rounded-full overflow-hidden">
+                                <div id="risk-bar" class="h-full bg-gradient-to-r from-green-500 via-yellow-500 to-red-500" style="width: 0%"></div>
+                            </div>
+                        </div>
+                        <div>
+                            <div class="flex justify-between text-xs mb-1">
+                                <span class="text-gray-400">Focus Quality</span>
+                                <span id="focus-value" class="font-bold">0/10</span>
+                            </div>
+                            <div class="h-2 bg-gray-700 rounded-full overflow-hidden">
+                                <div id="focus-bar" class="h-full bg-purple-500" style="width: 0%"></div>
                             </div>
                         </div>
                         <div>
                             <div class="flex justify-between text-xs mb-1">
                                 <span class="text-gray-400">Energy Level</span>
-                                <span id="energy-value" class="text-white">7/10</span>
+                                <span id="energy-value" class="font-bold">0/10</span>
                             </div>
-                            <div class="h-2 bg-gray-700 rounded-full">
-                                <div id="energy-bar" class="h-full bg-green-500 rounded-full" style="width: 70%"></div>
+                            <div class="h-2 bg-gray-700 rounded-full overflow-hidden">
+                                <div id="energy-bar" class="h-full bg-blue-500" style="width: 0%"></div>
                             </div>
                         </div>
-                        <div>
-                            <div class="flex justify-between text-xs mb-1">
+                        <div class="pt-2 border-t border-gray-700">
+                            <div class="flex justify-between text-xs">
                                 <span class="text-gray-400">Context Switches</span>
-                                <span id="switches-value" class="text-white">0</span>
+                                <span id="context-switches" class="font-bold text-orange-400">0</span>
+                            </div>
+                            <div class="flex justify-between text-xs mt-1">
+                                <span class="text-gray-400">Interventions Today</span>
+                                <span id="interventions-count" class="font-bold text-red-400">0</span>
                             </div>
                         </div>
                     </div>
                 </div>
-            </div>
 
-            <!-- Center: Task Timeline -->
-            <div class="lg:col-span-2 space-y-4">
                 <!-- Active Tasks -->
                 <div class="glass rounded-xl p-4">
-                    <div class="flex items-center justify-between mb-3">
-                        <h3 class="text-sm font-semibold flex items-center gap-2">📋 Active Tasks</h3>
-                        <span id="active-count" class="text-xs text-gray-500">0 tasks</span>
-                    </div>
+                    <h3 class="text-sm font-semibold mb-3 flex items-center gap-2">
+                        <span>📋</span> Active Tasks
+                        <span id="active-count" class="text-xs text-gray-500">(0)</span>
+                    </h3>
                     <div id="active-tasks" class="space-y-2 max-h-48 overflow-y-auto">
-                        <div class="text-center text-gray-500 py-4 text-sm">No active tasks</div>
+                        <div class="text-center text-gray-500 text-sm py-4">Loading...</div>
                     </div>
                 </div>
 
-                <!-- Timeline -->
+                <!-- Daily Summary -->
                 <div class="glass rounded-xl p-4">
-                    <div class="flex items-center justify-between mb-3">
-                        <h3 class="text-sm font-semibold flex items-center gap-2">📅 Today's Timeline</h3>
-                        <span id="timeline-count" class="text-xs text-gray-500">0 events</span>
+                    <h3 class="text-sm font-semibold mb-3 flex items-center gap-2">
+                        <span>📈</span> Today's Summary
+                    </h3>
+                    <div class="space-y-2">
+                        <div class="flex justify-between items-center p-2 bg-gray-800/50 rounded-lg">
+                            <span class="text-gray-400 text-sm">Productivity Score</span>
+                            <span id="productivity-score" class="text-xl font-bold text-purple-400">--</span>
+                        </div>
+                        <div class="flex justify-between items-center p-2 bg-gray-800/50 rounded-lg">
+                            <span class="text-gray-400 text-sm">Active Minutes</span>
+                            <span id="active-minutes" class="font-bold text-blue-400">0</span>
+                        </div>
+                        <div class="flex justify-between items-center p-2 bg-gray-800/50 rounded-lg">
+                            <span class="text-gray-400 text-sm">Peak Hours</span>
+                            <span id="peak-hours" class="font-bold text-green-400">--</span>
+                        </div>
                     </div>
-                    <div id="timeline" class="space-y-2 max-h-64 overflow-y-auto timeline-line">
-                        <div class="text-center text-gray-500 py-4 text-sm">No events yet</div>
-                    </div>
-                </div>
-
-                <!-- Interventions Log -->
-                <div class="glass rounded-xl p-4">
-                    <div class="flex items-center justify-between mb-3">
-                        <h3 class="text-sm font-semibold flex items-center gap-2">⚠️ Interventions</h3>
-                        <span id="intervention-count" class="text-xs text-gray-500">0 today</span>
-                    </div>
-                    <div id="interventions-list" class="space-y-2 max-h-32 overflow-y-auto">
-                        <div class="text-center text-gray-500 py-2 text-sm">No interventions</div>
+                    <div class="mt-3 pt-3 border-t border-gray-700">
+                        <div id="daily-insight" class="text-xs text-gray-400 italic">
+                            Loading insights...
+                        </div>
                     </div>
                 </div>
             </div>
 
-            <!-- Right: Domain Stats + Family -->
-            <div class="space-y-4">
-                <!-- Domain Breakdown -->
+            <!-- Domain Distribution & Timeline Chart -->
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
                 <div class="glass rounded-xl p-4">
-                    <h3 class="text-sm font-semibold mb-3">📊 By Domain</h3>
-                    <div class="space-y-2">
-                        <div class="flex items-center justify-between">
-                            <span class="text-xs flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-purple-500"></span> ARIEL</span>
-                            <span id="domain-ariel" class="text-xs text-white">0/0</span>
-                        </div>
-                        <div class="flex items-center justify-between">
-                            <span class="text-xs flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-blue-500"></span> MICHAEL</span>
-                            <span id="domain-michael" class="text-xs text-white">0/0</span>
-                        </div>
-                        <div class="flex items-center justify-between">
-                            <span class="text-xs flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-green-500"></span> FAMILY</span>
-                            <span id="domain-family" class="text-xs text-white">0/0</span>
-                        </div>
-                        <div class="flex items-center justify-between">
-                            <span class="text-xs flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-orange-500"></span> BUSINESS</span>
-                            <span id="domain-business" class="text-xs text-white">0/0</span>
-                        </div>
+                    <h3 class="text-sm font-semibold mb-3">📊 Domain Distribution</h3>
+                    <canvas id="domain-chart" height="150"></canvas>
+                </div>
+                <div class="glass rounded-xl p-4">
+                    <h3 class="text-sm font-semibold mb-3">⏰ Task Completion Over Time</h3>
+                    <canvas id="completion-chart" height="150"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tab Content: Tasks -->
+        <div id="tab-tasks" class="tab-content hidden">
+            <div class="glass rounded-xl p-4">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="text-lg font-semibold">📋 All Tasks Today</h3>
+                    <div class="flex gap-2">
+                        <select id="task-filter" class="bg-gray-800 text-white text-sm rounded-lg px-3 py-1 border border-gray-700">
+                            <option value="all">All Status</option>
+                            <option value="INITIATED">Initiated</option>
+                            <option value="IN_PROGRESS">In Progress</option>
+                            <option value="COMPLETED">Completed</option>
+                            <option value="ABANDONED">Abandoned</option>
+                        </select>
                     </div>
                 </div>
-
-                <!-- Family Status -->
-                <div class="glass rounded-xl p-4">
-                    <h3 class="text-sm font-semibold mb-3">👨‍👩‍👦 Family</h3>
-                    <div class="space-y-2">
-                        <div class="flex items-center justify-between p-2 bg-purple-900/30 rounded-lg">
-                            <span class="text-xs">👤 Ariel</span>
-                            <span id="ariel-status" class="text-xs text-gray-400">--</span>
-                        </div>
-                        <div class="flex items-center justify-between p-2 bg-blue-900/30 rounded-lg">
-                            <span class="text-xs">🏊 Michael</span>
-                            <span id="michael-status" class="text-xs text-gray-400">--</span>
-                        </div>
-                        <div class="flex items-center justify-between p-2 bg-green-900/30 rounded-lg">
-                            <span class="text-xs">👩 Mariam</span>
-                            <span class="text-xs text-gray-400">Home</span>
-                        </div>
-                    </div>
+                <div id="tasks-table" class="overflow-x-auto">
+                    <table class="w-full text-sm">
+                        <thead>
+                            <tr class="text-gray-400 border-b border-gray-700">
+                                <th class="text-left py-2 px-2">Time</th>
+                                <th class="text-left py-2 px-2">Task</th>
+                                <th class="text-left py-2 px-2">Domain</th>
+                                <th class="text-center py-2 px-2">Complexity</th>
+                                <th class="text-center py-2 px-2">Risk</th>
+                                <th class="text-center py-2 px-2">Status</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tasks-body">
+                            <tr><td colspan="6" class="text-center py-8 text-gray-500">Loading tasks...</td></tr>
+                        </tbody>
+                    </table>
                 </div>
+            </div>
+        </div>
 
-                <!-- Today's Events -->
-                <div class="glass rounded-xl p-4">
-                    <h3 class="text-sm font-semibold mb-3">🗓️ Events</h3>
-                    <div id="events-list" class="space-y-2">
-                        <div class="text-center text-gray-500 py-2 text-xs">No events</div>
-                    </div>
-                </div>
-
-                <!-- Home Base -->
-                <div class="glass rounded-xl p-3">
-                    <div class="flex items-center gap-2">
-                        <span class="text-lg">🏠</span>
-                        <div>
-                            <div class="text-xs text-white">390 Roosevelt Ave</div>
-                            <div class="text-xs text-gray-500">Satellite Beach, FL 32937</div>
-                        </div>
+        <!-- Tab Content: Timeline -->
+        <div id="tab-timeline" class="tab-content hidden">
+            <div class="glass rounded-xl p-4">
+                <h3 class="text-lg font-semibold mb-4">⏱️ Today's Timeline</h3>
+                <div id="timeline-container" class="relative pl-8">
+                    <div class="absolute left-3 top-0 bottom-0 w-0.5 bg-gray-700"></div>
+                    <div id="timeline-events" class="space-y-4">
+                        <div class="text-center text-gray-500 py-8">Loading timeline...</div>
                     </div>
                 </div>
             </div>
         </div>
 
+        <!-- Tab Content: Travel -->
+        <div id="tab-travel" class="tab-content hidden">
+            <div class="glass rounded-xl p-4 mb-4">
+                <h3 class="text-lg font-semibold mb-4">🚗 Today's Travel</h3>
+                <div id="travel-info">
+                    <div class="text-center text-gray-500 py-8">Loading travel info...</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tab Content: Michael -->
+        <div id="tab-michael" class="tab-content hidden">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div class="glass rounded-xl p-4">
+                    <h3 class="text-lg font-semibold mb-4">🏊 Swim Meet</h3>
+                    <div id="swim-info">Loading...</div>
+                </div>
+                <div class="glass rounded-xl p-4">
+                    <h3 class="text-lg font-semibold mb-4">🥗 Nutrition</h3>
+                    <div id="nutrition-info">Loading...</div>
+                </div>
+            </div>
+        </div>
+
         <!-- Footer -->
-        <div class="text-center text-gray-500 text-xs">
-            <p>Life OS v2.0 • XGBoost ADHD Monitor • Created by Ariel Shapira</p>
+        <div class="text-center text-gray-500 text-xs mt-4">
+            <p>Life OS v2.0 • XGBoost ADHD Monitor • Created by Ariel Shapira, Solo Founder</p>
+            <p class="mt-1">Auto-updates every 30 seconds • Last update: <span id="last-update">--</span></p>
         </div>
     </div>
 
@@ -296,31 +294,60 @@
             'Content-Type': 'application/json'
         };
 
-        let currentData = { tasks: [], interventions: [], activities: [], metrics: null };
+        let domainChart = null;
+        let completionChart = null;
+        let allTasks = [];
+        let allInterventions = [];
 
-        function updateClock() {
+        // Tab switching
+        function switchTab(tabName) {
+            document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+            document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+            document.getElementById(`tab-${tabName}`).classList.remove('hidden');
+            event.target.classList.add('active');
+        }
+
+        // Time display
+        function updateTime() {
             const now = new Date();
-            document.getElementById('current-time').textContent = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-            document.getElementById('current-date').textContent = now.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
-        }
-        setInterval(updateClock, 1000);
-        updateClock();
-
-        function updateProductivityRing(score) {
-            const ring = document.getElementById('score-ring');
-            const circumference = 314;
-            const offset = circumference - (score / 100 * circumference);
-            ring.style.strokeDashoffset = offset;
+            document.getElementById('current-time').textContent = now.toLocaleTimeString('en-US', { 
+                hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true 
+            });
             
-            // Color based on score
-            if (score >= 70) ring.style.stroke = '#10b981';
-            else if (score >= 50) ring.style.stroke = '#f59e0b';
-            else ring.style.stroke = '#ef4444';
+            // Next 30-min update
+            const mins = now.getMinutes();
+            const nextUpdate = mins < 30 ? 30 - mins : 60 - mins;
+            document.getElementById('next-update').textContent = `Next update: ${nextUpdate}m`;
+        }
+        setInterval(updateTime, 1000);
+        updateTime();
+
+        // XGBoost-style risk calculation
+        function calculateRisk(task) {
+            if (!task.initiated_at) return 0;
             
-            document.getElementById('productivity-score').textContent = Math.round(score);
+            const initiated = new Date(task.initiated_at);
+            const now = new Date();
+            const minutesElapsed = (now - initiated) / 60000;
+            const estimated = task.estimated_minutes || 30;
+            
+            // Feature weights (XGBoost-style)
+            const timeRatio = Math.min(minutesElapsed / estimated, 3);
+            const complexityScore = (task.complexity || 5) / 10;
+            const hourRisk = [0.3, 0.3, 0.3, 0.3, 0.3, 0.3, 0.3, 0.2, 0.1, 0.1, 0.1, 0.2, 0.5, 0.5, 0.6, 0.6, 0.5, 0.4, 0.3, 0.3, 0.4, 0.5, 0.5, 0.4][now.getHours()];
+            
+            const risk = (timeRatio * 0.35 + complexityScore * 0.25 + hourRisk * 0.2 + 0.2) * 100;
+            return Math.min(Math.round(risk), 100);
         }
 
-        async function fetchAllData() {
+        // Intervention response
+        function respondIntervention(response) {
+            document.getElementById('alert-banner').classList.add('hidden');
+            console.log('Intervention response:', response);
+        }
+
+        // Fetch all data
+        async function fetchData() {
             const today = new Date().toISOString().split('T')[0];
             
             try {
@@ -329,238 +356,375 @@
                     `${SUPABASE_URL}/rest/v1/task_states?initiated_at=gte.${today}T00:00:00&order=initiated_at.desc`,
                     { headers }
                 );
-                currentData.tasks = await tasksRes.json();
-
+                allTasks = await tasksRes.json() || [];
+                
                 // Fetch interventions
                 const intRes = await fetch(
                     `${SUPABASE_URL}/rest/v1/task_interventions?triggered_at=gte.${today}T00:00:00&order=triggered_at.desc`,
                     { headers }
                 );
-                currentData.interventions = await intRes.json();
-
-                // Fetch activities (including trips)
-                const actRes = await fetch(
-                    `${SUPABASE_URL}/rest/v1/activities?start_time=gte.${today}T00:00:00&order=start_time.desc`,
-                    { headers }
-                );
-                currentData.activities = await actRes.json();
-
+                allInterventions = await intRes.json() || [];
+                
                 // Fetch daily metrics
-                const metRes = await fetch(
+                const metricsRes = await fetch(
                     `${SUPABASE_URL}/rest/v1/daily_metrics?date=eq.${today}&limit=1`,
                     { headers }
                 );
-                const metrics = await metRes.json();
-                currentData.metrics = metrics[0] || null;
-
-                renderDashboard();
+                const metrics = (await metricsRes.json())?.[0] || {};
+                
+                // Fetch activities for travel/swim
+                const activitiesRes = await fetch(
+                    `${SUPABASE_URL}/rest/v1/activities?platform=eq.life_os&order=start_time.desc&limit=20`,
+                    { headers }
+                );
+                const activities = await activitiesRes.json() || [];
+                
+                // Update UI
+                updateDashboard(allTasks, allInterventions, metrics);
+                updateTasksTable(allTasks);
+                updateTimeline(allTasks, allInterventions);
+                updateTravel(activities);
+                updateMichael(activities);
+                updateCharts(allTasks);
+                
+                document.getElementById('last-update').textContent = new Date().toLocaleTimeString();
+                
             } catch (e) {
                 console.error('Fetch error:', e);
             }
         }
 
-        function renderDashboard() {
-            const tasks = currentData.tasks || [];
-            const interventions = currentData.interventions || [];
-            const activities = currentData.activities || [];
-            const metrics = currentData.metrics;
-
-            // Calculate stats
+        function updateDashboard(tasks, interventions, metrics) {
             const completed = tasks.filter(t => t.status === 'COMPLETED').length;
             const abandoned = tasks.filter(t => t.status === 'ABANDONED').length;
-            const active = tasks.filter(t => !['COMPLETED', 'ABANDONED', 'DEFERRED'].includes(t.status)).length;
+            const inProgress = tasks.filter(t => ['INITIATED', 'IN_PROGRESS', 'SOLUTION_PROVIDED'].includes(t.status)).length;
             const total = tasks.length;
-
-            // Update quick stats
-            document.getElementById('stat-completed').textContent = completed;
-            document.getElementById('stat-active').textContent = active;
-            document.getElementById('stat-abandoned').textContent = abandoned;
-            document.getElementById('stat-interventions').textContent = interventions.length;
-
-            // Update productivity score
-            const score = metrics?.productivity_score || (total > 0 ? Math.round((completed / total) * 100) : 0);
-            updateProductivityRing(score);
-
-            // Update ADHD metrics
-            const focus = metrics?.average_focus_quality || 7;
-            const energy = metrics?.energy_average || 7;
-            const switches = metrics?.context_switches || 0;
             
-            document.getElementById('focus-value').textContent = `${focus}/10`;
-            document.getElementById('focus-bar').style.width = `${focus * 10}%`;
-            document.getElementById('energy-value').textContent = `${energy}/10`;
-            document.getElementById('energy-bar').style.width = `${energy * 10}%`;
-            document.getElementById('switches-value').textContent = switches;
+            document.getElementById('tasks-today').textContent = total;
+            document.getElementById('completed-count').textContent = completed;
+            document.getElementById('in-progress-count').textContent = inProgress;
+            document.getElementById('abandoned-count').textContent = abandoned;
+            document.getElementById('completion-rate').textContent = total > 0 ? `${Math.round(completed / total * 100)}%` : '--%';
+            document.getElementById('completion-rate').className = `text-3xl font-bold ${completed/total > 0.7 ? 'text-green-400' : completed/total > 0.5 ? 'text-yellow-400' : 'text-red-400'}`;
+            
+            // XGBoost metrics
+            const avgRisk = inProgress > 0 ? tasks.filter(t => ['INITIATED', 'IN_PROGRESS'].includes(t.status)).reduce((sum, t) => sum + calculateRisk(t), 0) / inProgress : 0;
+            document.getElementById('risk-value').textContent = `${Math.round(avgRisk)}%`;
+            document.getElementById('risk-bar').style.width = `${avgRisk}%`;
+            
+            const focusQuality = metrics.average_focus_quality || 5;
+            document.getElementById('focus-value').textContent = `${focusQuality}/10`;
+            document.getElementById('focus-bar').style.width = `${focusQuality * 10}%`;
+            
+            const energyLevel = 6; // Would come from health logs
+            document.getElementById('energy-value').textContent = `${energyLevel}/10`;
+            document.getElementById('energy-bar').style.width = `${energyLevel * 10}%`;
+            
+            document.getElementById('context-switches').textContent = metrics.context_switches || 0;
+            document.getElementById('interventions-count').textContent = interventions.length;
+            
+            document.getElementById('productivity-score').textContent = metrics.productivity_score || '--';
+            document.getElementById('active-minutes').textContent = `${metrics.total_active_minutes || 0}m`;
+            document.getElementById('peak-hours').textContent = metrics.peak_focus_hours ? JSON.parse(metrics.peak_focus_hours).join(', ') : '9-11 AM';
+            
+            // Active tasks list
+            const activeTasks = tasks.filter(t => ['INITIATED', 'IN_PROGRESS', 'SOLUTION_PROVIDED'].includes(t.status));
+            document.getElementById('active-count').textContent = `(${activeTasks.length})`;
+            
+            if (activeTasks.length > 0) {
+                document.getElementById('active-tasks').innerHTML = activeTasks.map(t => {
+                    const risk = calculateRisk(t);
+                    const riskClass = risk > 70 ? 'border-red-500 bg-red-900/20' : risk > 40 ? 'border-yellow-500 bg-yellow-900/20' : 'border-green-500 bg-green-900/20';
+                    const initiated = new Date(t.initiated_at);
+                    const mins = Math.round((new Date() - initiated) / 60000);
+                    
+                    return `
+                        <div class="p-2 rounded-lg border ${riskClass}">
+                            <div class="flex justify-between items-start">
+                                <div class="text-sm font-medium">${t.description?.substring(0, 40) || 'Task'}...</div>
+                                <span class="text-xs ${risk > 70 ? 'text-red-400' : risk > 40 ? 'text-yellow-400' : 'text-green-400'}">${risk}%</span>
+                            </div>
+                            <div class="flex justify-between text-xs text-gray-500 mt-1">
+                                <span>${t.domain || 'ARIEL'}</span>
+                                <span>${mins}m ago</span>
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+            } else {
+                document.getElementById('active-tasks').innerHTML = '<div class="text-center text-gray-500 text-sm py-4">No active tasks</div>';
+            }
+            
+            // Check for high-risk interventions
+            const highRisk = activeTasks.find(t => calculateRisk(t) > 70);
+            if (highRisk) {
+                document.getElementById('alert-banner').classList.remove('hidden');
+                document.getElementById('alert-message').textContent = `"${highRisk.description?.substring(0, 50)}..." - ${calculateRisk(highRisk)}% abandonment risk`;
+            } else {
+                document.getElementById('alert-banner').classList.add('hidden');
+            }
+            
+            // Daily insight
+            const insights = [];
+            if (abandoned > completed) insights.push("⚠️ More tasks abandoned than completed today.");
+            if (avgRisk > 50) insights.push("🧠 High average risk - consider smaller tasks.");
+            if (interventions.length > 5) insights.push("🔔 Multiple interventions today - review patterns.");
+            if (completed >= 5) insights.push("🎉 Great progress! 5+ tasks completed!");
+            document.getElementById('daily-insight').textContent = insights[0] || "✨ Tracking your productivity patterns...";
+        }
 
-            // Domain breakdown
-            const domains = { ARIEL: {c: 0, t: 0}, MICHAEL: {c: 0, t: 0}, FAMILY: {c: 0, t: 0}, BUSINESS: {c: 0, t: 0} };
+        function updateTasksTable(tasks) {
+            const tbody = document.getElementById('tasks-body');
+            
+            if (tasks.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="6" class="text-center py-8 text-gray-500">No tasks recorded today</td></tr>';
+                return;
+            }
+            
+            const statusColors = {
+                'INITIATED': 'bg-blue-900/50 text-blue-300',
+                'SOLUTION_PROVIDED': 'bg-purple-900/50 text-purple-300',
+                'IN_PROGRESS': 'bg-yellow-900/50 text-yellow-300',
+                'COMPLETED': 'bg-green-900/50 text-green-300',
+                'ABANDONED': 'bg-red-900/50 text-red-300',
+                'BLOCKED': 'bg-gray-700 text-gray-300',
+                'DEFERRED': 'bg-gray-700 text-gray-300'
+            };
+            
+            const domainColors = {
+                'ARIEL': 'text-purple-400',
+                'MICHAEL': 'text-blue-400',
+                'FAMILY': 'text-green-400',
+                'BUSINESS': 'text-orange-400'
+            };
+            
+            tbody.innerHTML = tasks.map(t => {
+                const time = t.initiated_at ? new Date(t.initiated_at).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : '--';
+                const risk = calculateRisk(t);
+                const riskClass = risk > 70 ? 'text-red-400' : risk > 40 ? 'text-yellow-400' : 'text-green-400';
+                
+                return `
+                    <tr class="border-b border-gray-800 hover:bg-gray-800/30">
+                        <td class="py-2 px-2 text-gray-400 text-xs">${time}</td>
+                        <td class="py-2 px-2">${t.description?.substring(0, 50) || 'Task'}...</td>
+                        <td class="py-2 px-2 ${domainColors[t.domain] || 'text-gray-400'}">${t.domain || 'ARIEL'}</td>
+                        <td class="py-2 px-2 text-center">${t.complexity || 5}/10</td>
+                        <td class="py-2 px-2 text-center ${riskClass}">${risk}%</td>
+                        <td class="py-2 px-2 text-center"><span class="status-badge ${statusColors[t.status] || 'bg-gray-700'}">${t.status}</span></td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        function updateTimeline(tasks, interventions) {
+            const events = [];
+            
+            tasks.forEach(t => {
+                if (t.initiated_at) events.push({ time: t.initiated_at, type: 'task_start', data: t });
+                if (t.completed_at) events.push({ time: t.completed_at, type: 'task_complete', data: t });
+                if (t.abandoned_at) events.push({ time: t.abandoned_at, type: 'task_abandon', data: t });
+            });
+            
+            interventions.forEach(i => {
+                events.push({ time: i.triggered_at, type: 'intervention', data: i });
+            });
+            
+            events.sort((a, b) => new Date(b.time) - new Date(a.time));
+            
+            const container = document.getElementById('timeline-events');
+            
+            if (events.length === 0) {
+                container.innerHTML = '<div class="text-center text-gray-500 py-8">No events today</div>';
+                return;
+            }
+            
+            const typeConfig = {
+                'task_start': { icon: '📋', color: 'bg-blue-500', label: 'Task Started' },
+                'task_complete': { icon: '✅', color: 'bg-green-500', label: 'Completed' },
+                'task_abandon': { icon: '❌', color: 'bg-red-500', label: 'Abandoned' },
+                'intervention': { icon: '⚠️', color: 'bg-yellow-500', label: 'Intervention' }
+            };
+            
+            container.innerHTML = events.slice(0, 20).map(e => {
+                const config = typeConfig[e.type];
+                const time = new Date(e.time).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+                const desc = e.type === 'intervention' ? e.data.message?.substring(0, 60) : e.data.description?.substring(0, 60);
+                
+                return `
+                    <div class="relative flex items-start gap-4">
+                        <div class="absolute left-[-20px] timeline-dot ${config.color}"></div>
+                        <div class="flex-1 glass rounded-lg p-3">
+                            <div class="flex justify-between items-start">
+                                <div class="flex items-center gap-2">
+                                    <span>${config.icon}</span>
+                                    <span class="text-sm font-medium">${config.label}</span>
+                                </div>
+                                <span class="text-xs text-gray-500">${time}</span>
+                            </div>
+                            <div class="text-sm text-gray-400 mt-1">${desc || '...'}</div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function updateTravel(activities) {
+            const travel = activities.find(a => a.activity_type === 'DRIVING');
+            const hotel = activities.find(a => a.activity_type === 'HOTEL');
+            
+            let html = '';
+            
+            if (travel) {
+                try {
+                    const data = JSON.parse(travel.notes || '{}');
+                    html += `
+                        <div class="p-4 bg-blue-900/30 rounded-lg border border-blue-500/30 mb-4">
+                            <div class="flex items-center gap-3 mb-3">
+                                <span class="text-3xl">🚗</span>
+                                <div>
+                                    <div class="font-semibold text-blue-400">${data.title || 'Trip'}</div>
+                                    <div class="text-sm text-gray-400">${data.departure_time || ''}</div>
+                                </div>
+                            </div>
+                            <div class="grid grid-cols-3 gap-4 text-center">
+                                <div><div class="text-2xl font-bold">${data.distance_miles || 0}</div><div class="text-xs text-gray-500">Miles</div></div>
+                                <div><div class="text-2xl font-bold">${Math.floor((data.estimated_time_minutes || 0) / 60)}h ${(data.estimated_time_minutes || 0) % 60}m</div><div class="text-xs text-gray-500">Est. Time</div></div>
+                                <div><div class="text-2xl font-bold text-green-400">${(data.status || 'scheduled').toUpperCase()}</div><div class="text-xs text-gray-500">Status</div></div>
+                            </div>
+                            <div class="mt-3 text-sm text-gray-400">
+                                📍 ${data.origin || 'Origin'} → ${data.destination || 'Destination'}
+                            </div>
+                        </div>
+                    `;
+                } catch(e) {}
+            }
+            
+            if (hotel) {
+                try {
+                    const data = JSON.parse(hotel.notes || '{}');
+                    html += `
+                        <div class="p-4 bg-orange-900/30 rounded-lg border border-orange-500/30">
+                            <div class="flex items-center gap-3 mb-3">
+                                <span class="text-3xl">🏨</span>
+                                <div>
+                                    <div class="font-semibold text-orange-400">${data.hotel_name || 'Hotel'}</div>
+                                    <div class="text-sm text-gray-400">${data.address || ''}</div>
+                                </div>
+                            </div>
+                            <div class="grid grid-cols-2 gap-4 text-sm">
+                                <div><span class="text-gray-500">Check-in:</span> <span class="text-white">${data.check_in || 'TBD'}</span></div>
+                                <div><span class="text-gray-500">Check-out:</span> <span class="text-white">${data.check_out || 'TBD'}</span></div>
+                            </div>
+                        </div>
+                    `;
+                } catch(e) {}
+            }
+            
+            document.getElementById('travel-info').innerHTML = html || '<div class="text-center text-gray-500 py-4">No travel scheduled</div>';
+        }
+
+        function updateMichael(activities) {
+            const swim = activities.find(a => a.activity_type === 'SWIM_MEET');
+            const nutrition = activities.find(a => a.activity_type === 'NUTRITION');
+            
+            if (swim) {
+                try {
+                    const data = JSON.parse(swim.notes || '{}');
+                    document.getElementById('swim-info').innerHTML = `
+                        <div class="text-lg font-semibold text-blue-400">${data.meet_name || 'Swim Meet'}</div>
+                        <div class="text-sm text-gray-400 mb-3">📍 ${data.location || 'TBD'}</div>
+                        <div class="space-y-2">
+                            ${(data.events || []).map(e => `
+                                <div class="flex justify-between p-2 bg-blue-900/30 rounded">
+                                    <span>${e.event}</span>
+                                    <span class="text-gray-400">Seed: ${e.seed_time || 'NT'}</span>
+                                </div>
+                            `).join('')}
+                        </div>
+                    `;
+                } catch(e) {
+                    document.getElementById('swim-info').innerHTML = '<div class="text-gray-500">No swim meet data</div>';
+                }
+            } else {
+                document.getElementById('swim-info').innerHTML = '<div class="text-gray-500">No swim meet today</div>';
+            }
+            
+            if (nutrition) {
+                try {
+                    const data = JSON.parse(nutrition.notes || '{}');
+                    document.getElementById('nutrition-info').innerHTML = `
+                        <div class="flex items-center justify-between mb-3">
+                            <span class="text-green-400 font-semibold">${(data.diet_phase || 'standard').toUpperCase()}</span>
+                            <span class="text-gray-500 text-sm">${data.meal_type || ''}</span>
+                        </div>
+                        <div class="grid grid-cols-3 gap-2 text-center">
+                            <div class="bg-gray-800 rounded p-2"><div class="font-bold">${data.total_calories || 0}</div><div class="text-xs text-gray-500">Cal</div></div>
+                            <div class="bg-gray-800 rounded p-2"><div class="font-bold">${data.total_protein_g || 0}g</div><div class="text-xs text-gray-500">Protein</div></div>
+                            <div class="bg-gray-800 rounded p-2"><div class="font-bold">${data.total_carbs_g || 0}g</div><div class="text-xs text-gray-500">Carbs</div></div>
+                        </div>
+                    `;
+                } catch(e) {
+                    document.getElementById('nutrition-info').innerHTML = '<div class="text-gray-500">No nutrition data</div>';
+                }
+            } else {
+                document.getElementById('nutrition-info').innerHTML = '<div class="text-gray-500">No nutrition logged</div>';
+            }
+        }
+
+        function updateCharts(tasks) {
+            // Domain chart
+            const domains = { ARIEL: 0, MICHAEL: 0, FAMILY: 0, BUSINESS: 0 };
             tasks.forEach(t => {
                 const d = t.domain || 'ARIEL';
-                if (domains[d]) {
-                    domains[d].t++;
-                    if (t.status === 'COMPLETED') domains[d].c++;
+                if (domains[d] !== undefined) domains[d]++;
+            });
+            
+            if (domainChart) domainChart.destroy();
+            domainChart = new Chart(document.getElementById('domain-chart'), {
+                type: 'doughnut',
+                data: {
+                    labels: ['Ariel', 'Michael', 'Family', 'Business'],
+                    datasets: [{
+                        data: [domains.ARIEL, domains.MICHAEL, domains.FAMILY, domains.BUSINESS],
+                        backgroundColor: ['#8b5cf6', '#3b82f6', '#10b981', '#f59e0b']
+                    }]
+                },
+                options: {
+                    plugins: { legend: { position: 'right', labels: { color: '#9ca3af' } } }
                 }
             });
             
-            document.getElementById('domain-ariel').textContent = `${domains.ARIEL.c}/${domains.ARIEL.t}`;
-            document.getElementById('domain-michael').textContent = `${domains.MICHAEL.c}/${domains.MICHAEL.t}`;
-            document.getElementById('domain-family').textContent = `${domains.FAMILY.c}/${domains.FAMILY.t}`;
-            document.getElementById('domain-business').textContent = `${domains.BUSINESS.c}/${domains.BUSINESS.t}`;
-
-            // Render active tasks
-            const activeTasks = tasks.filter(t => !['COMPLETED', 'ABANDONED', 'DEFERRED'].includes(t.status));
-            document.getElementById('active-count').textContent = `${activeTasks.length} tasks`;
-            document.getElementById('active-tasks').innerHTML = activeTasks.length > 0 
-                ? activeTasks.slice(0, 5).map(t => {
-                    const statusColors = {
-                        'INITIATED': 'bg-gray-600',
-                        'SOLUTION_PROVIDED': 'bg-yellow-600',
-                        'IN_PROGRESS': 'bg-blue-600'
-                    };
-                    const elapsed = t.initiated_at ? Math.round((Date.now() - new Date(t.initiated_at).getTime()) / 60000) : 0;
-                    return `
-                        <div class="flex items-center justify-between p-2 bg-gray-800/50 rounded-lg">
-                            <div class="flex-1 min-w-0">
-                                <div class="text-xs font-medium truncate">${t.description || 'Task'}</div>
-                                <div class="text-xs text-gray-500">${t.domain} • ${elapsed}m elapsed</div>
-                            </div>
-                            <span class="status-badge ${statusColors[t.status] || 'bg-gray-600'} text-white ml-2">${t.status}</span>
-                        </div>
-                    `;
-                }).join('')
-                : '<div class="text-center text-gray-500 py-4 text-sm">No active tasks</div>';
-
-            // Render timeline
-            const timeline = [];
-            tasks.forEach(t => {
-                if (t.initiated_at) timeline.push({ time: t.initiated_at, type: 'START', desc: t.description, domain: t.domain });
-                if (t.completed_at) timeline.push({ time: t.completed_at, type: 'DONE', desc: t.description });
-                if (t.abandoned_at) timeline.push({ time: t.abandoned_at, type: 'ABANDONED', desc: t.description });
+            // Completion over time
+            const hours = Array(24).fill(0);
+            tasks.filter(t => t.completed_at).forEach(t => {
+                const h = new Date(t.completed_at).getHours();
+                hours[h]++;
             });
-            interventions.forEach(i => {
-                if (i.triggered_at) timeline.push({ time: i.triggered_at, type: `INT_L${i.intervention_level}`, desc: i.task_description, level: i.intervention_level });
-            });
-            timeline.sort((a, b) => new Date(b.time) - new Date(a.time));
-
-            document.getElementById('timeline-count').textContent = `${timeline.length} events`;
-            document.getElementById('timeline').innerHTML = timeline.length > 0
-                ? timeline.slice(0, 10).map(e => {
-                    const time = new Date(e.time).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
-                    const icons = { START: '📝', DONE: '✅', ABANDONED: '❌', INT_L1: '📌', INT_L2: '🔄', INT_L3: '⚠️' };
-                    const colors = { START: 'text-blue-400', DONE: 'text-green-400', ABANDONED: 'text-red-400', INT_L1: 'text-yellow-400', INT_L2: 'text-orange-400', INT_L3: 'text-red-400' };
-                    return `
-                        <div class="relative pl-4">
-                            <div class="timeline-dot"></div>
-                            <div class="flex items-center gap-2">
-                                <span class="text-xs text-gray-500 w-12">${time}</span>
-                                <span>${icons[e.type] || '•'}</span>
-                                <span class="text-xs ${colors[e.type] || 'text-gray-400'} truncate flex-1">${e.desc?.substring(0, 30) || e.type}</span>
-                            </div>
-                        </div>
-                    `;
-                }).join('')
-                : '<div class="text-center text-gray-500 py-4 text-sm">No events yet</div>';
-
-            // Render interventions
-            document.getElementById('intervention-count').textContent = `${interventions.length} today`;
-            document.getElementById('interventions-list').innerHTML = interventions.length > 0
-                ? interventions.slice(0, 5).map(i => {
-                    const levelColors = { 1: 'border-yellow-500', 2: 'border-orange-500', 3: 'border-red-500' };
-                    return `
-                        <div class="p-2 bg-gray-800/50 rounded-lg border-l-2 ${levelColors[i.intervention_level] || 'border-gray-500'}">
-                            <div class="text-xs font-medium">L${i.intervention_level}: ${i.task_description?.substring(0, 25) || 'Task'}</div>
-                            <div class="text-xs text-gray-500">${i.risk_level} risk • ${Math.round(i.abandonment_probability * 100)}% abandon prob</div>
-                        </div>
-                    `;
-                }).join('')
-                : '<div class="text-center text-gray-500 py-2 text-sm">No interventions</div>';
-
-            // Check for active trip
-            const tripActivity = activities.find(a => {
-                try {
-                    const notes = JSON.parse(a.notes || '{}');
-                    return a.activity_type === 'DRIVING' && (notes.status === 'in_progress' || notes.status === 'scheduled');
-                } catch { return false; }
-            });
-
-            if (tripActivity) {
-                const trip = JSON.parse(tripActivity.notes || '{}');
-                document.getElementById('trip-banner').classList.remove('hidden');
-                document.getElementById('trip-title').textContent = trip.title || 'Active Trip';
-                document.getElementById('trip-route').textContent = `${trip.origin || 'Home'} → ${trip.destination || 'Destination'}${trip.departure_time ? ' • Depart: ' + trip.departure_time : ''}`;
-                document.getElementById('trip-miles').textContent = trip.distance_miles || '--';
-                
-                const hours = Math.floor((trip.estimated_time_minutes || 0) / 60);
-                const mins = (trip.estimated_time_minutes || 0) % 60;
-                document.getElementById('trip-eta').textContent = `${hours}h${mins}m`;
-                document.getElementById('trip-status').textContent = (trip.status || 'SCHEDULED').toUpperCase();
-
-                document.getElementById('ariel-status').textContent = `→ ${trip.destination || 'Traveling'}`;
-                document.getElementById('michael-status').textContent = `→ ${trip.destination || 'Traveling'}`;
-            } else {
-                document.getElementById('trip-banner').classList.add('hidden');
-                document.getElementById('ariel-status').textContent = 'Home';
-                document.getElementById('michael-status').textContent = 'Home';
-            }
-
-            // Check for swim meet
-            const swimMeet = activities.find(a => a.activity_type === 'SWIM_MEET');
-            if (swimMeet) {
-                try {
-                    const meet = JSON.parse(swimMeet.notes || '{}');
-                    document.getElementById('events-list').innerHTML = `
-                        <div class="p-2 bg-blue-900/30 rounded-lg">
-                            <div class="text-xs font-medium text-blue-400">🏊 ${meet.meet_name || 'Swim Meet'}</div>
-                            <div class="text-xs text-gray-400">${meet.location || 'Location TBD'}</div>
-                            <div class="text-xs text-gray-500 mt-1">${(meet.events || []).map(e => e.event).join(', ')}</div>
-                        </div>
-                    `;
-                    document.getElementById('michael-status').textContent = `🏊 ${meet.meet_name || 'Swim Meet'}`;
-                } catch {}
-            }
-
-            // Show latest intervention alert
-            if (interventions.length > 0) {
-                const latest = interventions[0];
-                const thirtyMinsAgo = Date.now() - 30 * 60 * 1000;
-                if (new Date(latest.triggered_at).getTime() > thirtyMinsAgo) {
-                    document.getElementById('intervention-banner').classList.remove('hidden');
-                    document.getElementById('intervention-title').textContent = `Level ${latest.intervention_level} Intervention`;
-                    document.getElementById('intervention-message').textContent = latest.message?.substring(0, 100) || 'Check your task';
+            
+            if (completionChart) completionChart.destroy();
+            completionChart = new Chart(document.getElementById('completion-chart'), {
+                type: 'bar',
+                data: {
+                    labels: hours.map((_, i) => `${i}:00`),
+                    datasets: [{
+                        label: 'Completed',
+                        data: hours,
+                        backgroundColor: '#10b981'
+                    }]
+                },
+                options: {
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        x: { ticks: { color: '#9ca3af' }, grid: { display: false } },
+                        y: { ticks: { color: '#9ca3af' }, grid: { color: '#374151' } }
+                    }
                 }
-            }
-
-            // Last cron
-            const cronRun = activities.find(a => a.activity_type === 'CRON_RUN');
-            if (cronRun) {
-                const time = new Date(cronRun.start_time).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
-                document.getElementById('last-cron').textContent = `Last sync: ${time}`;
-            }
+            });
         }
 
-        function dismissIntervention() {
-            document.getElementById('intervention-banner').classList.add('hidden');
-        }
-
-        function shareFullStatus() {
-            const tasks = currentData.tasks || [];
-            const completed = tasks.filter(t => t.status === 'COMPLETED').length;
-            const active = tasks.filter(t => !['COMPLETED', 'ABANDONED', 'DEFERRED'].includes(t.status)).length;
-            
-            const now = new Date();
-            let msg = `🏠 *Life OS Status Update*\n`;
-            msg += `📅 ${now.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })} • ${now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}\n\n`;
-            msg += `📊 *Tasks:* ${completed}/${tasks.length} completed\n`;
-            msg += `🔄 *Active:* ${active} in progress\n`;
-            msg += `🧠 *Score:* ${currentData.metrics?.productivity_score || '--'}/100\n`;
-            msg += `\n_Sent from Life OS_`;
-            
-            window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, '_blank');
-        }
-
-        // Initial fetch and auto-refresh
-        fetchAllData();
-        setInterval(fetchAllData, 30000);
+        // Initial load and auto-refresh
+        fetchData();
+        setInterval(fetchData, 30000); // 30 seconds
     </script>
 </body>
 </html>
