@@ -188,7 +188,7 @@ class ClaudeSessionLogger:
                 )
     
     def log_context_switch(self, from_task: str, to_topic: str) -> Dict:
-        """Log when user switches context mid-task (ADHD pattern)"""
+        """Log when user switches context mid-task (focus pattern)"""
         self.context_switches += 1
         now = datetime.now().isoformat()
         
