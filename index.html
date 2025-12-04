@@ -171,7 +171,7 @@
 
         <!-- Footer -->
         <div class="text-center text-gray-500 text-xs">
-            <p>Life OS v3.1 • Created by Ariel Shapira • Auto-refreshes every 30s • V3.1 FIX: Only shows OPEN interventions</p>
+            <p>Life OS v3.2 • Build: 2025-12-04T16:52:00Z • Created by Ariel Shapira • Auto-refreshes every 30s • V3.2: Cache-busting + open-only interventions</p>
         </div>
     </div>
 
@@ -379,8 +379,9 @@
             window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, '_blank');
         }
 
-        fetchData();
+        console.log("Life OS v3.2 loaded at", new Date().toISOString()); fetchData();
         setInterval(fetchData, 30000);
     </script>
 </body>
 </html>
+
