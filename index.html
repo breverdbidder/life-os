@@ -7,20 +7,18 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
-        :root { --purple: #8b5cf6; --blue: #3b82f6; --green: #10b981; --orange: #f59e0b; --red: #ef4444; }
+        :root { --purple: #8b5cf6; --blue: #3b82f6; --green: #10b981; --orange: #f59e0b; --red: #ef4444; --whatsapp: #25D366; }
         body { background: linear-gradient(135deg, #0f0f1a 0%, #1a1a2e 50%, #0f172a 100%); min-height: 100vh; font-family: system-ui, -apple-system, sans-serif; }
         .glass { background: rgba(30, 30, 50, 0.85); backdrop-filter: blur(12px); border: 1px solid rgba(139, 92, 246, 0.2); }
         .glow { box-shadow: 0 0 25px rgba(139, 92, 246, 0.3); }
-        .glow-green { box-shadow: 0 0 30px rgba(16, 185, 129, 0.4); border-color: rgba(16, 185, 129, 0.5) !important; }
-        .glow-orange { box-shadow: 0 0 30px rgba(245, 158, 11, 0.4); border-color: rgba(245, 158, 11, 0.5) !important; }
-        .glow-red { box-shadow: 0 0 30px rgba(239, 68, 68, 0.4); border-color: rgba(239, 68, 68, 0.5) !important; }
+        .risk-high { background: rgba(239, 68, 68, 0.2); border-color: #ef4444; }
+        .risk-medium { background: rgba(245, 158, 11, 0.2); border-color: #f59e0b; }
+        .risk-low { background: rgba(16, 185, 129, 0.2); border-color: #10b981; }
         .status-badge { padding: 2px 8px; border-radius: 12px; font-size: 0.7rem; font-weight: 600; }
         .pulse { animation: pulse 2s infinite; }
         @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.6; } }
-        .score-ring { background: conic-gradient(from 0deg, var(--ring-color) calc(var(--score) * 3.6deg), rgba(255,255,255,0.1) 0); border-radius: 50%; }
         .whatsapp-btn { background: #25D366; }
         .whatsapp-btn:hover { background: #128C7E; }
-        .grade-badge { font-size: 1.5rem; font-weight: 800; }
     </style>
 </head>
 <body class="text-gray-100">
@@ -31,12 +29,16 @@
                 <div class="flex items-center gap-4">
                     <div class="text-5xl">🧠</div>
                     <div>
-                        <h1 class="text-2xl md:text-3xl font-bold bg-gradient-to-r from-purple-400 to-blue-400 bg-clip-text text-transparent">Life OS - Shapira Family</h1>
-                        <p class="text-gray-400 text-sm mt-1">FOCUS-Optimized Task Tracking • XGBoost ML Scoring</p>
+                        <h1 class="text-2xl md:text-3xl font-bold bg-gradient-to-r from-purple-400 to-blue-400 bg-clip-text text-transparent">
+                            Life OS - Shapira Family
+                        </h1>
+                        <p class="text-gray-400 text-sm mt-1">FOCUS-Optimized Task Tracking • XGBoost Risk Monitoring</p>
                     </div>
                 </div>
                 <div class="flex items-center gap-4">
-                    <button onclick="shareStatus()" class="whatsapp-btn text-white px-4 py-2 rounded-xl flex items-center gap-2 font-semibold">📱 Share</button>
+                    <button onclick="shareStatus()" class="whatsapp-btn text-white px-4 py-2 rounded-xl flex items-center gap-2 font-semibold">
+                        📱 Share
+                    </button>
                     <div class="text-right">
                         <div id="current-date" class="text-lg font-semibold text-purple-400"></div>
                         <div id="current-time" class="text-2xl font-mono text-white"></div>
@@ -46,261 +48,430 @@
             </div>
         </div>
 
-        <!-- XGBOOST FOCUS SCORE CARD -->
-        <div id="focus-score-card" class="glass rounded-2xl p-6 mb-6 border border-gray-600">
+        <!-- Focus Alert Banner - V3.1 FIX: Only shows for OPEN interventions -->
+        <div id="focus-alert" class="glass rounded-xl p-4 mb-6 border-l-4 border-red-500 hidden">
+            <div class="flex items-center gap-4">
+                <div class="text-3xl pulse">⚠️</div>
+                <div>
+                    <div class="font-semibold text-red-400">FOCUS INTERVENTION NEEDED</div>
+                    <div id="alert-message" class="text-sm text-gray-400"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- XGBoost Focus Score Card - V3.6 -->
+        <div id="focus-score-card" class="glass rounded-2xl p-6 mb-6 border border-purple-500/30">
             <div class="flex flex-col md:flex-row items-center justify-between gap-6">
                 <div class="flex items-center gap-6">
                     <div class="relative">
-                        <div id="score-ring" class="w-32 h-32 score-ring flex items-center justify-center" style="--score: 0; --ring-color: #6b7280;">
-                            <div class="w-28 h-28 rounded-full bg-gray-900 flex flex-col items-center justify-center">
-                                <span id="focus-score" class="text-4xl font-bold text-white">--</span>
+                        <div id="score-ring" class="w-28 h-28 rounded-full flex items-center justify-center" style="background: conic-gradient(from 0deg, #6b7280 0deg, rgba(255,255,255,0.1) 0deg);">
+                            <div class="w-24 h-24 rounded-full bg-gray-900 flex flex-col items-center justify-center">
+                                <span id="focus-score" class="text-3xl font-bold text-white">--</span>
                                 <span class="text-xs text-gray-400">/ 100</span>
                             </div>
                         </div>
                     </div>
                     <div>
                         <div class="text-sm text-gray-400 uppercase tracking-wider">XGBoost Focus Score</div>
-                        <div class="flex items-center gap-3 mt-1">
-                            <span id="focus-grade-emoji" class="text-3xl">📊</span>
-                            <span id="focus-grade" class="grade-badge text-gray-400">--</span>
+                        <div class="flex items-center gap-2 mt-1">
+                            <span id="focus-grade-emoji" class="text-2xl">📊</span>
+                            <span id="focus-grade" class="text-xl font-bold text-gray-400">--</span>
                         </div>
-                        <div id="focus-label" class="text-gray-400 mt-1">Loading...</div>
+                        <div id="focus-label" class="text-sm text-gray-400">Loading...</div>
                     </div>
                 </div>
-                <div class="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
-                    <div class="glass rounded-lg p-3"><div id="feat-completion" class="text-xl font-bold text-green-400">--%</div><div class="text-xs text-gray-500">Completion</div></div>
-                    <div class="glass rounded-lg p-3"><div id="feat-focus" class="text-xl font-bold text-blue-400">--</div><div class="text-xs text-gray-500">Focus Quality</div></div>
-                    <div class="glass rounded-lg p-3"><div id="feat-switches" class="text-xl font-bold text-orange-400">--</div><div class="text-xs text-gray-500">Ctx Switches</div></div>
-                    <div class="glass rounded-lg p-3"><div id="feat-streak" class="text-xl font-bold text-purple-400">--</div><div class="text-xs text-gray-500">Day Streak</div></div>
-                </div>
-                <div class="w-full md:w-48">
-                    <div class="text-xs text-gray-400 mb-2 text-center">7-Day Trend</div>
-                    <canvas id="trend-chart" height="60"></canvas>
+                <div class="grid grid-cols-4 gap-3 text-center">
+                    <div class="glass rounded-lg p-2"><div id="feat-completion" class="text-lg font-bold text-green-400">--%</div><div class="text-xs text-gray-500">Done</div></div>
+                    <div class="glass rounded-lg p-2"><div id="feat-focus" class="text-lg font-bold text-blue-400">--</div><div class="text-xs text-gray-500">Focus</div></div>
+                    <div class="glass rounded-lg p-2"><div id="feat-switches" class="text-lg font-bold text-orange-400">--</div><div class="text-xs text-gray-500">Switches</div></div>
+                    <div class="glass rounded-lg p-2"><div id="feat-streak" class="text-lg font-bold text-purple-400">--</div><div class="text-xs text-gray-500">Streak</div></div>
                 </div>
             </div>
-            <div id="focus-insights" class="mt-4 pt-4 border-t border-gray-700/50">
-                <div class="flex flex-wrap gap-2" id="insights-container"><span class="text-sm text-gray-400">Loading insights...</span></div>
-            </div>
-        </div>
-
-        <!-- Focus Alert Banner -->
-        <div id="focus-alert" class="glass rounded-xl p-4 mb-6 border-l-4 border-red-500 hidden">
-            <div class="flex items-center gap-4">
-                <div class="text-3xl pulse">⚠️</div>
-                <div><div class="font-semibold text-red-400">FOCUS INTERVENTION NEEDED</div><div id="alert-message" class="text-sm text-gray-400"></div></div>
+            <div id="focus-insights" class="mt-4 pt-3 border-t border-gray-700/50 flex flex-wrap gap-2">
+                <span class="text-sm text-gray-400">Loading insights...</span>
             </div>
         </div>
 
         <!-- Quick Stats -->
         <div class="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
-            <div class="glass rounded-xl p-4 text-center"><div class="text-3xl font-bold text-white" id="stat-total">0</div><div class="text-xs text-gray-500 uppercase">Total Tasks</div></div>
-            <div class="glass rounded-xl p-4 text-center"><div class="text-3xl font-bold text-green-400" id="stat-completed">0</div><div class="text-xs text-gray-500 uppercase">Completed</div></div>
-            <div class="glass rounded-xl p-4 text-center"><div class="text-3xl font-bold text-blue-400" id="stat-progress">0</div><div class="text-xs text-gray-500 uppercase">In Progress</div></div>
-            <div class="glass rounded-xl p-4 text-center"><div class="text-3xl font-bold text-orange-400" id="stat-pending">0</div><div class="text-xs text-gray-500 uppercase">Pending</div></div>
-            <div class="glass rounded-xl p-4 text-center"><div class="text-3xl font-bold text-red-400" id="stat-interventions">0</div><div class="text-xs text-gray-500 uppercase">Open Alerts</div></div>
+            <div class="glass rounded-xl p-4 text-center">
+                <div class="text-3xl font-bold text-white" id="stat-total">0</div>
+                <div class="text-xs text-gray-500 uppercase">Total Tasks</div>
+            </div>
+            <div class="glass rounded-xl p-4 text-center">
+                <div class="text-3xl font-bold text-green-400" id="stat-completed">0</div>
+                <div class="text-xs text-gray-500 uppercase">Completed</div>
+            </div>
+            <div class="glass rounded-xl p-4 text-center">
+                <div class="text-3xl font-bold text-blue-400" id="stat-progress">0</div>
+                <div class="text-xs text-gray-500 uppercase">In Progress</div>
+            </div>
+            <div class="glass rounded-xl p-4 text-center">
+                <div class="text-3xl font-bold text-orange-400" id="stat-pending">0</div>
+                <div class="text-xs text-gray-500 uppercase">Pending</div>
+            </div>
+            <div class="glass rounded-xl p-4 text-center">
+                <div class="text-3xl font-bold text-red-400" id="stat-interventions">0</div>
+                <div class="text-xs text-gray-500 uppercase">Open Alerts</div>
+            </div>
         </div>
 
         <!-- Main Grid -->
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+            <!-- Today's Tasks -->
             <div class="lg:col-span-2 glass rounded-xl p-5">
                 <div class="flex items-center justify-between mb-4">
-                    <h2 class="text-lg font-semibold flex items-center gap-2"><span>📋</span> Today's Tasks</h2>
-                    <div class="flex gap-2">
-                        <button onclick="filterTasks('all')" class="px-3 py-1 rounded-lg bg-gray-700 text-xs hover:bg-gray-600">All</button>
+                    <h2 class="text-lg font-semibold flex items-center gap-2">
+                        <span>📋</span> Today's Tasks
+                    </h2>
+                    <div class="flex gap-2" id="domain-filters">
+                        <button onclick="filterTasks('all')" class="px-3 py-1 rounded-lg bg-gray-700 text-xs hover:bg-gray-600 active">All</button>
                         <button onclick="filterTasks('BUSINESS')" class="px-3 py-1 rounded-lg bg-gray-800 text-xs hover:bg-gray-600">💼</button>
                         <button onclick="filterTasks('FAMILY')" class="px-3 py-1 rounded-lg bg-gray-800 text-xs hover:bg-gray-600">👨‍👩‍👦</button>
                         <button onclick="filterTasks('MICHAEL')" class="px-3 py-1 rounded-lg bg-gray-800 text-xs hover:bg-gray-600">🏊</button>
                     </div>
                 </div>
-                <div id="tasks-list" class="space-y-3 max-h-96 overflow-y-auto"><div class="text-center text-gray-500 py-4">Loading tasks...</div></div>
+                <div id="tasks-list" class="space-y-3 max-h-96 overflow-y-auto">
+                    <div class="text-center text-gray-500 py-4">Loading tasks...</div>
+                </div>
             </div>
+
+            <!-- FOCUS Monitor -->
             <div class="space-y-6">
-                <div class="glass rounded-xl p-5"><h2 class="text-lg font-semibold mb-4 flex items-center gap-2"><span>🧠</span> FOCUS Risk Monitor</h2><canvas id="risk-chart" height="200"></canvas></div>
-                <div class="glass rounded-xl p-5"><h2 class="text-lg font-semibold mb-4 flex items-center gap-2"><span>⚠️</span> Open Interventions</h2><div id="interventions-list" class="space-y-2 max-h-48 overflow-y-auto"><div class="text-center text-gray-500 py-4 text-sm">No open interventions ✅</div></div></div>
+                <!-- Risk Overview -->
+                <div class="glass rounded-xl p-5">
+                    <h2 class="text-lg font-semibold mb-4 flex items-center gap-2">
+                        <span>🧠</span> FOCUS Risk Monitor
+                    </h2>
+                    <canvas id="risk-chart" height="200"></canvas>
+                </div>
+
+                <!-- Recent Interventions - V3.1: Shows OPEN only -->
+                <div class="glass rounded-xl p-5">
+                    <h2 class="text-lg font-semibold mb-4 flex items-center gap-2">
+                        <span>⚠️</span> Open Interventions
+                    </h2>
+                    <div id="interventions-list" class="space-y-2 max-h-48 overflow-y-auto">
+                        <div class="text-center text-gray-500 py-4 text-sm">No open interventions ✅</div>
+                    </div>
+                </div>
             </div>
         </div>
 
-        <div class="text-center text-gray-500 text-xs"><p>Life OS v3.6 • XGBoost Focus Score • Created by Ariel Shapira • Auto-refreshes every 30s</p></div>
+        <!-- Travel & Events Row -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+            <!-- Active Trip -->
+            <div class="glass rounded-xl p-5 border-l-4 border-blue-500" id="trip-card">
+                <h2 class="text-lg font-semibold mb-3 flex items-center gap-2">
+                    <span>🚗</span> Active Trip
+                </h2>
+                <div id="trip-details" class="text-sm">
+                    <div class="text-gray-500">No active trip</div>
+                </div>
+            </div>
+
+            <!-- Swim Meet -->
+            <div class="glass rounded-xl p-5 border-l-4 border-green-500">
+                <h2 class="text-lg font-semibold mb-3 flex items-center gap-2">
+                    <span>🏊</span> Michael's Meet
+                </h2>
+                <div id="swim-details" class="text-sm">
+                    <div class="text-gray-500">Loading...</div>
+                </div>
+            </div>
+
+            <!-- Daily Metrics -->
+            <div class="glass rounded-xl p-5 border-l-4 border-purple-500">
+                <h2 class="text-lg font-semibold mb-3 flex items-center gap-2">
+                    <span>📊</span> Daily Metrics
+                </h2>
+                <div id="metrics-details" class="text-sm space-y-2">
+                    <div class="flex justify-between">
+                        <span class="text-gray-400">Focus Quality</span>
+                        <span id="metric-focus" class="text-white">--</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-gray-400">Completion Rate</span>
+                        <span id="metric-completion" class="text-green-400">--%</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-gray-400">Context Switches</span>
+                        <span id="metric-switches" class="text-orange-400">--</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <div class="text-center text-gray-500 text-xs">
+            <p>Life OS v3.6 • Build: 1764867315 • Created by Ariel Shapira • Auto-refreshes every 30s • XGBoost Focus Score</p>
+        </div>
     </div>
 
     <script>
         const SUPABASE_URL = 'https://mocerqjnksmhcjzxrewo.supabase.co';
         const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1vY2VycWpua3NtaGNqenhyZXdvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQ1MzI1MjYsImV4cCI6MjA4MDEwODUyNn0.ySFJIOngWWB0aqYra4PoGFuqcbdHOx1ZV6T9-klKQDw';
+        
         const headers = { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json' };
-        let allTasks = [], currentFilter = 'all', riskChart = null, trendChart = null;
+        
+        let allTasks = [];
+        let currentFilter = 'all';
+        let riskChart = null;
 
+        // XGBoost Focus Score Functions - V3.6
         const GRADES = [
             { min: 95, grade: 'A+', emoji: '🏆', label: 'Elite Focus', color: '#10b981' },
             { min: 90, grade: 'A', emoji: '🌟', label: 'Excellent', color: '#10b981' },
-            { min: 85, grade: 'A-', emoji: '⭐', label: 'Great', color: '#10b981' },
             { min: 80, grade: 'B+', emoji: '💪', label: 'Very Good', color: '#3b82f6' },
-            { min: 75, grade: 'B', emoji: '👍', label: 'Good', color: '#3b82f6' },
             { min: 70, grade: 'B-', emoji: '📈', label: 'Above Average', color: '#3b82f6' },
             { min: 65, grade: 'C+', emoji: '🔄', label: 'Average', color: '#f59e0b' },
             { min: 60, grade: 'C', emoji: '📊', label: 'Needs Work', color: '#f59e0b' },
             { min: 50, grade: 'C-', emoji: '⚠️', label: 'Below Average', color: '#f59e0b' },
-            { min: 40, grade: 'D', emoji: '🔻', label: 'Poor', color: '#ef4444' },
-            { min: 0, grade: 'F', emoji: '❌', label: 'Critical', color: '#ef4444' },
+            { min: 0, grade: 'D', emoji: '🔻', label: 'Poor', color: '#ef4444' },
         ];
-
         function getGrade(score) { return GRADES.find(g => score >= g.min) || GRADES[GRADES.length - 1]; }
+        
+        async function fetchFocusScore() {
+            try {
+                const today = new Date().toISOString().split('T')[0];
+                const res = await fetch(`${SUPABASE_URL}/rest/v1/daily_metrics?date=eq.${today}&limit=1`, { headers });
+                const data = await res.json();
+                if (data && data[0]) {
+                    const m = data[0];
+                    const score = m.productivity_score || 0;
+                    const gradeInfo = getGrade(score);
+                    document.getElementById('focus-score').textContent = Math.round(score);
+                    document.getElementById('focus-grade').textContent = gradeInfo.grade;
+                    document.getElementById('focus-grade').style.color = gradeInfo.color;
+                    document.getElementById('focus-grade-emoji').textContent = gradeInfo.emoji;
+                    document.getElementById('focus-label').textContent = gradeInfo.label;
+                    const ring = document.getElementById('score-ring');
+                    ring.style.background = `conic-gradient(from 0deg, ${gradeInfo.color} ${score * 3.6}deg, rgba(255,255,255,0.1) 0deg)`;
+                    const card = document.getElementById('focus-score-card');
+                    card.style.borderColor = score >= 70 ? 'rgba(16,185,129,0.5)' : score >= 50 ? 'rgba(245,158,11,0.5)' : 'rgba(239,68,68,0.5)';
+                    card.style.boxShadow = `0 0 25px ${score >= 70 ? 'rgba(16,185,129,0.3)' : score >= 50 ? 'rgba(245,158,11,0.3)' : 'rgba(239,68,68,0.3)'}`;
+                    document.getElementById('feat-completion').textContent = Math.round((m.completion_rate || 0) * 100) + '%';
+                    document.getElementById('feat-focus').textContent = (m.average_focus_quality || 0).toFixed(1);
+                    document.getElementById('feat-switches').textContent = m.context_switches || 0;
+                    const weekAgo = new Date(Date.now() - 7*24*60*60*1000).toISOString().split('T')[0];
+                    const histRes = await fetch(`${SUPABASE_URL}/rest/v1/daily_metrics?date=gte.${weekAgo}&date=lt.${today}&order=date.desc&select=productivity_score`, { headers });
+                    const history = await histRes.json();
+                    let streak = 0;
+                    if (history) for (const h of history) { if ((h.productivity_score || 0) >= 70) streak++; else break; }
+                    document.getElementById('feat-streak').textContent = streak + 'd';
+                    const insights = [];
+                    if ((m.completion_rate || 0) < 0.5) insights.push('📋 Low completion');
+                    if ((m.completion_rate || 0) >= 0.8) insights.push('✅ Great completion!');
+                    if ((m.context_switches || 0) > 10) insights.push('🔄 High switching');
+                    if ((m.average_focus_quality || 0) >= 8) insights.push('🎯 Excellent focus!');
+                    if (streak >= 3) insights.push(`🔥 ${streak}-day streak!`);
+                    if (score >= 90) insights.push('🏆 ELITE DAY!');
+                    document.getElementById('focus-insights').innerHTML = insights.length > 0 
+                        ? insights.map(i => `<span class="px-2 py-1 bg-gray-800/70 rounded-full text-xs">${i}</span>`).join('') 
+                        : '<span class="text-xs text-gray-400">Complete tasks to unlock insights</span>';
+                }
+            } catch (e) { console.error('Focus score error:', e); }
+        }
 
         function updateTime() {
             const now = new Date();
             document.getElementById('current-date').textContent = now.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
             document.getElementById('current-time').textContent = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
         }
-        setInterval(updateTime, 1000); updateTime();
+        setInterval(updateTime, 1000);
+        updateTime();
 
-        function filterTasks(domain) { currentFilter = domain; renderTasks(); }
+        function filterTasks(domain) {
+            currentFilter = domain;
+            renderTasks();
+        }
 
         function renderTasks() {
             const filtered = currentFilter === 'all' ? allTasks : allTasks.filter(t => t.domain === currentFilter);
             const container = document.getElementById('tasks-list');
-            if (filtered.length === 0) { container.innerHTML = '<div class="text-center text-gray-500 py-4">No tasks</div>'; return; }
-            const statusColors = { 'COMPLETED': 'bg-green-900/50 text-green-300', 'IN_PROGRESS': 'bg-blue-900/50 text-blue-300', 'INITIATED': 'bg-gray-700 text-gray-300', 'SOLUTION_PROVIDED': 'bg-purple-900/50 text-purple-300', 'ABANDONED': 'bg-red-900/50 text-red-300' };
-            const statusIcons = { 'COMPLETED': '✅', 'IN_PROGRESS': '🔄', 'INITIATED': '⏳', 'SOLUTION_PROVIDED': '💡', 'ABANDONED': '❌' };
-            const domainIcons = { 'BUSINESS': '💼', 'FAMILY': '👨‍👩‍👦', 'MICHAEL': '🏊', 'PERSONAL': '👤' };
-            container.innerHTML = filtered.map(t => `<div class="p-3 bg-gray-800/50 rounded-lg border-l-2 ${t.status === 'IN_PROGRESS' ? 'border-blue-500' : 'border-gray-600'}"><div class="flex items-start justify-between gap-2"><div class="flex-1"><div class="flex items-center gap-2"><span>${statusIcons[t.status] || '📌'}</span><span>${domainIcons[t.domain] || '📌'}</span><span class="font-medium text-sm">${t.description?.substring(0, 50) || t.task_id}</span></div><div class="text-xs text-gray-500 mt-1">Complexity: ${t.complexity || '-'}</div></div><span class="status-badge ${statusColors[t.status] || 'bg-gray-700'}">${t.status}</span></div></div>`).join('');
-        }
+            
+            if (filtered.length === 0) {
+                container.innerHTML = '<div class="text-center text-gray-500 py-4">No tasks</div>';
+                return;
+            }
 
-        async function fetchFocusScore() {
-            try {
-                const today = new Date().toISOString().split('T')[0];
+            container.innerHTML = filtered.map(t => {
+                const statusColors = {
+                    'COMPLETED': 'bg-green-900/50 text-green-300',
+                    'IN_PROGRESS': 'bg-blue-900/50 text-blue-300',
+                    'INITIATED': 'bg-gray-700 text-gray-300',
+                    'SOLUTION_PROVIDED': 'bg-purple-900/50 text-purple-300',
+                    'ABANDONED': 'bg-red-900/50 text-red-300'
+                };
+                const statusIcons = { 'COMPLETED': '✅', 'IN_PROGRESS': '🔄', 'INITIATED': '⏳', 'SOLUTION_PROVIDED': '💡', 'ABANDONED': '❌' };
+                const domainIcons = { 'BUSINESS': '💼', 'FAMILY': '👨‍👩‍👦', 'MICHAEL': '🏊', 'PERSONAL': '👤' };
                 
-                // Get today's metrics with XGBoost score from daily_metrics.productivity_score
-                const metricsRes = await fetch(`${SUPABASE_URL}/rest/v1/daily_metrics?date=eq.${today}&limit=1`, { headers });
-                const metrics = await metricsRes.json();
-                
-                let score = 0, completionRate = 0, focusQuality = 0, contextSwitches = 0;
-                
-                if (metrics && metrics[0]) {
-                    const m = metrics[0];
-                    score = m.productivity_score || 0;
-                    completionRate = m.completion_rate || 0;
-                    focusQuality = m.average_focus_quality || 0;
-                    contextSwitches = m.context_switches || 0;
-                }
-
-                const gradeInfo = getGrade(score);
-                
-                // Update UI
-                document.getElementById('focus-score').textContent = Math.round(score);
-                document.getElementById('focus-grade').textContent = gradeInfo.grade;
-                document.getElementById('focus-grade').style.color = gradeInfo.color;
-                document.getElementById('focus-grade-emoji').textContent = gradeInfo.emoji;
-                document.getElementById('focus-label').textContent = gradeInfo.label;
-
-                // Update score ring
-                const ring = document.getElementById('score-ring');
-                ring.style.setProperty('--score', score);
-                ring.style.setProperty('--ring-color', gradeInfo.color);
-
-                // Update card glow
-                const card = document.getElementById('focus-score-card');
-                card.classList.remove('glow-green', 'glow-orange', 'glow-red');
-                if (score >= 70) card.classList.add('glow-green');
-                else if (score >= 50) card.classList.add('glow-orange');
-                else if (score > 0) card.classList.add('glow-red');
-
-                // Update features
-                document.getElementById('feat-completion').textContent = Math.round(completionRate * 100) + '%';
-                document.getElementById('feat-focus').textContent = focusQuality.toFixed(1) + '/10';
-                document.getElementById('feat-switches').textContent = contextSwitches;
-
-                // Calculate streak from history
-                const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
-                const histRes = await fetch(`${SUPABASE_URL}/rest/v1/daily_metrics?date=gte.${weekAgo}&date=lt.${today}&order=date.desc&select=productivity_score`, { headers });
-                const history = await histRes.json();
-                let streak = 0;
-                if (history && Array.isArray(history)) {
-                    for (const h of history) {
-                        if ((h.productivity_score || 0) >= 70) streak++;
-                        else break;
-                    }
-                }
-                document.getElementById('feat-streak').textContent = streak + 'd';
-
-                // Generate insights
-                const insights = [];
-                if (completionRate < 0.5) insights.push('📋 Low completion rate');
-                if (completionRate >= 0.8) insights.push('✅ Great completion!');
-                if (contextSwitches > 10) insights.push('🔄 High context switching');
-                if (focusQuality >= 8) insights.push('🎯 Excellent focus!');
-                if (streak >= 3) insights.push(`🔥 ${streak}-day streak!`);
-                if (score >= 90) insights.push('🏆 ELITE FOCUS DAY!');
-
-                document.getElementById('insights-container').innerHTML = insights.length > 0 
-                    ? insights.map(i => `<span class="px-3 py-1 bg-gray-800/70 rounded-full text-sm">${i}</span>`).join('') 
-                    : '<span class="text-sm text-gray-400">Complete tasks to unlock insights</span>';
-
-                // Fetch weekly trend
-                const trendRes = await fetch(`${SUPABASE_URL}/rest/v1/daily_metrics?date=gte.${weekAgo}&order=date.asc&select=date,productivity_score`, { headers });
-                const trendData = await trendRes.json();
-                if (trendData && Array.isArray(trendData) && trendData.length > 0) {
-                    updateTrendChart(trendData.filter(d => d.productivity_score != null));
-                }
-            } catch (e) { console.error('Focus score error:', e); }
-        }
-
-        function updateTrendChart(data) {
-            const ctx = document.getElementById('trend-chart');
-            if (!data || data.length === 0) return;
-            if (trendChart) trendChart.destroy();
-            const labels = data.map(d => new Date(d.date).toLocaleDateString('en-US', { weekday: 'short' }));
-            const scores = data.map(d => d.productivity_score || 0);
-            const colors = scores.map(s => getGrade(s).color);
-            trendChart = new Chart(ctx, { type: 'line', data: { labels, datasets: [{ data: scores, borderColor: '#8b5cf6', backgroundColor: 'rgba(139, 92, 246, 0.1)', fill: true, tension: 0.4, pointRadius: 4, pointBackgroundColor: colors }] }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { display: false, min: 0, max: 100 }, x: { display: true, ticks: { color: '#6b7280', font: { size: 9 } }, grid: { display: false } } } } });
+                return `
+                    <div class="p-3 bg-gray-800/50 rounded-lg border-l-2 ${t.status === 'IN_PROGRESS' ? 'border-blue-500' : 'border-gray-600'}">
+                        <div class="flex items-start justify-between gap-2">
+                            <div class="flex-1">
+                                <div class="flex items-center gap-2">
+                                    <span>${statusIcons[t.status] || '📌'}</span>
+                                    <span>${domainIcons[t.domain] || '📌'}</span>
+                                    <span class="font-medium text-sm">${t.description?.substring(0, 50) || t.task_id}</span>
+                                </div>
+                                <div class="text-xs text-gray-500 mt-1">
+                                    Complexity: ${t.complexity || '-'} | ${t.task_id}
+                                </div>
+                            </div>
+                            <span class="status-badge ${statusColors[t.status] || 'bg-gray-700'}">${t.status}</span>
+                        </div>
+                    </div>
+                `;
+            }).join('');
         }
 
         async function fetchData() {
+            await fetchFocusScore();
             try {
                 const today = new Date().toISOString().split('T')[0];
-                await fetchFocusScore();
                 
+                // Fetch tasks
                 const tasksRes = await fetch(`${SUPABASE_URL}/rest/v1/task_states?select=*&order=initiated_at.desc`, { headers });
-                allTasks = await tasksRes.json();
-                const todayTasks = allTasks.filter(t => t.initiated_at?.startsWith(today));
+                const tasks = await tasksRes.json();
+                allTasks = tasks;
                 
+                // Filter today's tasks
+                const todayTasks = tasks.filter(t => t.initiated_at?.startsWith(today));
+                
+                // Update stats
                 document.getElementById('stat-total').textContent = todayTasks.length;
                 document.getElementById('stat-completed').textContent = todayTasks.filter(t => t.status === 'COMPLETED').length;
                 document.getElementById('stat-progress').textContent = todayTasks.filter(t => t.status === 'IN_PROGRESS').length;
                 document.getElementById('stat-pending').textContent = todayTasks.filter(t => ['INITIATED', 'SOLUTION_PROVIDED'].includes(t.status)).length;
+                
                 renderTasks();
-
-                const intRes = await fetch(`${SUPABASE_URL}/rest/v1/task_interventions?successful=is.null&select=*&order=triggered_at.desc&limit=10`, { headers });
+                
+                // ===== V3.1 FIX: Only fetch OPEN interventions (successful IS NULL) =====
+                const intRes = await fetch(
+                    `${SUPABASE_URL}/rest/v1/task_interventions?successful=is.null&select=*&order=triggered_at.desc&limit=10`, 
+                    { headers }
+                );
                 const openInterventions = await intRes.json();
+                
+                // Update stat with OPEN count only
                 document.getElementById('stat-interventions').textContent = openInterventions.length;
                 
+                // Show alert ONLY if there are OPEN high-risk interventions
                 const alertBanner = document.getElementById('focus-alert');
                 const openHighRisk = openInterventions.find(i => i.intervention_level >= 3);
-                if (openHighRisk) { alertBanner.classList.remove('hidden'); document.getElementById('alert-message').textContent = openHighRisk.message || 'High-risk task needs attention'; } 
-                else { alertBanner.classList.add('hidden'); }
                 
-                document.getElementById('interventions-list').innerHTML = openInterventions.length > 0 ? openInterventions.slice(0, 5).map(i => `<div class="p-2 bg-gray-800/50 rounded text-xs"><div class="flex items-center gap-2"><span class="${i.intervention_level >= 3 ? 'text-red-400' : 'text-orange-400'}">${'⚠️'.repeat(i.intervention_level || 1)}</span><span class="text-gray-300">${(i.task_description || 'Task').substring(0, 25)}</span></div></div>`).join('') : '<div class="text-center text-green-400 py-2 text-sm">✅ No open interventions</div>';
+                if (openHighRisk) {
+                    alertBanner.classList.remove('hidden');
+                    document.getElementById('alert-message').textContent = openHighRisk.message || 'High-risk task needs attention';
+                } else {
+                    // HIDE the banner if no open high-risk interventions
+                    alertBanner.classList.add('hidden');
+                }
+                
+                // Render OPEN interventions only
+                const intListHtml = openInterventions.length > 0 
+                    ? openInterventions.slice(0, 5).map(i => `
+                        <div class="p-2 bg-gray-800/50 rounded text-xs">
+                            <div class="flex items-center gap-2">
+                                <span class="${i.intervention_level >= 3 ? 'text-red-400' : i.intervention_level >= 2 ? 'text-orange-400' : 'text-yellow-400'}">
+                                    ${'⚠️'.repeat(i.intervention_level || 1)}
+                                </span>
+                                <span class="text-gray-300">${(i.task_description || i.task_id || 'Task').substring(0, 25)}</span>
+                            </div>
+                            <div class="text-gray-500 mt-1">${i.risk_level || ''} risk (${Math.round((i.abandonment_probability || 0) * 100)}%)</div>
+                        </div>
+                    `).join('')
+                    : '<div class="text-center text-green-400 py-2 text-sm">✅ No open interventions</div>';
+                
+                document.getElementById('interventions-list').innerHTML = intListHtml;
+                // ===== END V3.1 FIX =====
+                
+                // Update risk chart
                 updateRiskChart(todayTasks);
-            } catch(e) { console.error('Fetch error:', e); }
+                
+                // Fetch daily metrics
+                const metricsRes = await fetch(`${SUPABASE_URL}/rest/v1/daily_metrics?date=eq.${today}&limit=1`, { headers });
+                const metrics = await metricsRes.json();
+                if (metrics[0]) {
+                    document.getElementById('metric-focus').textContent = metrics[0].average_focus_quality || '--';
+                    document.getElementById('metric-completion').textContent = Math.round((metrics[0].completion_rate || 0) * 100) + '%';
+                    document.getElementById('metric-switches').textContent = metrics[0].context_switches || '0';
+                }
+                
+                // Fetch travel info
+                const travelRes = await fetch(`${SUPABASE_URL}/rest/v1/activities?activity_type=eq.DRIVING&platform=eq.life_os&limit=1&order=start_time.desc`, { headers });
+                const travels = await travelRes.json();
+                if (travels[0]) {
+                    try {
+                        const trip = JSON.parse(travels[0].notes || '{}');
+                        document.getElementById('trip-details').innerHTML = `
+                            <div class="font-medium text-blue-400">${trip.title || 'Trip'}</div>
+                            <div class="text-gray-400 mt-1">${trip.origin?.substring(0, 30) || ''} → ${trip.destination || ''}</div>
+                            <div class="flex gap-4 mt-2">
+                                <span>🛣️ ${trip.distance_miles || '-'} mi</span>
+                                <span>⏱️ ${Math.floor((trip.estimated_time_minutes || 0) / 60)}h ${(trip.estimated_time_minutes || 0) % 60}m</span>
+                            </div>
+                            <div class="mt-2 text-xs text-gray-500">Depart: ${trip.departure_time || 'TBD'}</div>
+                        `;
+                    } catch(e) {}
+                }
+                
+                // Fetch swim meet
+                const swimRes = await fetch(`${SUPABASE_URL}/rest/v1/activities?activity_type=eq.SWIM_MEET&platform=eq.life_os&limit=1&order=start_time.desc`, { headers });
+                const swims = await swimRes.json();
+                if (swims[0]) {
+                    try {
+                        const meet = JSON.parse(swims[0].notes || '{}');
+                        document.getElementById('swim-details').innerHTML = `
+                            <div class="font-medium text-green-400">${meet.meet_name || 'Meet'}</div>
+                            <div class="text-gray-400">${meet.location || ''}</div>
+                            <div class="mt-2 text-xs">
+                                ${(meet.events || []).map(e => `<span class="inline-block bg-blue-900/50 px-2 py-1 rounded mr-1 mb-1">${e.event}</span>`).join('')}
+                            </div>
+                        `;
+                    } catch(e) {}
+                }
+                
+            } catch(e) {
+                console.error('Fetch error:', e);
+            }
         }
 
         function updateRiskChart(tasks) {
             const ctx = document.getElementById('risk-chart');
             const domains = { BUSINESS: 0, FAMILY: 0, MICHAEL: 0, PERSONAL: 0 };
             tasks.forEach(t => { if (domains[t.domain] !== undefined) domains[t.domain]++; });
+            
             if (riskChart) riskChart.destroy();
-            riskChart = new Chart(ctx, { type: 'doughnut', data: { labels: ['Business', 'Family', 'Michael', 'Personal'], datasets: [{ data: [domains.BUSINESS, domains.FAMILY, domains.MICHAEL, domains.PERSONAL], backgroundColor: ['#f59e0b', '#10b981', '#3b82f6', '#8b5cf6'], borderWidth: 0 }] }, options: { plugins: { legend: { position: 'bottom', labels: { color: '#9ca3af', font: { size: 10 } } } }, cutout: '60%' } });
+            riskChart = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: ['Business', 'Family', 'Michael', 'Personal'],
+                    datasets: [{
+                        data: [domains.BUSINESS, domains.FAMILY, domains.MICHAEL, domains.PERSONAL],
+                        backgroundColor: ['#f59e0b', '#10b981', '#3b82f6', '#8b5cf6'],
+                        borderWidth: 0
+                    }]
+                },
+                options: {
+                    plugins: { legend: { position: 'bottom', labels: { color: '#9ca3af', font: { size: 10 } } } },
+                    cutout: '60%'
+                }
+            });
         }
 
         function shareStatus() {
-            const score = document.getElementById('focus-score').textContent;
-            const grade = document.getElementById('focus-grade').textContent;
             const completed = document.getElementById('stat-completed').textContent;
             const total = document.getElementById('stat-total').textContent;
-            window.open(`https://wa.me/?text=${encodeURIComponent(`🧠 *Life OS*\n📅 ${new Date().toLocaleDateString()}\n🎯 Focus: ${score}/100 (${grade})\n✅ ${completed}/${total} tasks\n🔗 https://shapira-life-os.vercel.app`)}`, '_blank');
+            const msg = `🧠 *Life OS Status Update*\n📅 ${new Date().toLocaleDateString()}\n\n✅ ${completed}/${total} tasks completed\n🔗 https://shapira-life-os.vercel.app`;
+            window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, '_blank');
         }
 
-        console.log("Life OS v3.6 loaded"); fetchData(); setInterval(fetchData, 30000);
+        console.log("Life OS v3.6 loaded at", new Date().toISOString()); fetchData();
+        setInterval(fetchData, 30000);
     </script>
 </body>
 </html>
-<!-- Deploy trigger: 1764872339 -->
-<!-- Auto-deploy 1764872962 -->
+
+
