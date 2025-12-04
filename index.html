@@ -3,298 +3,286 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Life OS - Shapira Family Dashboard</title>
+    <title>Life OS - Shapira Family Command Center</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
-        :root { --purple: #8b5cf6; --blue: #3b82f6; --green: #10b981; --orange: #f59e0b; --red: #ef4444; --whatsapp: #25D366; }
-        body { background: linear-gradient(135deg, #0f0f1a 0%, #1a1a2e 50%, #0f172a 100%); min-height: 100vh; font-family: system-ui, -apple-system, sans-serif; }
-        .glass { background: rgba(30, 30, 50, 0.85); backdrop-filter: blur(12px); border: 1px solid rgba(139, 92, 246, 0.2); }
+        :root { 
+            --purple: #8b5cf6; --blue: #3b82f6; --green: #10b981; 
+            --orange: #f59e0b; --red: #ef4444; --whatsapp: #25D366; 
+        }
+        body { 
+            background: linear-gradient(135deg, #0f0f1a 0%, #1a1a2e 50%, #0f172a 100%); 
+            min-height: 100vh; 
+            font-family: system-ui, -apple-system, sans-serif; 
+        }
+        .glass { 
+            background: rgba(30, 30, 50, 0.85); 
+            backdrop-filter: blur(12px); 
+            border: 1px solid rgba(139, 92, 246, 0.2); 
+        }
         .glow { box-shadow: 0 0 25px rgba(139, 92, 246, 0.3); }
         .glow-green { box-shadow: 0 0 20px rgba(16, 185, 129, 0.3); }
+        .glow-red { box-shadow: 0 0 20px rgba(239, 68, 68, 0.3); }
         .glow-blue { box-shadow: 0 0 20px rgba(59, 130, 246, 0.3); }
-        .glow-whatsapp { box-shadow: 0 0 20px rgba(37, 211, 102, 0.4); }
-        .status-badge { padding: 2px 8px; border-radius: 12px; font-size: 0.7rem; font-weight: 600; }
+        .status-badge { padding: 2px 8px; border-radius: 12px; font-size: 0.65rem; font-weight: 600; text-transform: uppercase; }
         .pulse { animation: pulse 2s infinite; }
         @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.6; } }
+        .timeline-line { position: relative; padding-left: 24px; }
+        .timeline-line::before { 
+            content: ''; position: absolute; left: 8px; top: 0; bottom: 0; 
+            width: 2px; background: linear-gradient(to bottom, #8b5cf6, #3b82f6); 
+        }
+        .timeline-dot { 
+            position: absolute; left: 4px; top: 6px; width: 10px; height: 10px; 
+            border-radius: 50%; background: #8b5cf6; border: 2px solid #0f0f1a;
+        }
+        .whatsapp-btn { background: #25D366; }
+        .whatsapp-btn:hover { background: #128C7E; }
+        .intervention-alert { animation: shake 0.5s ease-in-out; }
+        @keyframes shake { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-5px); } 75% { transform: translateX(5px); } }
+        .progress-ring { transform: rotate(-90deg); }
         .driving-animation { animation: drive 3s ease-in-out infinite; }
         @keyframes drive { 0%, 100% { transform: translateX(0); } 50% { transform: translateX(10px); } }
-        .whatsapp-btn { background: #25D366; transition: all 0.3s; }
-        .whatsapp-btn:hover { background: #128C7E; transform: scale(1.05); }
-        .share-modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.8); z-index: 100; }
-        .share-modal.active { display: flex; }
     </style>
 </head>
 <body class="text-gray-100">
-    <!-- WhatsApp Share Modal -->
-    <div id="share-modal" class="share-modal items-center justify-center p-4">
-        <div class="glass rounded-2xl p-6 max-w-lg w-full glow-whatsapp">
-            <div class="flex items-center justify-between mb-4">
-                <h3 class="text-xl font-bold flex items-center gap-2">
-                    <span class="text-2xl">📱</span> Share via WhatsApp
-                </h3>
-                <button onclick="closeShareModal()" class="text-gray-400 hover:text-white text-2xl">&times;</button>
-            </div>
-            
-            <div class="space-y-3 mb-6">
-                <button onclick="shareUpdate('trip')" class="w-full whatsapp-btn text-white rounded-xl p-4 flex items-center gap-3">
-                    <span class="text-2xl">🚗</span>
-                    <div class="text-left">
-                        <div class="font-semibold">Share Trip Update</div>
-                        <div class="text-sm opacity-80">Current location & ETA</div>
-                    </div>
-                </button>
-                
-                <button onclick="shareUpdate('swim')" class="w-full whatsapp-btn text-white rounded-xl p-4 flex items-center gap-3">
-                    <span class="text-2xl">🏊</span>
-                    <div class="text-left">
-                        <div class="font-semibold">Share Swim Meet Info</div>
-                        <div class="text-sm opacity-80">Michael's events & schedule</div>
-                    </div>
-                </button>
-                
-                <button onclick="shareUpdate('hotel')" class="w-full whatsapp-btn text-white rounded-xl p-4 flex items-center gap-3">
-                    <span class="text-2xl">🏨</span>
-                    <div class="text-left">
-                        <div class="font-semibold">Share Hotel Info</div>
-                        <div class="text-sm opacity-80">Reservation details</div>
-                    </div>
-                </button>
-                
-                <button onclick="shareUpdate('full')" class="w-full whatsapp-btn text-white rounded-xl p-4 flex items-center gap-3">
-                    <span class="text-2xl">📋</span>
-                    <div class="text-left">
-                        <div class="font-semibold">Share Full Status</div>
-                        <div class="text-sm opacity-80">Complete daily summary</div>
-                    </div>
-                </button>
-            </div>
-            
-            <div class="border-t border-gray-700 pt-4">
-                <label class="text-sm text-gray-400 mb-2 block">Send to specific contact:</label>
-                <div class="flex gap-2">
-                    <input type="tel" id="phone-number" placeholder="+1 (555) 123-4567" 
-                           class="flex-1 bg-gray-800 border border-gray-600 rounded-lg px-4 py-2 text-white placeholder-gray-500">
-                    <button onclick="shareToNumber()" class="whatsapp-btn text-white px-4 py-2 rounded-lg font-semibold">
-                        Send
-                    </button>
-                </div>
-                <p class="text-xs text-gray-500 mt-2">Or use buttons above to open WhatsApp directly</p>
-            </div>
-        </div>
-    </div>
-
-    <div class="container mx-auto px-4 py-6 max-w-7xl">
-        <!-- Header with Share Button -->
-        <div class="glass rounded-2xl p-5 mb-6 glow">
+    <div class="container mx-auto px-4 py-4 max-w-7xl">
+        <!-- Header -->
+        <div class="glass rounded-2xl p-4 mb-4 glow">
             <div class="flex items-center justify-between flex-wrap gap-4">
-                <div class="flex items-center gap-4">
-                    <div class="text-5xl">🏠</div>
+                <div class="flex items-center gap-3">
+                    <div class="text-4xl">🏠</div>
                     <div>
-                        <h1 class="text-2xl md:text-3xl font-bold bg-gradient-to-r from-purple-400 to-blue-400 bg-clip-text text-transparent">
-                            Life OS - Shapira Family
+                        <h1 class="text-xl md:text-2xl font-bold bg-gradient-to-r from-purple-400 to-blue-400 bg-clip-text text-transparent">
+                            Life OS Command Center
                         </h1>
-                        <p class="text-gray-400 text-sm mt-1">Real-Time Life Tracking • ADHD-Optimized</p>
+                        <p class="text-gray-400 text-xs">Real-Time ADHD-Optimized Tracking • Auto-updates every 30s</p>
                     </div>
                 </div>
                 <div class="flex items-center gap-4">
-                    <button onclick="openShareModal()" class="whatsapp-btn text-white px-4 py-2 rounded-xl flex items-center gap-2 font-semibold glow-whatsapp">
-                        <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
-                        Share
+                    <div id="last-cron" class="text-xs text-gray-500">Last sync: --</div>
+                    <button onclick="shareFullStatus()" class="whatsapp-btn text-white px-3 py-1.5 rounded-lg flex items-center gap-2 text-sm font-semibold">
+                        📱 Share
                     </button>
                     <div class="text-right">
-                        <div id="current-date" class="text-lg font-semibold text-purple-400"></div>
-                        <div id="current-time" class="text-2xl font-mono text-white"></div>
+                        <div id="current-time" class="text-xl font-mono text-white"></div>
+                        <div id="current-date" class="text-xs text-purple-400"></div>
                     </div>
                 </div>
             </div>
         </div>
 
-        <!-- Active Trip Banner with Quick Share -->
-        <div id="trip-banner" class="glass rounded-xl p-4 mb-6 border-l-4 border-blue-500 glow-blue hidden">
-            <div class="flex items-center justify-between flex-wrap gap-4">
-                <div class="flex items-center gap-4">
-                    <div class="text-4xl driving-animation">🚗</div>
+        <!-- Alert Banner for Interventions -->
+        <div id="intervention-banner" class="hidden glass rounded-xl p-3 mb-4 border-l-4 border-red-500 glow-red intervention-alert">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center gap-3">
+                    <div class="text-2xl">⚠️</div>
                     <div>
-                        <div class="text-lg font-semibold text-blue-400" id="trip-title">Loading...</div>
-                        <div class="text-sm text-gray-400" id="trip-route"></div>
+                        <div class="text-sm font-semibold text-red-400" id="intervention-title">Intervention Alert</div>
+                        <div class="text-xs text-gray-400" id="intervention-message"></div>
                     </div>
                 </div>
-                <div class="flex items-center gap-6">
-                    <div class="grid grid-cols-3 gap-6 text-center">
-                        <div>
-                            <div class="text-2xl font-bold text-white" id="trip-distance">--</div>
-                            <div class="text-xs text-gray-500">MILES</div>
-                        </div>
-                        <div>
-                            <div class="text-2xl font-bold text-white" id="trip-time">--</div>
-                            <div class="text-xs text-gray-500">EST. TIME</div>
-                        </div>
-                        <div>
-                            <div class="text-2xl font-bold text-green-400" id="trip-status">--</div>
-                            <div class="text-xs text-gray-500">STATUS</div>
-                        </div>
+                <button onclick="dismissIntervention()" class="text-gray-500 hover:text-white">✕</button>
+            </div>
+        </div>
+
+        <!-- Active Trip Banner -->
+        <div id="trip-banner" class="hidden glass rounded-xl p-3 mb-4 border-l-4 border-blue-500 glow-blue">
+            <div class="flex items-center justify-between flex-wrap gap-3">
+                <div class="flex items-center gap-3">
+                    <div class="text-3xl driving-animation">🚗</div>
+                    <div>
+                        <div class="text-sm font-semibold text-blue-400" id="trip-title">Trip</div>
+                        <div class="text-xs text-gray-400" id="trip-route"></div>
                     </div>
-                    <button onclick="shareUpdate('trip')" class="whatsapp-btn text-white p-3 rounded-full" title="Share trip update">
-                        <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
-                    </button>
+                </div>
+                <div class="flex items-center gap-4 text-center">
+                    <div><div class="text-lg font-bold text-white" id="trip-miles">--</div><div class="text-xs text-gray-500">MI</div></div>
+                    <div><div class="text-lg font-bold text-white" id="trip-eta">--</div><div class="text-xs text-gray-500">ETA</div></div>
+                    <div><div class="text-lg font-bold text-green-400" id="trip-status">--</div><div class="text-xs text-gray-500">STATUS</div></div>
                 </div>
             </div>
         </div>
 
         <!-- Main Grid -->
-        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
-            <!-- Left Column -->
-            <div class="lg:col-span-2 space-y-6">
-                <!-- Today's Tasks -->
-                <div class="glass rounded-xl p-5">
-                    <div class="flex items-center justify-between mb-4">
-                        <h2 class="text-lg font-semibold flex items-center gap-2">
-                            <span>📋</span> Today's Tasks
-                        </h2>
-                        <span id="task-count" class="text-sm text-gray-500">0 tasks</span>
-                    </div>
-                    <div id="tasks-list" class="space-y-3">
-                        <div class="text-center text-gray-500 py-4">Loading tasks...</div>
-                    </div>
-                </div>
-
-                <!-- Michael's Swim Meet -->
-                <div class="glass rounded-xl p-5 border-l-4 border-blue-400">
-                    <div class="flex items-center justify-between mb-4">
-                        <h2 class="text-lg font-semibold flex items-center gap-2">
-                            <span>🏊</span> Michael's Swim Meet
-                        </h2>
-                        <div class="flex items-center gap-2">
-                            <span class="status-badge bg-blue-900 text-blue-300" id="meet-status">TODAY</span>
-                            <button onclick="shareUpdate('swim')" class="whatsapp-btn text-white p-2 rounded-lg text-xs" title="Share">
-                                📱 Share
-                            </button>
+        <div class="grid grid-cols-1 lg:grid-cols-4 gap-4 mb-4">
+            <!-- Left: Productivity Score + Quick Stats -->
+            <div class="space-y-4">
+                <!-- Productivity Score Circle -->
+                <div class="glass rounded-xl p-4 text-center">
+                    <div class="relative inline-block">
+                        <svg class="w-28 h-28 progress-ring">
+                            <circle cx="56" cy="56" r="50" stroke="#1f2937" stroke-width="8" fill="none"/>
+                            <circle id="score-ring" cx="56" cy="56" r="50" stroke="#8b5cf6" stroke-width="8" fill="none"
+                                    stroke-dasharray="314" stroke-dashoffset="314" stroke-linecap="round"/>
+                        </svg>
+                        <div class="absolute inset-0 flex items-center justify-center">
+                            <div>
+                                <div id="productivity-score" class="text-2xl font-bold text-white">--</div>
+                                <div class="text-xs text-gray-500">SCORE</div>
+                            </div>
                         </div>
                     </div>
-                    <div id="swim-meet-details" class="space-y-3">
-                        <div class="text-center text-gray-500 py-4">Loading meet info...</div>
+                    <div class="text-xs text-gray-400 mt-2">Productivity Score</div>
+                </div>
+
+                <!-- Quick Stats -->
+                <div class="grid grid-cols-2 gap-2">
+                    <div class="glass rounded-lg p-3 text-center">
+                        <div id="stat-completed" class="text-xl font-bold text-green-400">0</div>
+                        <div class="text-xs text-gray-500">Completed</div>
+                    </div>
+                    <div class="glass rounded-lg p-3 text-center">
+                        <div id="stat-active" class="text-xl font-bold text-blue-400">0</div>
+                        <div class="text-xs text-gray-500">Active</div>
+                    </div>
+                    <div class="glass rounded-lg p-3 text-center">
+                        <div id="stat-abandoned" class="text-xl font-bold text-red-400">0</div>
+                        <div class="text-xs text-gray-500">Abandoned</div>
+                    </div>
+                    <div class="glass rounded-lg p-3 text-center">
+                        <div id="stat-interventions" class="text-xl font-bold text-orange-400">0</div>
+                        <div class="text-xs text-gray-500">Interventions</div>
                     </div>
                 </div>
 
-                <!-- Driving Log -->
-                <div class="glass rounded-xl p-5">
-                    <div class="flex items-center justify-between mb-4">
-                        <h2 class="text-lg font-semibold flex items-center gap-2">
-                            <span>🚗</span> Driving Log
-                        </h2>
-                        <span id="total-miles" class="text-sm text-gray-500">0 miles today</span>
-                    </div>
-                    <div id="driving-log" class="space-y-3">
-                        <div class="text-center text-gray-500 py-4">Loading trips...</div>
+                <!-- ADHD Metrics -->
+                <div class="glass rounded-xl p-4">
+                    <h3 class="text-sm font-semibold mb-3 flex items-center gap-2">🧠 ADHD Metrics</h3>
+                    <div class="space-y-3">
+                        <div>
+                            <div class="flex justify-between text-xs mb-1">
+                                <span class="text-gray-400">Focus Quality</span>
+                                <span id="focus-value" class="text-white">7/10</span>
+                            </div>
+                            <div class="h-2 bg-gray-700 rounded-full">
+                                <div id="focus-bar" class="h-full bg-purple-500 rounded-full" style="width: 70%"></div>
+                            </div>
+                        </div>
+                        <div>
+                            <div class="flex justify-between text-xs mb-1">
+                                <span class="text-gray-400">Energy Level</span>
+                                <span id="energy-value" class="text-white">7/10</span>
+                            </div>
+                            <div class="h-2 bg-gray-700 rounded-full">
+                                <div id="energy-bar" class="h-full bg-green-500 rounded-full" style="width: 70%"></div>
+                            </div>
+                        </div>
+                        <div>
+                            <div class="flex justify-between text-xs mb-1">
+                                <span class="text-gray-400">Context Switches</span>
+                                <span id="switches-value" class="text-white">0</span>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
 
-            <!-- Right Column -->
-            <div class="space-y-6">
-                <!-- Family Members -->
-                <div class="glass rounded-xl p-5">
-                    <h2 class="text-lg font-semibold mb-4 flex items-center gap-2">
-                        <span>👨‍👩‍👦</span> Family Status
-                    </h2>
-                    <div class="space-y-4">
-                        <div class="flex items-center justify-between p-3 bg-purple-900/30 rounded-lg">
-                            <div class="flex items-center gap-3">
-                                <div class="text-2xl">👤</div>
-                                <div>
-                                    <div class="font-medium">Ariel</div>
-                                    <div class="text-xs text-gray-400" id="ariel-status">At Home</div>
-                                </div>
-                            </div>
-                            <div class="text-green-400 text-sm" id="ariel-icon">🏠</div>
+            <!-- Center: Task Timeline -->
+            <div class="lg:col-span-2 space-y-4">
+                <!-- Active Tasks -->
+                <div class="glass rounded-xl p-4">
+                    <div class="flex items-center justify-between mb-3">
+                        <h3 class="text-sm font-semibold flex items-center gap-2">📋 Active Tasks</h3>
+                        <span id="active-count" class="text-xs text-gray-500">0 tasks</span>
+                    </div>
+                    <div id="active-tasks" class="space-y-2 max-h-48 overflow-y-auto">
+                        <div class="text-center text-gray-500 py-4 text-sm">No active tasks</div>
+                    </div>
+                </div>
+
+                <!-- Timeline -->
+                <div class="glass rounded-xl p-4">
+                    <div class="flex items-center justify-between mb-3">
+                        <h3 class="text-sm font-semibold flex items-center gap-2">📅 Today's Timeline</h3>
+                        <span id="timeline-count" class="text-xs text-gray-500">0 events</span>
+                    </div>
+                    <div id="timeline" class="space-y-2 max-h-64 overflow-y-auto timeline-line">
+                        <div class="text-center text-gray-500 py-4 text-sm">No events yet</div>
+                    </div>
+                </div>
+
+                <!-- Interventions Log -->
+                <div class="glass rounded-xl p-4">
+                    <div class="flex items-center justify-between mb-3">
+                        <h3 class="text-sm font-semibold flex items-center gap-2">⚠️ Interventions</h3>
+                        <span id="intervention-count" class="text-xs text-gray-500">0 today</span>
+                    </div>
+                    <div id="interventions-list" class="space-y-2 max-h-32 overflow-y-auto">
+                        <div class="text-center text-gray-500 py-2 text-sm">No interventions</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right: Domain Stats + Family -->
+            <div class="space-y-4">
+                <!-- Domain Breakdown -->
+                <div class="glass rounded-xl p-4">
+                    <h3 class="text-sm font-semibold mb-3">📊 By Domain</h3>
+                    <div class="space-y-2">
+                        <div class="flex items-center justify-between">
+                            <span class="text-xs flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-purple-500"></span> ARIEL</span>
+                            <span id="domain-ariel" class="text-xs text-white">0/0</span>
                         </div>
-                        <div class="flex items-center justify-between p-3 bg-blue-900/30 rounded-lg">
-                            <div class="flex items-center gap-3">
-                                <div class="text-2xl">🏊</div>
-                                <div>
-                                    <div class="font-medium">Michael</div>
-                                    <div class="text-xs text-gray-400" id="michael-status">At Home</div>
-                                </div>
-                            </div>
-                            <div class="text-blue-400 text-sm" id="michael-icon">🏠</div>
+                        <div class="flex items-center justify-between">
+                            <span class="text-xs flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-blue-500"></span> MICHAEL</span>
+                            <span id="domain-michael" class="text-xs text-white">0/0</span>
                         </div>
-                        <div class="flex items-center justify-between p-3 bg-green-900/30 rounded-lg">
-                            <div class="flex items-center gap-3">
-                                <div class="text-2xl">👩</div>
-                                <div>
-                                    <div class="font-medium">Mariam</div>
-                                    <div class="text-xs text-gray-400">Home - Satellite Beach</div>
-                                </div>
-                            </div>
-                            <div class="text-green-400 text-sm">🏠</div>
+                        <div class="flex items-center justify-between">
+                            <span class="text-xs flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-green-500"></span> FAMILY</span>
+                            <span id="domain-family" class="text-xs text-white">0/0</span>
+                        </div>
+                        <div class="flex items-center justify-between">
+                            <span class="text-xs flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-orange-500"></span> BUSINESS</span>
+                            <span id="domain-business" class="text-xs text-white">0/0</span>
                         </div>
                     </div>
                 </div>
 
-                <!-- Hotel Reservation -->
-                <div class="glass rounded-xl p-5 border-l-4 border-orange-400">
-                    <div class="flex items-center justify-between mb-4">
-                        <h2 class="text-lg font-semibold flex items-center gap-2">
-                            <span>🏨</span> Hotel Tonight
-                        </h2>
-                        <button onclick="shareUpdate('hotel')" class="whatsapp-btn text-white p-2 rounded-lg text-xs">
-                            📱 Share
-                        </button>
-                    </div>
-                    <div id="hotel-details">
-                        <div class="text-center text-gray-500 py-4">Loading...</div>
+                <!-- Family Status -->
+                <div class="glass rounded-xl p-4">
+                    <h3 class="text-sm font-semibold mb-3">👨‍👩‍👦 Family</h3>
+                    <div class="space-y-2">
+                        <div class="flex items-center justify-between p-2 bg-purple-900/30 rounded-lg">
+                            <span class="text-xs">👤 Ariel</span>
+                            <span id="ariel-status" class="text-xs text-gray-400">--</span>
+                        </div>
+                        <div class="flex items-center justify-between p-2 bg-blue-900/30 rounded-lg">
+                            <span class="text-xs">🏊 Michael</span>
+                            <span id="michael-status" class="text-xs text-gray-400">--</span>
+                        </div>
+                        <div class="flex items-center justify-between p-2 bg-green-900/30 rounded-lg">
+                            <span class="text-xs">👩 Mariam</span>
+                            <span class="text-xs text-gray-400">Home</span>
+                        </div>
                     </div>
                 </div>
 
-                <!-- Michael's Nutrition -->
-                <div class="glass rounded-xl p-5 border-l-4 border-green-400">
-                    <h2 class="text-lg font-semibold mb-4 flex items-center gap-2">
-                        <span>🥗</span> Michael's Nutrition
-                    </h2>
-                    <div id="nutrition-details">
-                        <div class="text-center text-gray-500 py-4">Loading...</div>
+                <!-- Today's Events -->
+                <div class="glass rounded-xl p-4">
+                    <h3 class="text-sm font-semibold mb-3">🗓️ Events</h3>
+                    <div id="events-list" class="space-y-2">
+                        <div class="text-center text-gray-500 py-2 text-xs">No events</div>
                     </div>
                 </div>
 
                 <!-- Home Base -->
-                <div class="glass rounded-xl p-5">
-                    <h2 class="text-lg font-semibold mb-4 flex items-center gap-2">
-                        <span>🏠</span> Home Base
-                    </h2>
-                    <div class="text-sm">
-                        <div class="text-gray-400">390 Roosevelt Ave</div>
-                        <div class="text-white font-medium">Satellite Beach, FL 32937</div>
-                        <div class="mt-3 flex items-center gap-2 text-xs text-gray-500">
-                            <span>🌴</span> Brevard County
+                <div class="glass rounded-xl p-3">
+                    <div class="flex items-center gap-2">
+                        <span class="text-lg">🏠</span>
+                        <div>
+                            <div class="text-xs text-white">390 Roosevelt Ave</div>
+                            <div class="text-xs text-gray-500">Satellite Beach, FL 32937</div>
                         </div>
                     </div>
                 </div>
-            </div>
-        </div>
-
-        <!-- Quick Stats -->
-        <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-            <div class="glass rounded-xl p-4 text-center">
-                <div class="text-3xl font-bold text-purple-400" id="stat-tasks">0</div>
-                <div class="text-xs text-gray-500 uppercase">Tasks Today</div>
-            </div>
-            <div class="glass rounded-xl p-4 text-center">
-                <div class="text-3xl font-bold text-blue-400" id="stat-miles">0</div>
-                <div class="text-xs text-gray-500 uppercase">Miles Today</div>
-            </div>
-            <div class="glass rounded-xl p-4 text-center">
-                <div class="text-3xl font-bold text-green-400" id="stat-events">0</div>
-                <div class="text-xs text-gray-500 uppercase">Events</div>
-            </div>
-            <div class="glass rounded-xl p-4 text-center">
-                <div class="text-3xl font-bold text-orange-400" id="stat-focus">--</div>
-                <div class="text-xs text-gray-500 uppercase">Focus Score</div>
             </div>
         </div>
 
         <!-- Footer -->
         <div class="text-center text-gray-500 text-xs">
-            <p>Life OS v2.1 • Created by Ariel Shapira • Auto-refreshes every 30s</p>
+            <p>Life OS v2.0 • XGBoost ADHD Monitor • Created by Ariel Shapira</p>
         </div>
     </div>
 
@@ -308,336 +296,271 @@
             'Content-Type': 'application/json'
         };
 
-        // Store data globally for sharing
-        let currentData = {
-            trip: null,
-            swimMeet: null,
-            hotel: null,
-            tasks: []
-        };
+        let currentData = { tasks: [], interventions: [], activities: [], metrics: null };
 
-        // WhatsApp Share Functions
-        function openShareModal() {
-            document.getElementById('share-modal').classList.add('active');
-        }
-
-        function closeShareModal() {
-            document.getElementById('share-modal').classList.remove('active');
-        }
-
-        function generateMessage(type) {
+        function updateClock() {
             const now = new Date();
-            const timeStr = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
-            const dateStr = now.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' });
-            
-            let msg = `🏠 *Shapira Family Update*\n📅 ${dateStr} • ${timeStr}\n\n`;
-            
-            if (type === 'trip' && currentData.trip) {
-                const t = currentData.trip;
-                msg += `🚗 *TRAVEL UPDATE*\n`;
-                msg += `━━━━━━━━━━━━━━━\n`;
-                msg += `📍 From: ${t.origin || 'Home'}\n`;
-                msg += `📍 To: ${t.destination || 'Destination'}\n`;
-                msg += `🛣️ Distance: ${t.distance_miles || '?'} miles\n`;
-                msg += `⏱️ Est. Time: ${Math.floor((t.estimated_time_minutes || 0) / 60)}h ${(t.estimated_time_minutes || 0) % 60}m\n`;
-                msg += `👥 Travelers: ${(t.travelers || []).join(', ')}\n`;
-                msg += `📊 Status: ${(t.status || 'unknown').toUpperCase()}\n`;
-                if (t.departure_time) msg += `🕐 Departure: ${t.departure_time}\n`;
-            }
-            else if (type === 'swim' && currentData.swimMeet) {
-                const s = currentData.swimMeet;
-                msg += `🏊 *MICHAEL'S SWIM MEET*\n`;
-                msg += `━━━━━━━━━━━━━━━\n`;
-                msg += `🏆 ${s.meet_name || 'Swim Meet'}\n`;
-                msg += `📍 ${s.location || 'TBD'}\n`;
-                msg += `🏫 ${s.school || ''}\n\n`;
-                msg += `*Events:*\n`;
-                (s.events || []).forEach(e => {
-                    msg += `  • ${e.event} (Seed: ${e.seed_time || 'NT'})\n`;
-                });
-                msg += `\n⏰ Warmup: ${s.warmup_time || 'TBD'}\n`;
-                msg += `🍽️ Diet: ${s.diet_today || 'Standard'}\n`;
-            }
-            else if (type === 'hotel' && currentData.hotel) {
-                const h = currentData.hotel;
-                msg += `🏨 *HOTEL RESERVATION*\n`;
-                msg += `━━━━━━━━━━━━━━━\n`;
-                msg += `🏨 ${h.hotel_name || 'Hotel TBD'}\n`;
-                msg += `📍 ${h.address || 'Address TBD'}\n`;
-                msg += `📥 Check-in: ${h.check_in || 'TBD'}\n`;
-                msg += `📤 Check-out: ${h.check_out || 'TBD'}\n`;
-                msg += `👥 Guests: ${(h.guests || []).join(', ')}\n`;
-            }
-            else if (type === 'full') {
-                msg += `📋 *FULL STATUS UPDATE*\n`;
-                msg += `━━━━━━━━━━━━━━━\n\n`;
-                
-                if (currentData.trip) {
-                    msg += `🚗 *Travel:* ${currentData.trip.origin} → ${currentData.trip.destination}\n`;
-                    msg += `   ${currentData.trip.distance_miles} mi • Depart: ${currentData.trip.departure_time || 'TBD'}\n\n`;
-                }
-                
-                if (currentData.swimMeet) {
-                    msg += `🏊 *Swim Meet:* ${currentData.swimMeet.meet_name}\n`;
-                    msg += `   📍 ${currentData.swimMeet.location}\n`;
-                    msg += `   Events: ${(currentData.swimMeet.events || []).map(e => e.event).join(', ')}\n\n`;
-                }
-                
-                if (currentData.hotel) {
-                    msg += `🏨 *Hotel:* ${currentData.hotel.hotel_name || 'TBD'}\n`;
-                    msg += `   Check-in: ${currentData.hotel.check_in || 'TBD'}\n\n`;
-                }
-                
-                msg += `👨‍👩‍👦 *Family:*\n`;
-                msg += `   • Ariel & Michael: Traveling to Ocala\n`;
-                msg += `   • Mariam: Home (Satellite Beach)\n`;
-            }
-            
-            msg += `\n━━━━━━━━━━━━━━━\n`;
-            msg += `_Sent from Life OS_`;
-            
-            return msg;
-        }
-
-        function shareUpdate(type) {
-            const message = generateMessage(type);
-            const encoded = encodeURIComponent(message);
-            window.open(`https://wa.me/?text=${encoded}`, '_blank');
-            closeShareModal();
-        }
-
-        function shareToNumber() {
-            const phone = document.getElementById('phone-number').value.replace(/\D/g, '');
-            if (!phone) {
-                alert('Please enter a phone number');
-                return;
-            }
-            const message = generateMessage('full');
-            const encoded = encodeURIComponent(message);
-            window.open(`https://wa.me/${phone}?text=${encoded}`, '_blank');
-            closeShareModal();
-        }
-
-        // Update time display
-        function updateTime() {
-            const now = new Date();
-            const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
-            document.getElementById('current-date').textContent = now.toLocaleDateString('en-US', options);
             document.getElementById('current-time').textContent = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+            document.getElementById('current-date').textContent = now.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
         }
-        setInterval(updateTime, 1000);
-        updateTime();
+        setInterval(updateClock, 1000);
+        updateClock();
 
-        async function fetchData() {
+        function updateProductivityRing(score) {
+            const ring = document.getElementById('score-ring');
+            const circumference = 314;
+            const offset = circumference - (score / 100 * circumference);
+            ring.style.strokeDashoffset = offset;
+            
+            // Color based on score
+            if (score >= 70) ring.style.stroke = '#10b981';
+            else if (score >= 50) ring.style.stroke = '#f59e0b';
+            else ring.style.stroke = '#ef4444';
+            
+            document.getElementById('productivity-score').textContent = Math.round(score);
+        }
+
+        async function fetchAllData() {
+            const today = new Date().toISOString().split('T')[0];
+            
             try {
-                const res = await fetch(
-                    `${SUPABASE_URL}/rest/v1/activities?platform=eq.life_os&order=start_time.desc`,
+                // Fetch tasks
+                const tasksRes = await fetch(
+                    `${SUPABASE_URL}/rest/v1/task_states?initiated_at=gte.${today}T00:00:00&order=initiated_at.desc`,
                     { headers }
                 );
-                const activities = await res.json();
-                
-                let totalMiles = 0;
-                let taskCount = 0;
-                let eventCount = 0;
-                
-                const tasks = [];
-                const trips = [];
-                let activeTrip = null;
-                let swimMeet = null;
-                let hotel = null;
-                let nutrition = null;
-                
-                activities.forEach(a => {
-                    try {
-                        const data = JSON.parse(a.notes || '{}');
-                        
-                        if (a.activity_type === 'DRIVING') {
-                            const trip = { ...a, ...data };
-                            trips.push(trip);
-                            totalMiles += data.distance_miles || 0;
-                            if (data.status === 'in_progress' || data.status === 'scheduled') {
-                                activeTrip = trip;
-                                currentData.trip = trip;
-                            }
-                        }
-                        else if (a.activity_type === 'TASK') {
-                            tasks.push({ ...a, ...data });
-                            taskCount++;
-                        }
-                        else if (a.activity_type === 'SWIM_MEET') {
-                            swimMeet = { ...a, ...data };
-                            currentData.swimMeet = swimMeet;
-                            eventCount++;
-                        }
-                        else if (a.activity_type === 'HOTEL') {
-                            hotel = { ...a, ...data };
-                            currentData.hotel = hotel;
-                        }
-                        else if (a.activity_type === 'NUTRITION') {
-                            nutrition = { ...a, ...data };
-                        }
-                    } catch(e) {}
-                });
-                
-                currentData.tasks = tasks;
-                
-                // Update stats
-                document.getElementById('stat-tasks').textContent = taskCount;
-                document.getElementById('stat-miles').textContent = totalMiles;
-                document.getElementById('stat-events').textContent = eventCount;
-                document.getElementById('task-count').textContent = `${taskCount} tasks`;
-                document.getElementById('total-miles').textContent = `${totalMiles} miles today`;
-                
-                // Update family status based on trip
-                if (activeTrip && (activeTrip.status === 'in_progress' || activeTrip.status === 'scheduled')) {
-                    document.getElementById('ariel-status').textContent = `Traveling to ${activeTrip.destination || 'Ocala'}`;
-                    document.getElementById('ariel-icon').textContent = '🚗';
-                    document.getElementById('michael-status').textContent = `Swim Meet - ${activeTrip.destination || 'Ocala'}`;
-                    document.getElementById('michael-icon').textContent = '🏊';
-                }
-                
-                // Render trip banner
-                if (activeTrip) {
-                    document.getElementById('trip-banner').classList.remove('hidden');
-                    document.getElementById('trip-title').textContent = activeTrip.title || 'Active Trip';
-                    document.getElementById('trip-route').textContent = `${activeTrip.origin || 'Origin'} → ${activeTrip.destination || 'Destination'}`;
-                    document.getElementById('trip-distance').textContent = activeTrip.distance_miles || '--';
-                    const hours = Math.floor((activeTrip.estimated_time_minutes || 0) / 60);
-                    const mins = (activeTrip.estimated_time_minutes || 0) % 60;
-                    document.getElementById('trip-time').textContent = `${hours}h ${mins}m`;
-                    document.getElementById('trip-status').textContent = (activeTrip.status || 'SCHEDULED').toUpperCase();
-                    if (activeTrip.departure_time) {
-                        document.getElementById('trip-route').textContent += ` • Depart: ${activeTrip.departure_time}`;
-                    }
-                }
-                
-                // Render tasks
-                const tasksHtml = tasks.length > 0 ? tasks.map(t => {
-                    const statusColors = {
-                        'completed': 'bg-green-900/50 text-green-300',
-                        'in_progress': 'bg-blue-900/50 text-blue-300',
-                        'scheduled': 'bg-purple-900/50 text-purple-300',
-                        'pending': 'bg-gray-700 text-gray-300'
-                    };
-                    const statusIcons = {
-                        'completed': '✅',
-                        'in_progress': '🔄',
-                        'scheduled': '📅',
-                        'pending': '⏳'
-                    };
-                    return `
-                        <div class="flex items-center justify-between p-3 bg-gray-800/50 rounded-lg">
-                            <div class="flex items-center gap-3">
-                                <span class="text-xl">${statusIcons[t.status] || '📌'}</span>
-                                <div>
-                                    <div class="font-medium">${t.title || 'Task'}</div>
-                                    <div class="text-xs text-gray-500">${t.description || ''}</div>
-                                </div>
-                            </div>
-                            <span class="status-badge ${statusColors[t.status] || 'bg-gray-700 text-gray-300'}">${(t.status || 'pending').toUpperCase()}</span>
-                        </div>
-                    `;
-                }).join('') : '<div class="text-center text-gray-500 py-4">No tasks for today</div>';
-                document.getElementById('tasks-list').innerHTML = tasksHtml;
-                
-                // Render swim meet
-                if (swimMeet) {
-                    const events = swimMeet.events || [];
-                    document.getElementById('swim-meet-details').innerHTML = `
-                        <div class="mb-3">
-                            <div class="text-lg font-semibold text-white">${swimMeet.meet_name || 'Swim Meet'}</div>
-                            <div class="text-sm text-gray-400">📍 ${swimMeet.location || 'TBD'}</div>
-                            <div class="text-sm text-gray-400">🏫 ${swimMeet.school || ''}</div>
-                        </div>
-                        <div class="grid grid-cols-3 gap-2 mb-3">
-                            ${events.map(e => `
-                                <div class="bg-blue-900/30 rounded-lg p-2 text-center">
-                                    <div class="font-semibold text-blue-300">${e.event}</div>
-                                    <div class="text-xs text-gray-400">Seed: ${e.seed_time || 'NT'}</div>
-                                </div>
-                            `).join('')}
-                        </div>
-                        <div class="flex items-center justify-between text-sm">
-                            <span class="text-gray-400">🍽️ ${swimMeet.diet_today || 'Standard'}</span>
-                            <span class="text-gray-400">⏰ Warmup: ${swimMeet.warmup_time || 'TBD'}</span>
-                        </div>
-                    `;
-                }
-                
-                // Render hotel
-                if (hotel) {
-                    document.getElementById('hotel-details').innerHTML = `
-                        <div class="space-y-2">
-                            <div class="font-semibold text-orange-300">${hotel.hotel_name || 'Hotel TBD'}</div>
-                            <div class="text-sm text-gray-400">📍 ${hotel.address || 'Address TBD'}</div>
-                            <div class="flex justify-between text-sm mt-3">
-                                <div><span class="text-gray-500">Check-in:</span> <span class="text-white">${hotel.check_in || 'TBD'}</span></div>
-                            </div>
-                            <div class="flex justify-between text-sm">
-                                <div><span class="text-gray-500">Check-out:</span> <span class="text-white">${hotel.check_out || 'TBD'}</span></div>
-                            </div>
-                            <div class="text-xs text-gray-500 mt-2">👥 ${(hotel.guests || []).join(', ')}</div>
-                        </div>
-                    `;
-                }
-                
-                // Render nutrition
-                if (nutrition) {
-                    document.getElementById('nutrition-details').innerHTML = `
-                        <div class="space-y-2">
-                            <div class="flex items-center justify-between">
-                                <span class="text-green-400 font-medium">${nutrition.diet_phase?.toUpperCase() || 'STANDARD'}</span>
-                                <span class="text-xs text-gray-500">${nutrition.meal_type || ''}</span>
-                            </div>
-                            <div class="text-sm text-gray-400">${(nutrition.foods || []).join(', ')}</div>
-                            <div class="grid grid-cols-3 gap-2 mt-3 text-center text-xs">
-                                <div class="bg-gray-800 rounded p-2">
-                                    <div class="text-white font-bold">${nutrition.total_calories || 0}</div>
-                                    <div class="text-gray-500">Cal</div>
-                                </div>
-                                <div class="bg-gray-800 rounded p-2">
-                                    <div class="text-white font-bold">${nutrition.total_protein_g || 0}g</div>
-                                    <div class="text-gray-500">Protein</div>
-                                </div>
-                                <div class="bg-gray-800 rounded p-2">
-                                    <div class="text-white font-bold">${nutrition.total_carbs_g || 0}g</div>
-                                    <div class="text-gray-500">Carbs</div>
-                                </div>
-                            </div>
-                        </div>
-                    `;
-                }
-                
-                // Render driving log
-                const drivingHtml = trips.length > 0 ? trips.map(t => `
-                    <div class="flex items-center justify-between p-3 bg-gray-800/50 rounded-lg">
-                        <div class="flex items-center gap-3">
-                            <span class="text-xl">${t.status === 'in_progress' ? '🚗' : t.status === 'scheduled' ? '📅' : '✅'}</span>
-                            <div>
-                                <div class="font-medium">${t.title || 'Trip'}</div>
-                                <div class="text-xs text-gray-500">${t.departure_time ? 'Depart: ' + t.departure_time : ''}</div>
-                            </div>
-                        </div>
-                        <div class="text-right">
-                            <div class="font-bold text-blue-400">${t.distance_miles || 0} mi</div>
-                            <div class="text-xs text-gray-500">${Math.floor((t.estimated_time_minutes || 0) / 60)}h ${(t.estimated_time_minutes || 0) % 60}m</div>
-                        </div>
-                    </div>
-                `).join('') : '<div class="text-center text-gray-500 py-4">No trips logged today</div>';
-                document.getElementById('driving-log').innerHTML = drivingHtml;
-                
-            } catch(e) {
+                currentData.tasks = await tasksRes.json();
+
+                // Fetch interventions
+                const intRes = await fetch(
+                    `${SUPABASE_URL}/rest/v1/task_interventions?triggered_at=gte.${today}T00:00:00&order=triggered_at.desc`,
+                    { headers }
+                );
+                currentData.interventions = await intRes.json();
+
+                // Fetch activities (including trips)
+                const actRes = await fetch(
+                    `${SUPABASE_URL}/rest/v1/activities?start_time=gte.${today}T00:00:00&order=start_time.desc`,
+                    { headers }
+                );
+                currentData.activities = await actRes.json();
+
+                // Fetch daily metrics
+                const metRes = await fetch(
+                    `${SUPABASE_URL}/rest/v1/daily_metrics?date=eq.${today}&limit=1`,
+                    { headers }
+                );
+                const metrics = await metRes.json();
+                currentData.metrics = metrics[0] || null;
+
+                renderDashboard();
+            } catch (e) {
                 console.error('Fetch error:', e);
             }
         }
 
-        // Close modal on outside click
-        document.getElementById('share-modal').addEventListener('click', function(e) {
-            if (e.target === this) closeShareModal();
-        });
+        function renderDashboard() {
+            const tasks = currentData.tasks || [];
+            const interventions = currentData.interventions || [];
+            const activities = currentData.activities || [];
+            const metrics = currentData.metrics;
 
-        fetchData();
-        setInterval(fetchData, 30000);
+            // Calculate stats
+            const completed = tasks.filter(t => t.status === 'COMPLETED').length;
+            const abandoned = tasks.filter(t => t.status === 'ABANDONED').length;
+            const active = tasks.filter(t => !['COMPLETED', 'ABANDONED', 'DEFERRED'].includes(t.status)).length;
+            const total = tasks.length;
+
+            // Update quick stats
+            document.getElementById('stat-completed').textContent = completed;
+            document.getElementById('stat-active').textContent = active;
+            document.getElementById('stat-abandoned').textContent = abandoned;
+            document.getElementById('stat-interventions').textContent = interventions.length;
+
+            // Update productivity score
+            const score = metrics?.productivity_score || (total > 0 ? Math.round((completed / total) * 100) : 0);
+            updateProductivityRing(score);
+
+            // Update ADHD metrics
+            const focus = metrics?.average_focus_quality || 7;
+            const energy = metrics?.energy_average || 7;
+            const switches = metrics?.context_switches || 0;
+            
+            document.getElementById('focus-value').textContent = `${focus}/10`;
+            document.getElementById('focus-bar').style.width = `${focus * 10}%`;
+            document.getElementById('energy-value').textContent = `${energy}/10`;
+            document.getElementById('energy-bar').style.width = `${energy * 10}%`;
+            document.getElementById('switches-value').textContent = switches;
+
+            // Domain breakdown
+            const domains = { ARIEL: {c: 0, t: 0}, MICHAEL: {c: 0, t: 0}, FAMILY: {c: 0, t: 0}, BUSINESS: {c: 0, t: 0} };
+            tasks.forEach(t => {
+                const d = t.domain || 'ARIEL';
+                if (domains[d]) {
+                    domains[d].t++;
+                    if (t.status === 'COMPLETED') domains[d].c++;
+                }
+            });
+            
+            document.getElementById('domain-ariel').textContent = `${domains.ARIEL.c}/${domains.ARIEL.t}`;
+            document.getElementById('domain-michael').textContent = `${domains.MICHAEL.c}/${domains.MICHAEL.t}`;
+            document.getElementById('domain-family').textContent = `${domains.FAMILY.c}/${domains.FAMILY.t}`;
+            document.getElementById('domain-business').textContent = `${domains.BUSINESS.c}/${domains.BUSINESS.t}`;
+
+            // Render active tasks
+            const activeTasks = tasks.filter(t => !['COMPLETED', 'ABANDONED', 'DEFERRED'].includes(t.status));
+            document.getElementById('active-count').textContent = `${activeTasks.length} tasks`;
+            document.getElementById('active-tasks').innerHTML = activeTasks.length > 0 
+                ? activeTasks.slice(0, 5).map(t => {
+                    const statusColors = {
+                        'INITIATED': 'bg-gray-600',
+                        'SOLUTION_PROVIDED': 'bg-yellow-600',
+                        'IN_PROGRESS': 'bg-blue-600'
+                    };
+                    const elapsed = t.initiated_at ? Math.round((Date.now() - new Date(t.initiated_at).getTime()) / 60000) : 0;
+                    return `
+                        <div class="flex items-center justify-between p-2 bg-gray-800/50 rounded-lg">
+                            <div class="flex-1 min-w-0">
+                                <div class="text-xs font-medium truncate">${t.description || 'Task'}</div>
+                                <div class="text-xs text-gray-500">${t.domain} • ${elapsed}m elapsed</div>
+                            </div>
+                            <span class="status-badge ${statusColors[t.status] || 'bg-gray-600'} text-white ml-2">${t.status}</span>
+                        </div>
+                    `;
+                }).join('')
+                : '<div class="text-center text-gray-500 py-4 text-sm">No active tasks</div>';
+
+            // Render timeline
+            const timeline = [];
+            tasks.forEach(t => {
+                if (t.initiated_at) timeline.push({ time: t.initiated_at, type: 'START', desc: t.description, domain: t.domain });
+                if (t.completed_at) timeline.push({ time: t.completed_at, type: 'DONE', desc: t.description });
+                if (t.abandoned_at) timeline.push({ time: t.abandoned_at, type: 'ABANDONED', desc: t.description });
+            });
+            interventions.forEach(i => {
+                if (i.triggered_at) timeline.push({ time: i.triggered_at, type: `INT_L${i.intervention_level}`, desc: i.task_description, level: i.intervention_level });
+            });
+            timeline.sort((a, b) => new Date(b.time) - new Date(a.time));
+
+            document.getElementById('timeline-count').textContent = `${timeline.length} events`;
+            document.getElementById('timeline').innerHTML = timeline.length > 0
+                ? timeline.slice(0, 10).map(e => {
+                    const time = new Date(e.time).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+                    const icons = { START: '📝', DONE: '✅', ABANDONED: '❌', INT_L1: '📌', INT_L2: '🔄', INT_L3: '⚠️' };
+                    const colors = { START: 'text-blue-400', DONE: 'text-green-400', ABANDONED: 'text-red-400', INT_L1: 'text-yellow-400', INT_L2: 'text-orange-400', INT_L3: 'text-red-400' };
+                    return `
+                        <div class="relative pl-4">
+                            <div class="timeline-dot"></div>
+                            <div class="flex items-center gap-2">
+                                <span class="text-xs text-gray-500 w-12">${time}</span>
+                                <span>${icons[e.type] || '•'}</span>
+                                <span class="text-xs ${colors[e.type] || 'text-gray-400'} truncate flex-1">${e.desc?.substring(0, 30) || e.type}</span>
+                            </div>
+                        </div>
+                    `;
+                }).join('')
+                : '<div class="text-center text-gray-500 py-4 text-sm">No events yet</div>';
+
+            // Render interventions
+            document.getElementById('intervention-count').textContent = `${interventions.length} today`;
+            document.getElementById('interventions-list').innerHTML = interventions.length > 0
+                ? interventions.slice(0, 5).map(i => {
+                    const levelColors = { 1: 'border-yellow-500', 2: 'border-orange-500', 3: 'border-red-500' };
+                    return `
+                        <div class="p-2 bg-gray-800/50 rounded-lg border-l-2 ${levelColors[i.intervention_level] || 'border-gray-500'}">
+                            <div class="text-xs font-medium">L${i.intervention_level}: ${i.task_description?.substring(0, 25) || 'Task'}</div>
+                            <div class="text-xs text-gray-500">${i.risk_level} risk • ${Math.round(i.abandonment_probability * 100)}% abandon prob</div>
+                        </div>
+                    `;
+                }).join('')
+                : '<div class="text-center text-gray-500 py-2 text-sm">No interventions</div>';
+
+            // Check for active trip
+            const tripActivity = activities.find(a => {
+                try {
+                    const notes = JSON.parse(a.notes || '{}');
+                    return a.activity_type === 'DRIVING' && (notes.status === 'in_progress' || notes.status === 'scheduled');
+                } catch { return false; }
+            });
+
+            if (tripActivity) {
+                const trip = JSON.parse(tripActivity.notes || '{}');
+                document.getElementById('trip-banner').classList.remove('hidden');
+                document.getElementById('trip-title').textContent = trip.title || 'Active Trip';
+                document.getElementById('trip-route').textContent = `${trip.origin || 'Home'} → ${trip.destination || 'Destination'}${trip.departure_time ? ' • Depart: ' + trip.departure_time : ''}`;
+                document.getElementById('trip-miles').textContent = trip.distance_miles || '--';
+                
+                const hours = Math.floor((trip.estimated_time_minutes || 0) / 60);
+                const mins = (trip.estimated_time_minutes || 0) % 60;
+                document.getElementById('trip-eta').textContent = `${hours}h${mins}m`;
+                document.getElementById('trip-status').textContent = (trip.status || 'SCHEDULED').toUpperCase();
+
+                document.getElementById('ariel-status').textContent = `→ ${trip.destination || 'Traveling'}`;
+                document.getElementById('michael-status').textContent = `→ ${trip.destination || 'Traveling'}`;
+            } else {
+                document.getElementById('trip-banner').classList.add('hidden');
+                document.getElementById('ariel-status').textContent = 'Home';
+                document.getElementById('michael-status').textContent = 'Home';
+            }
+
+            // Check for swim meet
+            const swimMeet = activities.find(a => a.activity_type === 'SWIM_MEET');
+            if (swimMeet) {
+                try {
+                    const meet = JSON.parse(swimMeet.notes || '{}');
+                    document.getElementById('events-list').innerHTML = `
+                        <div class="p-2 bg-blue-900/30 rounded-lg">
+                            <div class="text-xs font-medium text-blue-400">🏊 ${meet.meet_name || 'Swim Meet'}</div>
+                            <div class="text-xs text-gray-400">${meet.location || 'Location TBD'}</div>
+                            <div class="text-xs text-gray-500 mt-1">${(meet.events || []).map(e => e.event).join(', ')}</div>
+                        </div>
+                    `;
+                    document.getElementById('michael-status').textContent = `🏊 ${meet.meet_name || 'Swim Meet'}`;
+                } catch {}
+            }
+
+            // Show latest intervention alert
+            if (interventions.length > 0) {
+                const latest = interventions[0];
+                const thirtyMinsAgo = Date.now() - 30 * 60 * 1000;
+                if (new Date(latest.triggered_at).getTime() > thirtyMinsAgo) {
+                    document.getElementById('intervention-banner').classList.remove('hidden');
+                    document.getElementById('intervention-title').textContent = `Level ${latest.intervention_level} Intervention`;
+                    document.getElementById('intervention-message').textContent = latest.message?.substring(0, 100) || 'Check your task';
+                }
+            }
+
+            // Last cron
+            const cronRun = activities.find(a => a.activity_type === 'CRON_RUN');
+            if (cronRun) {
+                const time = new Date(cronRun.start_time).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+                document.getElementById('last-cron').textContent = `Last sync: ${time}`;
+            }
+        }
+
+        function dismissIntervention() {
+            document.getElementById('intervention-banner').classList.add('hidden');
+        }
+
+        function shareFullStatus() {
+            const tasks = currentData.tasks || [];
+            const completed = tasks.filter(t => t.status === 'COMPLETED').length;
+            const active = tasks.filter(t => !['COMPLETED', 'ABANDONED', 'DEFERRED'].includes(t.status)).length;
+            
+            const now = new Date();
+            let msg = `🏠 *Life OS Status Update*\n`;
+            msg += `📅 ${now.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })} • ${now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}\n\n`;
+            msg += `📊 *Tasks:* ${completed}/${tasks.length} completed\n`;
+            msg += `🔄 *Active:* ${active} in progress\n`;
+            msg += `🧠 *Score:* ${currentData.metrics?.productivity_score || '--'}/100\n`;
+            msg += `\n_Sent from Life OS_`;
+            
+            window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, '_blank');
+        }
+
+        // Initial fetch and auto-refresh
+        fetchAllData();
+        setInterval(fetchAllData, 30000);
     </script>
 </body>
 </html>
