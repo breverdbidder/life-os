@@ -47,7 +47,7 @@ def generate_daily_report():
 - **In Progress**: {len([t for t in tasks if t['status'] == 'IN_PROGRESS'])}
 - **Abandoned**: {len([t for t in tasks if t['status'] == 'ABANDONED'])}
 
-### 🧠 ADHD Interventions
+### 🧠 Focus Interventions
 - **Total Interventions**: {len(interventions)}
 - **Level 1 (Quick Check)**: {len([i for i in interventions if i.get('intervention_level') == 1])}
 - **Level 2 (Pattern)**: {len([i for i in interventions if i.get('intervention_level') == 2])}
