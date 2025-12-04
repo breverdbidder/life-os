@@ -48,7 +48,7 @@
             </div>
         </div>
 
-        <!-- ADHD Alert Banner -->
+        <!-- ADHD Alert Banner - V3.1 FIX: Only shows for OPEN interventions -->
         <div id="adhd-alert" class="glass rounded-xl p-4 mb-6 border-l-4 border-red-500 hidden">
             <div class="flex items-center gap-4">
                 <div class="text-3xl pulse">⚠️</div>
@@ -79,7 +79,7 @@
             </div>
             <div class="glass rounded-xl p-4 text-center">
                 <div class="text-3xl font-bold text-red-400" id="stat-interventions">0</div>
-                <div class="text-xs text-gray-500 uppercase">Interventions</div>
+                <div class="text-xs text-gray-500 uppercase">Open Alerts</div>
             </div>
         </div>
 
@@ -113,13 +113,13 @@
                     <canvas id="risk-chart" height="200"></canvas>
                 </div>
 
-                <!-- Recent Interventions -->
+                <!-- Recent Interventions - V3.1: Shows OPEN only -->
                 <div class="glass rounded-xl p-5">
                     <h2 class="text-lg font-semibold mb-4 flex items-center gap-2">
-                        <span>⚠️</span> Recent Interventions
+                        <span>⚠️</span> Open Interventions
                     </h2>
                     <div id="interventions-list" class="space-y-2 max-h-48 overflow-y-auto">
-                        <div class="text-center text-gray-500 py-4 text-sm">No interventions</div>
+                        <div class="text-center text-gray-500 py-4 text-sm">No open interventions ✅</div>
                     </div>
                 </div>
             </div>
@@ -171,7 +171,7 @@
 
         <!-- Footer -->
         <div class="text-center text-gray-500 text-xs">
-            <p>Life OS v3.0 • Created by Ariel Shapira • Auto-refreshes every 30s • XGBoost ADHD Monitoring Active</p>
+            <p>Life OS v3.1 • Created by Ariel Shapira • Auto-refreshes every 30s • V3.1 FIX: Only shows OPEN interventions</p>
         </div>
     </div>
 
@@ -258,30 +258,45 @@
                 
                 renderTasks();
                 
-                // Fetch interventions
-                const intRes = await fetch(`${SUPABASE_URL}/rest/v1/task_interventions?select=*&order=triggered_at.desc&limit=10`, { headers });
-                const interventions = await intRes.json();
-                document.getElementById('stat-interventions').textContent = interventions.length;
+                // ===== V3.1 FIX: Only fetch OPEN interventions (successful IS NULL) =====
+                const intRes = await fetch(
+                    `${SUPABASE_URL}/rest/v1/task_interventions?successful=is.null&select=*&order=triggered_at.desc&limit=10`, 
+                    { headers }
+                );
+                const openInterventions = await intRes.json();
                 
-                // Show alert if high-risk intervention
-                const highRisk = interventions.find(i => i.intervention_level >= 3);
-                if (highRisk) {
-                    document.getElementById('adhd-alert').classList.remove('hidden');
-                    document.getElementById('alert-message').textContent = highRisk.message || 'High-risk task needs attention';
+                // Update stat with OPEN count only
+                document.getElementById('stat-interventions').textContent = openInterventions.length;
+                
+                // Show alert ONLY if there are OPEN high-risk interventions
+                const alertBanner = document.getElementById('adhd-alert');
+                const openHighRisk = openInterventions.find(i => i.intervention_level >= 3);
+                
+                if (openHighRisk) {
+                    alertBanner.classList.remove('hidden');
+                    document.getElementById('alert-message').textContent = openHighRisk.message || 'High-risk task needs attention';
+                } else {
+                    // HIDE the banner if no open high-risk interventions
+                    alertBanner.classList.add('hidden');
                 }
                 
-                // Render interventions list
-                document.getElementById('interventions-list').innerHTML = interventions.slice(0, 5).map(i => `
-                    <div class="p-2 bg-gray-800/50 rounded text-xs">
-                        <div class="flex items-center gap-2">
-                            <span class="${i.intervention_level >= 3 ? 'text-red-400' : i.intervention_level >= 2 ? 'text-orange-400' : 'text-yellow-400'}">
-                                ${'⚠️'.repeat(i.intervention_level || 1)}
-                            </span>
-                            <span class="text-gray-300">${i.task_id?.substring(0, 20) || 'Task'}</span>
+                // Render OPEN interventions only
+                const intListHtml = openInterventions.length > 0 
+                    ? openInterventions.slice(0, 5).map(i => `
+                        <div class="p-2 bg-gray-800/50 rounded text-xs">
+                            <div class="flex items-center gap-2">
+                                <span class="${i.intervention_level >= 3 ? 'text-red-400' : i.intervention_level >= 2 ? 'text-orange-400' : 'text-yellow-400'}">
+                                    ${'⚠️'.repeat(i.intervention_level || 1)}
+                                </span>
+                                <span class="text-gray-300">${(i.task_description || i.task_id || 'Task').substring(0, 25)}</span>
+                            </div>
+                            <div class="text-gray-500 mt-1">${i.risk_level || ''} risk (${Math.round((i.abandonment_probability || 0) * 100)}%)</div>
                         </div>
-                        <div class="text-gray-500 mt-1">${i.risk_level || ''} risk (${Math.round((i.abandonment_probability || 0) * 100)}%)</div>
-                    </div>
-                `).join('') || '<div class="text-center text-gray-500 py-2 text-xs">No interventions</div>';
+                    `).join('')
+                    : '<div class="text-center text-green-400 py-2 text-sm">✅ No open interventions</div>';
+                
+                document.getElementById('interventions-list').innerHTML = intListHtml;
+                // ===== END V3.1 FIX =====
                 
                 // Update risk chart
                 updateRiskChart(todayTasks);
