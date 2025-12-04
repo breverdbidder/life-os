@@ -59,6 +59,7 @@
             </div>
         </div>
 
+
         <!-- XGBoost Focus Score Card - V3.6 -->
         <div id="focus-score-card" class="glass rounded-2xl p-6 mb-6 border border-purple-500/30">
             <div class="flex flex-col md:flex-row items-center justify-between gap-6">
@@ -218,60 +219,53 @@
         let currentFilter = 'all';
         let riskChart = null;
 
-        // XGBoost Focus Score Functions - V3.6
+        // XGBoost Focus Score - V3.6
         const GRADES = [
-            { min: 95, grade: 'A+', emoji: '🏆', label: 'Elite Focus', color: '#10b981' },
+            { min: 95, grade: 'A+', emoji: '🏆', label: 'Elite', color: '#10b981' },
             { min: 90, grade: 'A', emoji: '🌟', label: 'Excellent', color: '#10b981' },
             { min: 80, grade: 'B+', emoji: '💪', label: 'Very Good', color: '#3b82f6' },
-            { min: 70, grade: 'B-', emoji: '📈', label: 'Above Average', color: '#3b82f6' },
+            { min: 70, grade: 'B-', emoji: '📈', label: 'Above Avg', color: '#3b82f6' },
             { min: 65, grade: 'C+', emoji: '🔄', label: 'Average', color: '#f59e0b' },
             { min: 60, grade: 'C', emoji: '📊', label: 'Needs Work', color: '#f59e0b' },
-            { min: 50, grade: 'C-', emoji: '⚠️', label: 'Below Average', color: '#f59e0b' },
+            { min: 50, grade: 'C-', emoji: '⚠️', label: 'Below Avg', color: '#f59e0b' },
             { min: 0, grade: 'D', emoji: '🔻', label: 'Poor', color: '#ef4444' },
         ];
-        function getGrade(score) { return GRADES.find(g => score >= g.min) || GRADES[GRADES.length - 1]; }
-        
+        function getGrade(s) { return GRADES.find(g => s >= g.min) || GRADES[GRADES.length-1]; }
+
         async function fetchFocusScore() {
             try {
                 const today = new Date().toISOString().split('T')[0];
                 const res = await fetch(`${SUPABASE_URL}/rest/v1/daily_metrics?date=eq.${today}&limit=1`, { headers });
                 const data = await res.json();
                 if (data && data[0]) {
-                    const m = data[0];
-                    const score = m.productivity_score || 0;
-                    const gradeInfo = getGrade(score);
+                    const m = data[0], score = m.productivity_score || 0, g = getGrade(score);
                     document.getElementById('focus-score').textContent = Math.round(score);
-                    document.getElementById('focus-grade').textContent = gradeInfo.grade;
-                    document.getElementById('focus-grade').style.color = gradeInfo.color;
-                    document.getElementById('focus-grade-emoji').textContent = gradeInfo.emoji;
-                    document.getElementById('focus-label').textContent = gradeInfo.label;
-                    const ring = document.getElementById('score-ring');
-                    ring.style.background = `conic-gradient(from 0deg, ${gradeInfo.color} ${score * 3.6}deg, rgba(255,255,255,0.1) 0deg)`;
+                    document.getElementById('focus-grade').textContent = g.grade;
+                    document.getElementById('focus-grade').style.color = g.color;
+                    document.getElementById('focus-grade-emoji').textContent = g.emoji;
+                    document.getElementById('focus-label').textContent = g.label;
+                    document.getElementById('score-ring').style.background = `conic-gradient(from 0deg, ${g.color} ${score*3.6}deg, rgba(255,255,255,0.1) 0deg)`;
                     const card = document.getElementById('focus-score-card');
                     card.style.borderColor = score >= 70 ? 'rgba(16,185,129,0.5)' : score >= 50 ? 'rgba(245,158,11,0.5)' : 'rgba(239,68,68,0.5)';
-                    card.style.boxShadow = `0 0 25px ${score >= 70 ? 'rgba(16,185,129,0.3)' : score >= 50 ? 'rgba(245,158,11,0.3)' : 'rgba(239,68,68,0.3)'}`;
-                    document.getElementById('feat-completion').textContent = Math.round((m.completion_rate || 0) * 100) + '%';
-                    document.getElementById('feat-focus').textContent = (m.average_focus_quality || 0).toFixed(1);
+                    document.getElementById('feat-completion').textContent = Math.round((m.completion_rate||0)*100)+'%';
+                    document.getElementById('feat-focus').textContent = (m.average_focus_quality||0).toFixed(1);
                     document.getElementById('feat-switches').textContent = m.context_switches || 0;
-                    const weekAgo = new Date(Date.now() - 7*24*60*60*1000).toISOString().split('T')[0];
-                    const histRes = await fetch(`${SUPABASE_URL}/rest/v1/daily_metrics?date=gte.${weekAgo}&date=lt.${today}&order=date.desc&select=productivity_score`, { headers });
-                    const history = await histRes.json();
-                    let streak = 0;
-                    if (history) for (const h of history) { if ((h.productivity_score || 0) >= 70) streak++; else break; }
-                    document.getElementById('feat-streak').textContent = streak + 'd';
-                    const insights = [];
-                    if ((m.completion_rate || 0) < 0.5) insights.push('📋 Low completion');
-                    if ((m.completion_rate || 0) >= 0.8) insights.push('✅ Great completion!');
-                    if ((m.context_switches || 0) > 10) insights.push('🔄 High switching');
-                    if ((m.average_focus_quality || 0) >= 8) insights.push('🎯 Excellent focus!');
-                    if (streak >= 3) insights.push(`🔥 ${streak}-day streak!`);
-                    if (score >= 90) insights.push('🏆 ELITE DAY!');
-                    document.getElementById('focus-insights').innerHTML = insights.length > 0 
-                        ? insights.map(i => `<span class="px-2 py-1 bg-gray-800/70 rounded-full text-xs">${i}</span>`).join('') 
-                        : '<span class="text-xs text-gray-400">Complete tasks to unlock insights</span>';
+                    const wa = new Date(Date.now()-7*24*60*60*1000).toISOString().split('T')[0];
+                    const hr = await fetch(`${SUPABASE_URL}/rest/v1/daily_metrics?date=gte.${wa}&date=lt.${today}&order=date.desc&select=productivity_score`, { headers });
+                    const hist = await hr.json(); let streak=0;
+                    if(hist) for(const h of hist) { if((h.productivity_score||0)>=70) streak++; else break; }
+                    document.getElementById('feat-streak').textContent = streak+'d';
+                    const ins=[];
+                    if((m.completion_rate||0)<0.5) ins.push('📋 Low completion');
+                    if((m.completion_rate||0)>=0.8) ins.push('✅ Great!');
+                    if(streak>=3) ins.push(`🔥 ${streak}d streak`);
+                    if(score>=90) ins.push('🏆 ELITE!');
+                    document.getElementById('focus-insights').innerHTML = ins.length ? ins.map(i=>`<span class="px-2 py-1 bg-gray-800/70 rounded-full text-xs">${i}</span>`).join('') : '<span class="text-xs text-gray-400">Complete tasks for insights</span>';
                 }
-            } catch (e) { console.error('Focus score error:', e); }
+            } catch(e) { console.error('Focus score error:', e); }
         }
+
+
 
         function updateTime() {
             const now = new Date();
