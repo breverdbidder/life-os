@@ -133,7 +133,7 @@
             </div>
         </div>
 
-        <div class="text-center text-gray-500 text-xs"><p>Life OS v3.3 • XGBoost Focus Score • Created by Ariel Shapira • Auto-refreshes every 30s</p></div>
+        <div class="text-center text-gray-500 text-xs"><p>Life OS v3.4 • XGBoost Focus Score • Created by Ariel Shapira • Auto-refreshes every 30s</p></div>
     </div>
 
     <script>
@@ -192,11 +192,29 @@
                     const metrics = await metricsRes.json();
                     if (metrics && metrics[0]) {
                         const m = metrics[0];
-                        const completionRate = m.completion_rate || 0;
-                        const focusQuality = (m.average_focus_quality || 5) / 10;
-                        const switchScore = Math.max(0, 1 - (m.context_switches || 0) / 20);
-                        const rawScore = (completionRate * 0.35 + focusQuality * 0.25 + switchScore * 0.20 + 0.20);
-                        scoreData = { score: Math.min(100, Math.max(0, Math.round(rawScore * 100))), features: { completion_rate: completionRate, focus_quality: focusQuality, context_switches: switchScore }, insights: [] };
+                        // Use XGBoost-calculated focus_score if available
+                        if (m.focus_score !== null && m.focus_score !== undefined) {
+                            const breakdown = typeof m.focus_breakdown === 'string' ? JSON.parse(m.focus_breakdown || '{}') : (m.focus_breakdown || {});
+                            scoreData = {
+                                score: m.focus_score,
+                                grade: m.focus_grade || getGrade(m.focus_score).grade,
+                                features: {
+                                    completion_rate: m.completion_rate || 0,
+                                    focus_quality: (m.average_focus_quality || 5) / 10,
+                                    context_switches: Math.max(0, 1 - (m.context_switches || 0) / 15),
+                                    streak_bonus: (m.productivity_streak || 0) / 7,
+                                    ...breakdown
+                                },
+                                insights: breakdown.insights || []
+                            };
+                        } else {
+                            // Fallback: calculate basic score if XGBoost not yet run
+                            const completionRate = m.completion_rate || 0;
+                            const focusQuality = (m.average_focus_quality || 5) / 10;
+                            const switchScore = Math.max(0, 1 - (m.context_switches || 0) / 20);
+                            const rawScore = (completionRate * 0.35 + focusQuality * 0.25 + switchScore * 0.20 + 0.20);
+                            scoreData = { score: Math.min(100, Math.max(0, Math.round(rawScore * 100))), features: { completion_rate: completionRate, focus_quality: focusQuality, context_switches: switchScore }, insights: ['XGBoost score will calculate on next cron run'] };
+                        }
                     }
                 }
 
@@ -234,9 +252,11 @@
 
                 const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
                 try {
-                    const trendRes = await fetch(`${SUPABASE_URL}/rest/v1/focus_scores?date=gte.${weekAgo}&order=date.asc`, { headers });
+                    const trendRes = await fetch(`${SUPABASE_URL}/rest/v1/daily_metrics?date=gte.${weekAgo}&select=date,focus_score&order=date.asc`, { headers });
                     const trendData = await trendRes.json();
-                    if (trendData && Array.isArray(trendData) && trendData.length > 0) updateTrendChart(trendData);
+                    if (trendData && Array.isArray(trendData) && trendData.length > 0 && trendData[0].focus_score !== undefined) {
+                        updateTrendChart(trendData.map(d => ({ date: d.date, score: d.focus_score })));
+                    }
                 } catch (e) { console.log('Trend data not available'); }
             } catch (e) { console.error('Focus score error:', e); }
         }
