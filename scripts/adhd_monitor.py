@@ -1,13 +1,19 @@
 #!/usr/bin/env python3
 """
-LIFE OS - ADHD Monitor (Runs every 30 minutes)
+LIFE OS - ADHD Monitor V2.0 (Runs every 30 minutes)
 Created by: Ariel Shapira, Solo Founder - Everest Capital USA
 
+V2.0 FIXES:
+- Auto-closes stale interventions for completed tasks
+- Checks for existing open interventions before creating duplicates
+- Verifies task state before displaying alerts
+
 This script:
-1. Checks all active tasks for abandonment risk
-2. Runs XGBoost prediction for intervention need
-3. Triggers interventions if needed
-4. Updates daily metrics
+1. FIRST: Closes any stale interventions for completed tasks
+2. Checks all active tasks for abandonment risk
+3. Runs XGBoost prediction for intervention need
+4. Triggers interventions if needed (no duplicates)
+5. Updates daily metrics
 """
 
 import os
@@ -26,6 +32,107 @@ headers = {
     "Content-Type": "application/json",
     "Prefer": "return=representation"
 }
+
+def close_stale_interventions():
+    """
+    V2.0 FIX: Auto-close interventions that:
+    1. Have no response (user_response is NULL)
+    2. Are older than 24 hours
+    3. Related task is completed or no longer exists
+    """
+    print("\n🔄 Checking for stale interventions to auto-close...")
+    
+    # Get unresolved interventions
+    r = requests.get(
+        f"{SUPABASE_URL}/rest/v1/task_interventions?user_response=is.null&select=id,task_id,task_description,triggered_at",
+        headers=headers, verify=False, timeout=30
+    )
+    
+    if r.status_code != 200:
+        print(f"   ⚠️ Failed to fetch interventions: {r.status_code}")
+        return 0
+    
+    open_interventions = r.json()
+    closed_count = 0
+    
+    for intervention in open_interventions:
+        intervention_id = intervention['id']
+        task_id = intervention.get('task_id')
+        triggered_at = intervention.get('triggered_at', '')
+        
+        should_close = False
+        close_reason = ""
+        
+        # Check 1: Is it older than 24 hours?
+        if triggered_at:
+            try:
+                triggered = datetime.fromisoformat(triggered_at.replace('Z', '+00:00').replace('+00:00', ''))
+                age_hours = (datetime.now() - triggered).total_seconds() / 3600
+                if age_hours > 24:
+                    should_close = True
+                    close_reason = f"Auto-closed: Stale intervention ({int(age_hours)}h old, no response)"
+            except:
+                pass
+        
+        # Check 2: If task_id exists, is the task still active?
+        if task_id and not should_close:
+            task_r = requests.get(
+                f"{SUPABASE_URL}/rest/v1/task_states?task_id=eq.{task_id}&select=status",
+                headers=headers, verify=False, timeout=30
+            )
+            if task_r.status_code == 200:
+                task_data = task_r.json()
+                if not task_data:
+                    should_close = True
+                    close_reason = "Auto-closed: Task no longer exists"
+                elif task_data[0].get('status') in ['COMPLETED', 'ABANDONED', 'DEFERRED']:
+                    should_close = True
+                    close_reason = f"Auto-closed: Task is {task_data[0].get('status')}"
+        
+        # Check 3: Check activities for completion signal
+        if not should_close and intervention.get('task_description'):
+            desc_keywords = intervention['task_description'][:30].lower()
+            # Look for matching activity completion in last 48h
+            activities_r = requests.get(
+                f"{SUPABASE_URL}/rest/v1/activities?activity_type=eq.TASK_COMPLETION&order=created_at.desc&limit=20",
+                headers=headers, verify=False, timeout=30
+            )
+            if activities_r.status_code == 200:
+                for activity in activities_r.json():
+                    notes = (activity.get('notes') or '').lower()
+                    if any(keyword in notes for keyword in desc_keywords.split()[:3]):
+                        should_close = True
+                        close_reason = "Auto-closed: Matching completion activity found"
+                        break
+        
+        # Close if needed
+        if should_close:
+            update_r = requests.patch(
+                f"{SUPABASE_URL}/rest/v1/task_interventions?id=eq.{intervention_id}",
+                headers=headers,
+                json={
+                    "user_response": "AUTO_CLOSED",
+                    "successful": True,
+                    "reasoning": close_reason
+                },
+                verify=False, timeout=30
+            )
+            if update_r.status_code in [200, 204]:
+                print(f"   ✅ Closed intervention #{intervention_id}: {close_reason}")
+                closed_count += 1
+    
+    print(f"   📊 Closed {closed_count} stale interventions")
+    return closed_count
+
+def has_open_intervention(task_id):
+    """V2.0 FIX: Check if task already has an open intervention"""
+    r = requests.get(
+        f"{SUPABASE_URL}/rest/v1/task_interventions?task_id=eq.{task_id}&user_response=is.null&select=id",
+        headers=headers, verify=False, timeout=30
+    )
+    if r.status_code == 200:
+        return len(r.json()) > 0
+    return False
 
 def get_active_tasks():
     """Get all active (non-completed) tasks"""
@@ -119,7 +226,7 @@ def create_intervention(task, level, risk, minutes_active):
     )
     return r.status_code in [200, 201]
 
-def update_daily_metrics(tasks, interventions_triggered):
+def update_daily_metrics(tasks, interventions_triggered, interventions_closed):
     """Update daily metrics"""
     today = datetime.now().strftime("%Y-%m-%d")
     
@@ -138,7 +245,8 @@ def update_daily_metrics(tasks, interventions_triggered):
         "tasks_abandoned": abandoned,
         "completion_rate": completion_rate,
         "abandonment_rate": abandonment_rate,
-        "intervention_count": interventions_triggered
+        "intervention_count": interventions_triggered,
+        "session_recommendation": f"Auto-closed {interventions_closed} stale interventions"
     }
     
     # Update existing or insert new
@@ -150,8 +258,11 @@ def update_daily_metrics(tasks, interventions_triggered):
     return r.status_code in [200, 204]
 
 def main():
-    print(f"🧠 LIFE OS ADHD MONITOR - {datetime.now().strftime('%Y-%m-%d %H:%M')}")
+    print(f"🧠 LIFE OS ADHD MONITOR V2.0 - {datetime.now().strftime('%Y-%m-%d %H:%M')}")
     print("="*60)
+    
+    # V2.0 FIX: FIRST close stale interventions
+    stale_closed = close_stale_interventions()
     
     # Get active tasks
     tasks = get_active_tasks()
@@ -160,6 +271,14 @@ def main():
     interventions_triggered = 0
     
     for task in tasks:
+        task_id = task.get('task_id')
+        
+        # V2.0 FIX: Skip if task already has open intervention
+        if task_id and has_open_intervention(task_id):
+            print(f"\n   • {task_id}")
+            print(f"     ⏭️  Skipped: Already has open intervention")
+            continue
+        
         # Calculate abandonment risk
         risk = calculate_abandonment_risk(task)
         
@@ -170,7 +289,7 @@ def main():
         # Determine if intervention needed
         level, level_name = determine_intervention_level(risk, minutes_active)
         
-        print(f"\n   • {task['task_id']}")
+        print(f"\n   • {task_id}")
         print(f"     Status: {task['status']}, Risk: {risk:.1%}, Minutes: {int(minutes_active)}")
         
         if level > 0:
@@ -180,10 +299,12 @@ def main():
                 interventions_triggered += 1
     
     # Update daily metrics
-    update_daily_metrics(tasks, interventions_triggered)
+    update_daily_metrics(tasks, interventions_triggered, stale_closed)
     
     print(f"\n{'='*60}")
-    print(f"✅ Monitor complete. Interventions triggered: {interventions_triggered}")
+    print(f"✅ Monitor complete.")
+    print(f"   • Stale interventions closed: {stale_closed}")
+    print(f"   • New interventions triggered: {interventions_triggered}")
     print(f"{'='*60}")
 
 if __name__ == "__main__":
