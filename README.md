@@ -6,66 +6,37 @@ Created by: **Ariel Shapira, Solo Founder - Everest Capital USA**
 
 ## 🎯 Live Dashboard
 
-# https://shapira-life-os.vercel.app
+https://shapira-life-os.vercel.app
 
 ## ✨ Features
 
-### 🧠 XGBoost FOCUS Monitor
-- Real-time abandonment risk prediction
-- Focus quality tracking
-- Energy level monitoring
-- Context switch detection
-- Automated interventions (Level 1/2/3)
+### 🧠 XGBoost FOCUS Score (v1.1)
+- Daily ML-calculated focus score (0-100)
+- Grade system: A+ to F with insights
+- 7-day trend tracking
+- Real-time dashboard display
+- Auto-calculation via GitHub Actions
 
 ### 📋 Task Tracking
-- Every task logged with timestamp
-- Status flow: INITIATED → SOLUTION_PROVIDED → IN_PROGRESS → COMPLETED/ABANDONED
-- Domain categorization (ARIEL/MICHAEL/FAMILY/BUSINESS)
-- Complexity scoring (1-10)
+- Task states: INITIATED → SOLUTION_PROVIDED → IN_PROGRESS → COMPLETED/ABANDONED
+- Domain tagging: BUSINESS, FAMILY, MICHAEL, PERSONAL
+- Complexity and clarity scoring
 
-### 📊 Daily Reports
-- Tasks completed/abandoned/in-progress
-- Completion rate
-- Productivity score
-- Timeline of all events
-- Pattern insights
+### 🔔 Focus Interventions
+- 3-level intervention system
+- XGBoost risk prediction
+- Context switch detection
+- Pattern analysis
 
-### 🔄 Auto-Updates
-- Dashboard refreshes every 30 seconds
-- GitHub Actions monitors every 30 minutes
-- Daily report generated at 9 PM EST
+## 🔧 Tech Stack
+- **Frontend**: Vercel (auto-deploy from GitHub)
+- **Backend**: Supabase (PostgreSQL + REST API)
+- **ML Engine**: XGBoost-style focus predictor
+- **Automation**: GitHub Actions (daily score calculation)
 
-### 🚗 Travel & Family
-- Driving tracker with mileage
-- Hotel reservations
-- Michael's swim meets
-- Nutrition logging (Keto-Shabbat)
-
-## 🛠️ Tech Stack
-
-- **Frontend**: HTML5, TailwindCSS, Chart.js
-- **Backend**: Python + Supabase
-- **ML**: XGBoost-style focus predictor
-- **Automation**: GitHub Actions (30-min cron)
-- **Hosting**: Vercel (auto-deploy)
-
-## 📁 Structure
-
-```
-life-os/
-├── index.html              # Dashboard
-├── scripts/
-│   └── life_os_engine.py   # Core engine + XGBoost predictor
-├── .github/workflows/
-│   └── monitor.yml         # 30-minute monitoring cron
-└── README.md
-```
-
-## 🔗 Links
-
-- **Dashboard**: https://shapira-life-os.vercel.app
-- **Database**: Supabase (mocerqjnksmhcjzxrewo)
+## 📊 Latest Focus Score
+Check the live dashboard for today's XGBoost Focus Score!
 
 ---
-
-*Life OS v2.0 - Built with ❤️ for FOCUS optimization*
+*Life OS v3.6 - Built with ❤️ for FOCUS optimization*
+*Last updated: Dec 4, 2025*
