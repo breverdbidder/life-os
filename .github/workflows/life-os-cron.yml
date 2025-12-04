@@ -1,0 +1,37 @@
+name: Life OS 30-Minute Cron
+
+on:
+  schedule:
+    # Run every 30 minutes
+    - cron: '*/30 * * * *'
+  workflow_dispatch:  # Allow manual trigger
+
+env:
+  SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+  SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+
+jobs:
+  run-life-os-cron:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      
+      - name: Install dependencies
+        run: |
+          pip install requests numpy
+      
+      - name: Run Life OS Cron
+        working-directory: ./src
+        run: |
+          python cron_runner.py
+      
+      - name: Log completion
+        run: |
+          echo "✅ Life OS cron completed at $(date)"
