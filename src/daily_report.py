@@ -1,6 +1,6 @@
 """
 Life OS Daily Report Generator
-Generates comprehensive end-of-day reports with FOCUS insights
+Generates comprehensive end-of-day reports with focus insights
 """
 import os
 import json
@@ -188,7 +188,7 @@ class DailyReportGenerator:
         return timeline
     
     def generate_insights(self, metrics: dict, timeline: List[dict]) -> List[str]:
-        """Generate FOCUS-specific insights from the day's data"""
+        """Generate focus-specific insights from the day's data"""
         insights = []
         
         # Completion rate insight
