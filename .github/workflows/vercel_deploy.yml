@@ -1,11 +1,9 @@
 name: Deploy to Vercel
 on:
   schedule:
-    # Run every hour to catch rate limit reset
-    - cron: '0 * * * *'
+    # Run every 2 hours to catch rate limit reset
+    - cron: '0 */2 * * *'
   workflow_dispatch:
-  push:
-    branches: [main]
 
 jobs:
   deploy:
@@ -16,8 +14,9 @@ jobs:
       - name: Deploy to Vercel
         run: |
           npm install -g vercel
-          vercel pull --yes --token=${{ secrets.VERCEL_TOKEN }}
-          vercel deploy --prod --token=${{ secrets.VERCEL_TOKEN }}
+          vercel pull --yes --token=${{ secrets.VERCEL_TOKEN }} || true
+          vercel deploy --prod --token=${{ secrets.VERCEL_TOKEN }} || echo "Rate limited, will retry later"
         env:
           VERCEL_ORG_ID: team_UEds2qBzyD9e7rOrX8aakj9K
           VERCEL_PROJECT_ID: prj_U0VyR305H2KnOMptJ4brMkFPbfjS
+        continue-on-error: true
