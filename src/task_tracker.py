@@ -1,6 +1,7 @@
 """
 Life OS Task Tracker
 Tracks all tasks with timestamps, states, and ADHD metrics
+V2.0 - Added auto-close interventions on task completion
 """
 import os
 import json
@@ -87,9 +88,81 @@ class LifeOSTaskTracker:
             print(f"❌ Failed to create task: {r.status_code}")
             return None
     
+    def close_interventions_for_task(self, task_id: str = None, task_description: str = None, 
+                                      resolution: str = "COMPLETED") -> int:
+        """
+        Close all open interventions related to a task.
+        Can match by task_id or partial task_description.
+        Returns: number of interventions closed
+        
+        V2.0 FIX: This prevents stale alerts from persisting after task completion.
+        """
+        now = datetime.now().isoformat()
+        closed_count = 0
+        
+        # Build query to find open interventions
+        query_params = "successful=is.null"  # Open interventions have null successful field
+        
+        if task_id:
+            query_params += f"&task_id=eq.{task_id}"
+        
+        # Get matching interventions
+        r = requests.get(
+            f"{self.supabase_url}/rest/v1/task_interventions?{query_params}",
+            headers=self.headers,
+            verify=False,
+            timeout=30
+        )
+        
+        if r.status_code != 200:
+            print(f"❌ Failed to query interventions: {r.status_code}")
+            return 0
+        
+        interventions = r.json()
+        
+        # Also match by description if provided
+        if task_description and not task_id:
+            desc_lower = task_description.lower()[:30]
+            interventions = [
+                i for i in interventions 
+                if i.get('task_description', '').lower().startswith(desc_lower)
+            ]
+        
+        # Close each intervention
+        for intervention in interventions:
+            int_id = intervention.get('id')
+            if not int_id:
+                continue
+            
+            update_data = {
+                "successful": resolution == "COMPLETED",
+                "user_response": resolution,
+                "reasoning": f"Auto-closed: Task marked as {resolution} at {now}"
+            }
+            
+            r = requests.patch(
+                f"{self.supabase_url}/rest/v1/task_interventions?id=eq.{int_id}",
+                headers=self.headers,
+                json=update_data,
+                verify=False,
+                timeout=30
+            )
+            
+            if r.status_code in [200, 204]:
+                closed_count += 1
+                print(f"✅ Closed intervention #{int_id} ({resolution})")
+            else:
+                print(f"❌ Failed to close intervention #{int_id}: {r.status_code}")
+        
+        return closed_count
+    
     def update_task_status(self, task_id: str, new_status: str, 
-                          artifacts: List[str] = None) -> dict:
-        """Update task status with timestamp"""
+                          artifacts: List[str] = None,
+                          task_description: str = None) -> dict:
+        """
+        Update task status with timestamp.
+        V2.0: Auto-closes related interventions when task reaches terminal state.
+        """
         now = datetime.now().isoformat()
         
         status_field_map = {
@@ -120,7 +193,33 @@ class LifeOSTaskTracker:
             timeout=30
         )
         
-        return r.json() if r.status_code in [200, 204] else None
+        result = r.json() if r.status_code in [200, 204] else None
+        
+        # V2.0 FIX: Auto-close interventions for terminal states
+        terminal_states = ["COMPLETED", "ABANDONED", "DEFERRED"]
+        if new_status in terminal_states:
+            closed = self.close_interventions_for_task(
+                task_id=task_id,
+                task_description=task_description,
+                resolution=new_status
+            )
+            if closed > 0:
+                print(f"🔔 Auto-closed {closed} intervention(s) for {new_status} task")
+        
+        return result
+    
+    def complete_task(self, task_id: str, artifacts: List[str] = None,
+                      task_description: str = None) -> dict:
+        """
+        Convenience method to complete a task and close all related interventions.
+        Use this for autonomous task completion.
+        """
+        return self.update_task_status(
+            task_id=task_id,
+            new_status="COMPLETED",
+            artifacts=artifacts,
+            task_description=task_description
+        )
     
     def get_active_tasks(self) -> List[dict]:
         """Get all non-completed tasks"""
@@ -137,6 +236,16 @@ class LifeOSTaskTracker:
         today = datetime.now().strftime("%Y-%m-%d")
         r = requests.get(
             f"{self.supabase_url}/rest/v1/task_states?initiated_at=gte.{today}T00:00:00&order=initiated_at.desc",
+            headers=self.headers,
+            verify=False,
+            timeout=30
+        )
+        return r.json() if r.status_code == 200 else []
+    
+    def get_open_interventions(self) -> List[dict]:
+        """Get all unresolved interventions"""
+        r = requests.get(
+            f"{self.supabase_url}/rest/v1/task_interventions?successful=is.null&order=triggered_at.desc",
             headers=self.headers,
             verify=False,
             timeout=30
@@ -188,3 +297,9 @@ if __name__ == "__main__":
         estimated_minutes=15
     )
     print(f"Created: {task}")
+    
+    # Show open interventions
+    open_ints = tracker.get_open_interventions()
+    print(f"\nOpen interventions: {len(open_ints)}")
+    for i in open_ints:
+        print(f"  - {i.get('task_description', 'Unknown')}: {i.get('message', '')[:50]}")
