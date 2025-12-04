@@ -1,7 +1,9 @@
 """
-XGBOOST FOCUS SCORE ENGINE v1.0
+XGBOOST FOCUS SCORE ENGINE v1.1
 Daily ML-powered focus score calculation
 Created by: Ariel Shapira, Solo Founder - Everest Capital USA
+
+V1.1: Dual-write to focus_scores AND daily_metrics for compatibility
 """
 
 import json
@@ -63,18 +65,19 @@ class XGBoostFocusScore:
     def __init__(self):
         self.today = datetime.now().strftime('%Y-%m-%d')
     
-    def _api_call(self, method: str, endpoint: str, data: dict = None) -> dict:
+    def _api_call(self, method: str, endpoint: str, data: dict = None, upsert: bool = False) -> dict:
         """Make Supabase API call"""
         url = f"{SUPABASE_URL}/rest/v1/{endpoint}"
         try:
             if method == 'GET':
-                resp = requests.get(url, headers=HEADERS, verify=False)
+                resp = requests.get(url, headers=HEADERS, verify=False, timeout=30)
             elif method == 'POST':
-                # Upsert logic
-                headers = {**HEADERS, "Prefer": "resolution=merge-duplicates,return=representation"}
-                resp = requests.post(url, json=data, headers=headers, verify=False)
+                headers = {**HEADERS}
+                if upsert:
+                    headers["Prefer"] = "resolution=merge-duplicates,return=representation"
+                resp = requests.post(url, json=data, headers=headers, verify=False, timeout=30)
             else:
-                resp = requests.request(method, url, json=data, headers=HEADERS, verify=False)
+                resp = requests.request(method, url, json=data, headers=HEADERS, verify=False, timeout=30)
             return resp.json() if resp.text else {}
         except Exception as e:
             print(f"API Error: {e}")
@@ -96,9 +99,9 @@ class XGBoostFocusScore:
         activities = self._api_call('GET', f'activities?start_time=gte.{target_date}T00:00:00&start_time=lt.{target_date}T23:59:59')
         activities = activities if isinstance(activities, list) else []
         
-        # Get historical scores (last 7 days)
+        # Get historical metrics (last 7 days) - check both tables
         week_ago = (datetime.strptime(target_date, '%Y-%m-%d') - timedelta(days=7)).strftime('%Y-%m-%d')
-        history = self._api_call('GET', f'focus_scores?date=gte.{week_ago}&date=lt.{target_date}&order=date.desc')
+        history = self._api_call('GET', f'daily_metrics?date=gte.{week_ago}&date=lt.{target_date}&order=date.desc')
         history = history if isinstance(history, list) else []
         
         return {
@@ -122,25 +125,27 @@ class XGBoostFocusScore:
         completion_rate = completed / total
         
         # 2. Focus Quality Average (0-1, scaled from 1-10)
-        focus_scores = [a.get('focus_quality', 5) for a in activities if a.get('focus_quality')]
+        focus_scores = [t.get('focus_quality', 5) for t in tasks if t.get('focus_quality')]
+        if not focus_scores:
+            focus_scores = [a.get('focus_quality', 5) for a in activities if a.get('focus_quality')]
         avg_focus = (sum(focus_scores) / len(focus_scores)) if focus_scores else 5
         focus_quality = (avg_focus - 1) / 9  # Scale 1-10 to 0-1
         
         # 3. Context Switches (inverted - fewer = better)
-        context_switches = sum(a.get('context_switches', 0) for a in activities)
-        # Normalize: 0 switches = 1.0, 20+ switches = 0.0
-        switch_score = max(0, 1 - (context_switches / 20))
+        context_switches_count = len([a for a in activities if a.get('activity_type') == 'CONTEXT_SWITCH'])
+        # Normalize: 0 switches = 1.0, 15+ switches = 0.0
+        switch_score = max(0, 1 - (context_switches_count / 15))
         
-        # 4. Intervention Response (responded/resolved vs ignored)
-        resolved = len([i for i in interventions if i.get('status') == 'RESOLVED'])
+        # 4. Intervention Response (resolved vs total)
+        resolved = len([i for i in interventions if i.get('successful') == True])
         total_interventions = len(interventions) if interventions else 1
         intervention_response = resolved / total_interventions if interventions else 1.0
         
         # 5. Productive Hours Utilization
         now = datetime.now()
         current_hour = now.hour
-        # Peak productive hours: 9-12, 17-20
-        if 9 <= current_hour < 12 or 17 <= current_hour < 20:
+        # Peak productive hours: 9-12 AM
+        if 9 <= current_hour < 12:
             productive_hours = 1.0
         elif 6 <= current_hour < 9 or 14 <= current_hour < 17:
             productive_hours = 0.7
@@ -149,8 +154,9 @@ class XGBoostFocusScore:
         
         # 6. Streak Bonus (consecutive good days with score > 70)
         good_days = 0
-        for score in history:
-            if score.get('score', 0) >= 70:
+        for day_metric in history:
+            day_score = day_metric.get('productivity_score') or day_metric.get('focus_score', 0)
+            if day_score and day_score >= 70:
                 good_days += 1
             else:
                 break
@@ -179,7 +185,6 @@ class XGBoostFocusScore:
         )
         
         # Apply sigmoid smoothing for more natural distribution
-        # Centers around 0.5, expands to 0-1 range
         smoothed = 1 / (1 + math.exp(-8 * (raw_score - 0.5)))
         
         # Scale to 0-100
@@ -204,28 +209,25 @@ class XGBoostFocusScore:
         insights = []
         
         if features['completion_rate'] < 0.5:
-            insights.append("📋 Low completion rate - try breaking tasks into smaller chunks")
+            insights.append("📋 Low completion rate - try smaller tasks")
         elif features['completion_rate'] >= 0.8:
-            insights.append("✅ Excellent task completion today!")
+            insights.append("✅ Excellent task completion!")
         
         if features['context_switches'] < 0.5:
-            insights.append("🔄 High context switching - try time-blocking tomorrow")
+            insights.append("🔄 High context switching - try time-blocking")
         
         if features['focus_quality'] < 0.5:
-            insights.append("🧘 Focus quality low - check sleep/energy levels")
+            insights.append("🧘 Focus quality low - check energy levels")
         elif features['focus_quality'] >= 0.8:
             insights.append("🎯 Outstanding focus quality!")
         
         if features['streak_bonus'] >= 0.7:
             insights.append(f"🔥 {int(features['streak_bonus'] * 7)}-day focus streak!")
         
-        if features['intervention_response'] < 0.5 and features['intervention_response'] > 0:
-            insights.append("⚠️ Many unresolved interventions - address blockers")
-        
         if score >= 90:
-            insights.append("🏆 ELITE FOCUS DAY - Keep this momentum!")
+            insights.append("🏆 ELITE FOCUS DAY!")
         elif score < 50:
-            insights.append("💪 Tomorrow is a fresh start - plan 3 small wins")
+            insights.append("💪 Tomorrow is a fresh start")
         
         return insights
     
@@ -264,11 +266,32 @@ class XGBoostFocusScore:
             'tasks_completed': len([t for t in data['tasks'] if t.get('status') == 'COMPLETED']),
             'interventions_count': len(data['interventions']),
             'calculated_at': datetime.now().isoformat(),
-            'model_version': 'xgboost_v1.0'
+            'model_version': 'xgboost_v1.1'
         }
         
-        # Store in Supabase
-        store_data = {
+        # V1.1: Dual-write to both tables for compatibility
+        # 1. Write to daily_metrics (primary - always exists)
+        metrics_data = {
+            'user_id': 1,
+            'date': target_date,
+            'tasks_completed': result['tasks_completed'],
+            'tasks_abandoned': len([t for t in data['tasks'] if t.get('status') == 'ABANDONED']),
+            'completion_rate': round(features['completion_rate'], 3),
+            'abandonment_rate': round(1 - features['abandonment_rate'], 3),
+            'average_focus_quality': round(features['focus_quality'] * 9 + 1, 1),
+            'context_switches': int((1 - features['context_switches']) * 15),
+            'intervention_count': len(data['interventions']),
+            'productivity_score': int(score),  # Store focus score here too
+        }
+        
+        resp = self._api_call('POST', 'daily_metrics', metrics_data, upsert=True)
+        if isinstance(resp, list) and resp:
+            print(f"✅ Saved to daily_metrics")
+        else:
+            print(f"⚠️ daily_metrics save: {resp}")
+        
+        # 2. Try to write to focus_scores (secondary - may not exist)
+        focus_data = {
             'date': target_date,
             'user_id': 1,
             'score': score,
@@ -279,32 +302,42 @@ class XGBoostFocusScore:
             'tasks_completed': result['tasks_completed'],
             'interventions_count': len(data['interventions']),
             'calculated_at': result['calculated_at'],
-            'model_version': 'xgboost_v1.0'
+            'model_version': 'xgboost_v1.1'
         }
         
-        self._api_call('POST', 'focus_scores', store_data)
-        print(f"✅ Score saved to Supabase")
+        resp = self._api_call('POST', 'focus_scores', focus_data, upsert=True)
+        if isinstance(resp, list) and resp:
+            print(f"✅ Saved to focus_scores")
+        elif isinstance(resp, dict) and 'code' in resp:
+            print(f"ℹ️ focus_scores table not available (using daily_metrics)")
         
         return result
     
     def get_latest_score(self) -> Optional[Dict]:
-        """Get the most recent focus score"""
-        result = self._api_call('GET', 'focus_scores?order=date.desc&limit=1')
+        """Get the most recent focus score from daily_metrics"""
+        result = self._api_call('GET', 'daily_metrics?order=date.desc&limit=1')
         if result and isinstance(result, list) and len(result) > 0:
-            score_data = result[0]
-            # Parse JSON fields
-            if isinstance(score_data.get('features'), str):
-                score_data['features'] = json.loads(score_data['features'])
-            if isinstance(score_data.get('insights'), str):
-                score_data['insights'] = json.loads(score_data['insights'])
-            return score_data
+            m = result[0]
+            return {
+                'date': m.get('date'),
+                'score': m.get('productivity_score', 50),
+                'grade': self.get_grade(m.get('productivity_score', 50))['grade'],
+                'features': {
+                    'completion_rate': m.get('completion_rate', 0),
+                    'focus_quality': (m.get('average_focus_quality', 5) - 1) / 9,
+                    'context_switches': max(0, 1 - m.get('context_switches', 0) / 15),
+                },
+                'insights': []
+            }
         return None
     
     def get_weekly_trend(self) -> List[Dict]:
         """Get last 7 days of scores for trend display"""
         week_ago = (datetime.now() - timedelta(days=7)).strftime('%Y-%m-%d')
-        result = self._api_call('GET', f'focus_scores?date=gte.{week_ago}&order=date.asc')
-        return result if isinstance(result, list) else []
+        result = self._api_call('GET', f'daily_metrics?date=gte.{week_ago}&order=date.asc&select=date,productivity_score')
+        if isinstance(result, list):
+            return [{'date': r['date'], 'score': r.get('productivity_score', 50)} for r in result]
+        return []
 
 
 # ============================================================
@@ -334,7 +367,7 @@ if __name__ == "__main__":
         elif command == "latest":
             result = engine.get_latest_score()
             if result:
-                print(json.dumps(result, indent=2))
+                print(json.dumps(result, indent=2, default=str))
             else:
                 print("No scores found")
         
@@ -342,11 +375,11 @@ if __name__ == "__main__":
             trend = engine.get_weekly_trend()
             print("Weekly Trend:")
             for day in trend:
-                print(f"  {day['date']}: {day['score']} ({day['grade']})")
+                print(f"  {day['date']}: {day['score']}")
         
         else:
             print(f"Unknown command: {command}")
     else:
         # Default: calculate today's score
         result = engine.calculate_daily_score()
-        print(json.dumps(result, indent=2))
+        print(json.dumps(result, indent=2, default=str))
