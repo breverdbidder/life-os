@@ -1,114 +1,71 @@
-# 🏠 Life OS - Shapira Family Ecosystem
+# 🏠 Life OS - Shapira Family Command Center
 
-**Real-Time Life Tracking & Management Platform**
+**Real-Time ADHD-Optimized Life Tracking & Management**
 
 Created by: **Ariel Shapira, Solo Founder - Everest Capital USA**
 
----
+## 🎯 Live Dashboard
 
-## 🎯 What is Life OS?
-
-Life OS is a comprehensive, ADHD-optimized life management ecosystem for the Shapira family. It provides real-time tracking, monitoring, and coordination across all aspects of family life.
-
----
+# https://shapira-life-os.vercel.app
 
 ## ✨ Features
 
-### 🚗 Travel & Driving
-- Real-time trip tracking
-- Mileage logging
-- Route planning
-- ETA calculations
-- Multi-traveler support
+### 🧠 XGBoost ADHD Monitor
+- Real-time abandonment risk prediction
+- Focus quality tracking
+- Energy level monitoring
+- Context switch detection
+- Automated interventions (Level 1/2/3)
 
-### 🏊 Michael's Swimming
-- Swim meet tracking
-- Event schedules (50/100/200 Free, 100 Fly, 100 Back)
-- Seed times & results
-- Competition calendar
+### 📋 Task Tracking
+- Every task logged with timestamp
+- Status flow: INITIATED → SOLUTION_PROVIDED → IN_PROGRESS → COMPLETED/ABANDONED
+- Domain categorization (ARIEL/MICHAEL/FAMILY/BUSINESS)
+- Complexity scoring (1-10)
 
-### 🥗 Nutrition Tracking
-- Keto-Shabbat diet protocol
-- Monday-Thursday: Strict Keto
-- Friday-Sunday: Moderate carbs (Shabbat)
-- Pre-competition meals
+### 📊 Daily Reports
+- Tasks completed/abandoned/in-progress
+- Completion rate
+- Productivity score
+- Timeline of all events
+- Pattern insights
 
-### 🏨 Travel Reservations
-- Hotel bookings
-- Check-in/out tracking
-- Guest management
+### 🔄 Auto-Updates
+- Dashboard refreshes every 30 seconds
+- GitHub Actions monitors every 30 minutes
+- Daily report generated at 9 PM EST
 
-### 👨‍👩‍👦 Family Coordination
-- Real-time family status
-- Location awareness
-- Event synchronization
-
-### 📱 WhatsApp Integration
-- One-tap sharing
-- Trip updates
-- Swim meet info
-- Hotel details
-- Full status summaries
-
-### 📋 Task Management
-- ADHD-optimized task tracking
-- Priority management
-- Status monitoring
-- Intervention system
-
----
-
-## 🏠 Home Base
-
-**390 Roosevelt Ave**
-**Satellite Beach, FL 32937**
-Brevard County, Florida
-
----
-
-## 👨‍👩‍👦 Family
-
-| Member | Role |
-|--------|------|
-| **Ariel Shapira** | Managing Member, Everest Capital |
-| **Mariam Shapira** | Property360, Protection Partners |
-| **Michael Shapira** | 16, D1 Swimmer, Satellite Beach HS |
-
----
+### 🚗 Travel & Family
+- Driving tracker with mileage
+- Hotel reservations
+- Michael's swim meets
+- Nutrition logging (Keto-Shabbat)
 
 ## 🛠️ Tech Stack
 
 - **Frontend**: HTML5, TailwindCSS, Chart.js
-- **Backend**: Supabase (PostgreSQL)
-- **Hosting**: Vercel (Auto-deploy)
-- **Repository**: GitHub
-- **Sharing**: WhatsApp Web API
+- **Backend**: Python + Supabase
+- **ML**: XGBoost-style ADHD predictor
+- **Automation**: GitHub Actions (30-min cron)
+- **Hosting**: Vercel (auto-deploy)
+
+## 📁 Structure
+
+```
+life-os/
+├── index.html              # Dashboard
+├── scripts/
+│   └── life_os_engine.py   # Core engine + XGBoost predictor
+├── .github/workflows/
+│   └── monitor.yml         # 30-minute monitoring cron
+└── README.md
+```
+
+## 🔗 Links
+
+- **Dashboard**: https://shapira-life-os.vercel.app
+- **Database**: Supabase (mocerqjnksmhcjzxrewo)
 
 ---
 
-## 📊 Dashboard
-
-**Live Dashboard**: https://life-os.vercel.app
-
----
-
-## 🔄 Roadmap
-
-- [ ] GPS integration
-- [ ] Calendar sync (Google/Apple)
-- [ ] Push notifications
-- [ ] Mobile app (React Native)
-- [ ] Voice commands (Alexa/Google)
-- [ ] Expense tracking
-- [ ] Photo memories
-- [ ] Health metrics integration
-
----
-
-## 📝 License
-
-Private - Shapira Family Use
-
----
-
-*Life OS v2.1 - Built with ❤️ for the Shapira Family*
+*Life OS v2.0 - Built with ❤️ for ADHD optimization*
