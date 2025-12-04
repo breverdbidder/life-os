@@ -1,6 +1,6 @@
 """
 LIFE OS ENGINE v1.0
-Real-time FOCUS-optimized task tracking with XGBoost predictions
+Real-time focus-optimized task tracking with XGBoost predictions
 Created by: Ariel Shapira, Solo Founder - Everest Capital USA
 """
 
@@ -93,11 +93,11 @@ class DailyMetrics:
 
 class FocusPredictor:
     """
-    XGBoost-inspired FOCUS abandonment predictor
+    XGBoost-inspired focus abandonment predictor
     Uses weighted features to predict task abandonment probability
     """
     
-    # Feature weights (trained on FOCUS patterns)
+    # Feature weights (trained on focus patterns)
     WEIGHTS = {
         'time_elapsed_ratio': 0.35,      # time_elapsed / estimated_time
         'complexity_score': 0.20,         # Higher complexity = higher risk
@@ -107,7 +107,7 @@ class FocusPredictor:
         'historical_completion': 0.10     # Past performance
     }
     
-    # Time of day risk factors (FOCUS energy patterns)
+    # Time of day risk factors (focus energy patterns)
     TIME_RISK = {
         range(6, 9): 0.3,    # Early morning - moderate
         range(9, 12): 0.1,   # Peak focus - low risk
@@ -194,7 +194,7 @@ class FocusPredictor:
         if switch_score > 0.3:
             reasons.append(f"{context_switches} context switches detected")
         if time_risk > 0.4:
-            reasons.append("Current time is in FOCUS low-focus window")
+            reasons.append("Current time is in low-focus window")
         if energy_score > 0.5:
             reasons.append(f"Low energy level ({energy_level}/10)")
         
@@ -219,7 +219,7 @@ class FocusPredictor:
 # ============================================================
 
 class InterventionGenerator:
-    """Generates FOCUS-appropriate interventions based on risk level"""
+    """Generates focus-appropriate interventions based on risk level"""
     
     MESSAGES = {
         1: [
@@ -283,7 +283,7 @@ class InterventionGenerator:
 # ============================================================
 
 class LifeOSEngine:
-    """Main engine for Life OS task tracking and FOCUS management"""
+    """Main engine for Life OS task tracking and focus management"""
     
     def __init__(self):
         self.predictor = FocusPredictor()
