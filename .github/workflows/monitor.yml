@@ -1,0 +1,64 @@
+name: Life OS Monitor
+
+on:
+  schedule:
+    # Every 30 minutes
+    - cron: '*/30 * * * *'
+  workflow_dispatch:
+    inputs:
+      command:
+        description: 'Command to run'
+        required: false
+        default: 'check'
+        type: choice
+        options:
+          - check
+          - metrics
+          - report
+
+env:
+  SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+  SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+
+jobs:
+  monitor:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      
+      - name: Install dependencies
+        run: |
+          pip install requests urllib3
+      
+      - name: Run Life OS Monitor
+        run: |
+          echo "🏠 Life OS Monitor - $(date)"
+          echo "================================"
+          
+          # Check for interventions
+          echo "🔍 Checking tasks for interventions..."
+          python scripts/life_os_engine.py check
+          
+          # Update metrics every 30 min
+          echo ""
+          echo "📊 Updating daily metrics..."
+          python scripts/life_os_engine.py metrics
+          
+          # Generate report at end of day (after 9 PM EST)
+          HOUR=$(TZ=America/New_York date +%H)
+          if [ "$HOUR" -ge "21" ]; then
+            echo ""
+            echo "📝 Generating daily report..."
+            python scripts/life_os_engine.py report
+          fi
+      
+      - name: Summary
+        run: |
+          echo "✅ Life OS Monitor completed at $(date)"
