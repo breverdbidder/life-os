@@ -1,0 +1,33 @@
+name: Daily Focus Score
+
+on:
+  schedule:
+    # Run at 11:30 PM EST (4:30 AM UTC next day)
+    - cron: '30 4 * * *'
+  workflow_dispatch:  # Allow manual trigger
+
+jobs:
+  calculate-score:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          
+      - name: Install dependencies
+        run: |
+          pip install requests urllib3
+          
+      - name: Calculate Daily Focus Score
+        run: |
+          python src/xgboost_focus_score.py calculate
+        env:
+          SUPABASE_URL: https://mocerqjnksmhcjzxrewo.supabase.co
+          
+      - name: Log completion
+        run: |
+          echo "✅ Daily Focus Score calculated at $(date)"
