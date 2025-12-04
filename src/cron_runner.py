@@ -1,13 +1,24 @@
 """
 Life OS Cron Runner
 Runs every 30 minutes to update metrics and check for interventions
+Includes XGBoost Daily Focus Score calculation
 """
 import os
+import sys
 import json
 import requests
-from datetime import datetime
+from datetime import datetime, timedelta
+
+# Add scripts directory to path for FocusPredictor
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'scripts'))
+
 from focus_monitor import FocusMonitor
 from daily_report import DailyReportGenerator
+
+try:
+    from life_os_engine import FocusPredictor
+except ImportError:
+    FocusPredictor = None
 
 class LifeOSCronRunner:
     def __init__(self):
@@ -61,7 +72,7 @@ class LifeOSCronRunner:
         }
     
     def _update_daily_metrics(self):
-        """Update cumulative daily metrics"""
+        """Update cumulative daily metrics with XGBoost Focus Score"""
         today = datetime.now().strftime("%Y-%m-%d")
         
         # Get today's task stats
@@ -73,6 +84,7 @@ class LifeOSCronRunner:
         )
         
         if r.status_code != 200:
+            print(f"   ❌ Failed to fetch tasks: {r.status_code}")
             return
         
         tasks = r.json()
@@ -84,6 +96,22 @@ class LifeOSCronRunner:
         completion_rate = (completed / total) if total > 0 else 0
         abandonment_rate = (abandoned / total) if total > 0 else 0
         
+        # Calculate average complexity of completed tasks
+        completed_tasks = [t for t in tasks if t.get('status') == 'COMPLETED']
+        avg_complexity = sum(t.get('complexity', 5) for t in completed_tasks) / len(completed_tasks) if completed_tasks else 5
+        
+        # Calculate average focus quality
+        avg_focus_quality = sum(t.get('focus_quality', 5) for t in tasks) / len(tasks) if tasks else 5
+        
+        # Get context switches count
+        r = requests.get(
+            f"{self.supabase_url}/rest/v1/activities?activity_type=eq.CONTEXT_SWITCH&start_time=gte.{today}T00:00:00&select=id",
+            headers=self.headers,
+            verify=False,
+            timeout=30
+        )
+        context_switches = len(r.json()) if r.status_code == 200 else 0
+        
         # Get intervention count
         r = requests.get(
             f"{self.supabase_url}/rest/v1/task_interventions?triggered_at=gte.{today}T00:00:00&select=id",
@@ -93,16 +121,59 @@ class LifeOSCronRunner:
         )
         intervention_count = len(r.json()) if r.status_code == 200 else 0
         
-        # Upsert daily metrics
+        # Calculate time efficiency (actual / estimated)
+        time_efficiency = 1.0
+        if completed_tasks:
+            total_estimated = sum(t.get('estimated_minutes', 30) for t in completed_tasks)
+            total_actual = sum(t.get('actual_minutes', t.get('estimated_minutes', 30)) for t in completed_tasks)
+            time_efficiency = total_actual / total_estimated if total_estimated > 0 else 1.0
+        
+        # Calculate productivity streak
+        streak = self._calculate_productivity_streak(today)
+        
+        # Calculate XGBoost Daily Focus Score
+        focus_score = 50  # Default
+        focus_grade = "C"
+        focus_breakdown = {}
+        
+        if FocusPredictor:
+            score_result = FocusPredictor.calculate_daily_focus_score(
+                tasks_completed=completed,
+                tasks_abandoned=abandoned,
+                tasks_total=total,
+                avg_focus_quality=avg_focus_quality,
+                avg_complexity_completed=avg_complexity,
+                context_switches=context_switches,
+                time_efficiency=time_efficiency,
+                consecutive_productive_days=streak,
+                interventions_triggered=intervention_count
+            )
+            focus_score = score_result.get('score', 50)
+            focus_grade = score_result.get('grade', 'C')
+            focus_breakdown = score_result.get('feature_breakdown', {})
+            
+            print(f"   🧠 XGBoost Focus Score: {focus_score} ({focus_grade})")
+        else:
+            print(f"   ⚠️ FocusPredictor not available, using default score")
+        
+        # Upsert daily metrics with Focus Score
         metrics = {
             'user_id': 1,
             'date': today,
             'tasks_completed': completed,
             'tasks_abandoned': abandoned,
-            'completion_rate': completion_rate,
-            'abandonment_rate': abandonment_rate,
+            'completion_rate': round(completion_rate, 3),
+            'abandonment_rate': round(abandonment_rate, 3),
             'intervention_count': intervention_count,
-            'created_at': datetime.now().isoformat()
+            'context_switches': context_switches,
+            'average_focus_quality': round(avg_focus_quality, 2),
+            'average_complexity': round(avg_complexity, 2),
+            'time_efficiency': round(time_efficiency, 3),
+            'productivity_streak': streak,
+            'focus_score': focus_score,
+            'focus_grade': focus_grade,
+            'focus_breakdown': json.dumps(focus_breakdown),
+            'updated_at': datetime.now().isoformat()
         }
         
         r = requests.post(
@@ -113,7 +184,36 @@ class LifeOSCronRunner:
             timeout=30
         )
         
-        print(f"   Tasks: {completed}/{total} completed, {intervention_count} interventions")
+        if r.status_code in [200, 201]:
+            print(f"   ✅ Tasks: {completed}/{total} completed, Focus Score: {focus_score} ({focus_grade})")
+        else:
+            print(f"   ❌ Failed to save metrics: {r.status_code}")
+    
+    def _calculate_productivity_streak(self, today: str) -> int:
+        """Calculate consecutive days with focus_score >= 70"""
+        streak = 0
+        check_date = datetime.strptime(today, "%Y-%m-%d") - timedelta(days=1)
+        
+        for _ in range(30):  # Check up to 30 days back
+            date_str = check_date.strftime("%Y-%m-%d")
+            r = requests.get(
+                f"{self.supabase_url}/rest/v1/daily_metrics?date=eq.{date_str}&select=focus_score",
+                headers=self.headers,
+                verify=False,
+                timeout=10
+            )
+            
+            if r.status_code != 200:
+                break
+                
+            data = r.json()
+            if not data or data[0].get('focus_score', 0) < 70:
+                break
+            
+            streak += 1
+            check_date -= timedelta(days=1)
+        
+        return streak
     
     def _check_stale_tasks(self) -> int:
         """Mark tasks as potentially abandoned if no update in 2+ hours"""
