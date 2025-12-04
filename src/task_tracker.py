@@ -1,6 +1,6 @@
 """
 Life OS Task Tracker
-Tracks all tasks with timestamps, states, and ADHD metrics
+Tracks all tasks with timestamps, states, and focus metrics
 V2.0 - Added auto-close interventions on task completion
 """
 import os
