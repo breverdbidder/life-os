@@ -93,11 +93,12 @@ class DailyMetrics:
 
 class FocusPredictor:
     """
-    XGBoost-inspired focus abandonment predictor
-    Uses weighted features to predict task abandonment probability
+    XGBoost-inspired focus predictor
+    - Predicts task abandonment probability (real-time)
+    - Calculates Daily Focus Score (0-100 scale)
     """
     
-    # Feature weights (trained on focus patterns)
+    # Feature weights for abandonment prediction
     WEIGHTS = {
         'time_elapsed_ratio': 0.35,      # time_elapsed / estimated_time
         'complexity_score': 0.20,         # Higher complexity = higher risk
@@ -105,6 +106,17 @@ class FocusPredictor:
         'time_of_day': 0.10,              # Afternoon dip = higher risk
         'energy_level': 0.10,             # Lower energy = higher risk
         'historical_completion': 0.10     # Past performance
+    }
+    
+    # Daily Score feature weights (XGBoost-style)
+    DAILY_SCORE_WEIGHTS = {
+        'completion_rate': 0.25,          # Tasks completed vs total
+        'focus_quality': 0.20,            # Average focus quality
+        'complexity_handled': 0.15,       # Avg complexity of completed tasks
+        'context_discipline': 0.15,       # Fewer switches = better
+        'time_efficiency': 0.10,          # Actual vs estimated time
+        'streak_bonus': 0.10,             # Consecutive productive days
+        'intervention_penalty': 0.05      # Fewer interventions = better
     }
     
     # Time of day risk factors (focus energy patterns)
@@ -211,6 +223,138 @@ class FocusPredictor:
                 'energy': round(energy_score, 2),
                 'history': round(history_score, 2)
             }
+        }
+    
+    @classmethod
+    def calculate_daily_focus_score(cls,
+                                    tasks_completed: int,
+                                    tasks_abandoned: int,
+                                    tasks_total: int,
+                                    avg_focus_quality: float,
+                                    avg_complexity_completed: float,
+                                    context_switches: int,
+                                    time_efficiency: float,
+                                    consecutive_productive_days: int,
+                                    interventions_triggered: int) -> Dict:
+        """
+        Calculate XGBoost-style Daily Focus Score (0-100)
+        
+        Returns: {
+            score: int (0-100),
+            grade: str (A+, A, B+, B, C+, C, D, F),
+            feature_breakdown: dict,
+            insights: list,
+            trend: str (improving, stable, declining)
+        }
+        """
+        
+        # 1. Completion Rate Score (0-1)
+        if tasks_total > 0:
+            completion_rate = tasks_completed / tasks_total
+        else:
+            completion_rate = 0.5  # Neutral if no tasks
+        
+        # 2. Focus Quality Score (0-1) - input is 0-10
+        focus_score = min(avg_focus_quality / 10, 1.0) if avg_focus_quality else 0.5
+        
+        # 3. Complexity Handled Score (0-1) - reward handling harder tasks
+        complexity_score = min(avg_complexity_completed / 10, 1.0) if avg_complexity_completed else 0.5
+        
+        # 4. Context Discipline Score (0-1) - fewer switches = better
+        # Baseline: 5 switches is acceptable, 0 is perfect, 15+ is bad
+        switch_penalty = min(context_switches / 15, 1.0)
+        discipline_score = 1 - switch_penalty
+        
+        # 5. Time Efficiency Score (0-1) - actual vs estimated
+        # 1.0 = on time, <1 = faster (bonus), >1 = slower (penalty)
+        if time_efficiency > 0:
+            efficiency_score = min(1 / time_efficiency, 1.2)  # Cap bonus at 20%
+            efficiency_score = max(efficiency_score, 0.3)      # Floor at 30%
+        else:
+            efficiency_score = 0.5
+        
+        # 6. Streak Bonus (0-1) - consecutive productive days
+        # 0 days = 0, 7+ days = 1.0
+        streak_score = min(consecutive_productive_days / 7, 1.0)
+        
+        # 7. Intervention Penalty (0-1) - fewer = better
+        # 0 interventions = 1.0, 5+ = 0
+        intervention_score = max(1 - (interventions_triggered / 5), 0)
+        
+        # Calculate weighted score
+        raw_score = (
+            cls.DAILY_SCORE_WEIGHTS['completion_rate'] * completion_rate +
+            cls.DAILY_SCORE_WEIGHTS['focus_quality'] * focus_score +
+            cls.DAILY_SCORE_WEIGHTS['complexity_handled'] * complexity_score +
+            cls.DAILY_SCORE_WEIGHTS['context_discipline'] * discipline_score +
+            cls.DAILY_SCORE_WEIGHTS['time_efficiency'] * efficiency_score +
+            cls.DAILY_SCORE_WEIGHTS['streak_bonus'] * streak_score +
+            cls.DAILY_SCORE_WEIGHTS['intervention_penalty'] * intervention_score
+        )
+        
+        # Scale to 0-100
+        final_score = int(round(raw_score * 100))
+        final_score = max(0, min(100, final_score))
+        
+        # Determine grade
+        if final_score >= 95:
+            grade = "A+"
+        elif final_score >= 90:
+            grade = "A"
+        elif final_score >= 85:
+            grade = "A-"
+        elif final_score >= 80:
+            grade = "B+"
+        elif final_score >= 75:
+            grade = "B"
+        elif final_score >= 70:
+            grade = "B-"
+        elif final_score >= 65:
+            grade = "C+"
+        elif final_score >= 60:
+            grade = "C"
+        elif final_score >= 55:
+            grade = "C-"
+        elif final_score >= 50:
+            grade = "D"
+        else:
+            grade = "F"
+        
+        # Generate insights
+        insights = []
+        if completion_rate >= 0.8:
+            insights.append("🎯 Excellent task completion rate!")
+        elif completion_rate < 0.5:
+            insights.append("⚠️ Consider breaking tasks into smaller chunks")
+        
+        if discipline_score >= 0.8:
+            insights.append("🧘 Great focus discipline - minimal context switching")
+        elif discipline_score < 0.5:
+            insights.append("🔄 High context switching detected - try time blocking")
+        
+        if streak_score >= 0.7:
+            insights.append(f"🔥 {consecutive_productive_days}-day productivity streak!")
+        
+        if intervention_score < 0.5:
+            insights.append("📍 Multiple interventions needed - energy management opportunity")
+        
+        if efficiency_score > 1:
+            insights.append("⚡ Beating time estimates - great efficiency!")
+        
+        return {
+            'score': final_score,
+            'grade': grade,
+            'feature_breakdown': {
+                'completion_rate': round(completion_rate * 100, 1),
+                'focus_quality': round(focus_score * 100, 1),
+                'complexity_handled': round(complexity_score * 100, 1),
+                'context_discipline': round(discipline_score * 100, 1),
+                'time_efficiency': round(efficiency_score * 100, 1),
+                'streak_bonus': round(streak_score * 100, 1),
+                'intervention_penalty': round(intervention_score * 100, 1)
+            },
+            'insights': insights,
+            'raw_score': round(raw_score, 4)
         }
 
 
@@ -462,13 +606,40 @@ class LifeOSEngine:
         
         # Focus quality from activities
         focus_scores = [a.get('focus_quality', 0) for a in activities if a.get('focus_quality')]
-        avg_focus = sum(focus_scores) / len(focus_scores) if focus_scores else 0
+        avg_focus = sum(focus_scores) / len(focus_scores) if focus_scores else 5.0  # Default to 5
         
         # Context switches
         context_switches = sum(a.get('context_switches', 0) for a in activities)
         
         # Active minutes
         total_minutes = sum(a.get('duration_minutes', 0) for a in activities)
+        
+        # Calculate average complexity of completed tasks
+        completed_tasks = [t for t in tasks if t.get('status') == 'COMPLETED']
+        avg_complexity = sum(t.get('complexity', 5) for t in completed_tasks) / len(completed_tasks) if completed_tasks else 5
+        
+        # Calculate time efficiency (actual / estimated)
+        time_efficiency = 1.0
+        if completed_tasks:
+            total_estimated = sum(t.get('estimated_minutes', 30) for t in completed_tasks)
+            total_actual = sum(t.get('actual_minutes', t.get('estimated_minutes', 30)) for t in completed_tasks)
+            time_efficiency = total_actual / total_estimated if total_estimated > 0 else 1.0
+        
+        # Get streak (consecutive days with completion_rate > 0.5)
+        streak = self._calculate_productivity_streak(date)
+        
+        # Calculate XGBoost Focus Score
+        focus_score_result = FocusPredictor.calculate_daily_focus_score(
+            tasks_completed=completed,
+            tasks_abandoned=abandoned,
+            tasks_total=total,
+            avg_focus_quality=avg_focus,
+            avg_complexity_completed=avg_complexity,
+            context_switches=context_switches,
+            time_efficiency=time_efficiency,
+            consecutive_productive_days=streak,
+            interventions_triggered=len(interventions)
+        )
         
         metrics = {
             'date': date,
@@ -483,6 +654,11 @@ class LifeOSEngine:
             'intervention_count': len(interventions),
             'domains': json.dumps(domains),
             'productivity_score': round((completed * 10 + avg_focus * 5 - abandoned * 5 - context_switches) / 10, 1),
+            'xgboost_focus_score': focus_score_result['score'],
+            'focus_grade': focus_score_result['grade'],
+            'focus_breakdown': json.dumps(focus_score_result['feature_breakdown']),
+            'focus_insights': json.dumps(focus_score_result['insights']),
+            'productivity_streak': streak,
             'created_at': datetime.now().isoformat()
         }
         
@@ -490,6 +666,25 @@ class LifeOSEngine:
         self._api_call('POST', 'daily_metrics', metrics)
         
         return metrics
+    
+    def _calculate_productivity_streak(self, current_date: str) -> int:
+        """Calculate consecutive productive days (completion_rate > 0.5)"""
+        streak = 0
+        check_date = datetime.strptime(current_date, '%Y-%m-%d')
+        
+        for i in range(30):  # Check up to 30 days back
+            prev_date = (check_date - timedelta(days=i+1)).strftime('%Y-%m-%d')
+            prev_metrics = self._api_call('GET', f'daily_metrics?date=eq.{prev_date}')
+            
+            if prev_metrics and isinstance(prev_metrics, list) and len(prev_metrics) > 0:
+                if prev_metrics[0].get('completion_rate', 0) >= 0.5:
+                    streak += 1
+                else:
+                    break
+            else:
+                break
+        
+        return streak
     
     # -------------------- ACTIVITY LOGGING --------------------
     
