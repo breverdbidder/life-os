@@ -45,7 +45,7 @@ Created by: **Ariel Shapira, Solo Founder - Everest Capital USA**
 
 - **Frontend**: HTML5, TailwindCSS, Chart.js
 - **Backend**: Python + Supabase
-- **ML**: XGBoost-style FOCUS predictor
+- **ML**: XGBoost-style focus predictor
 - **Automation**: GitHub Actions (30-min cron)
 - **Hosting**: Vercel (auto-deploy)
 
