@@ -1,46 +1,39 @@
 # Hotels Reference - Shapira Family
 
-## Quick Lookup
+## Florida - Swim Meet Hotels
 
-Query Supabase: `GET /rest/v1/insights?insight_type=eq.HOTEL&source=eq.life_os_knowledge`
-
-## Florida Swim Meet Hotels
-
-### Ocala Area
+### Ocala Area (Ocala Aquatic Center / FAST Pool)
 
 **Staybridge Suites Ocala** ⭐⭐⭐⭐⭐
-- Address: 4627 NW Blitchton Rd, Ocala, FL 34482
-- Context: Michael swim meets at Ocala Aquatic Center (fast pool)
-- Room Type: Studio with queen beds
-- Amenities: Full kitchen, free breakfast, spacious
-- Value: Excellent - great price for what you get
-- Last Stay: December 2025
-- ✅ **RECOMMENDED** for future Ocala meets
+- **Phone:** (352) 619-8080
+- **Email:** staybridgeocala@hdghotels.com
+- **Website:** https://www.ihg.com/staybridge/hotels/us/en/ocala/ocfht/hoteldetail
+- **Address:** 4627 NW Blitchton Rd, Ocala, FL 34482
+- **Context:** Michael swim meets at Ocala Aquatic Center (fast pool)
+- **Room Type:** Studio with queen beds
+- **Amenities:**
+  - Full kitchen in every suite
+  - Free hot breakfast daily
+  - Happy Hour Mon-Wed 5:30-6:30pm (free beer/wine + snacks)
+  - Outdoor pool & hot tub
+  - Fitness center
+  - Tesla Supercharging (16 stations)
+  - 1.5-acre pet recreation area
+  - Free WiFi (500+ Mbps)
+- **Distance to FAST:** 8 miles
+- **Value:** Excellent - great price for spacious suites
+- **Last Stay:** December 2025
+- **Notes:** Highly recommended for future Ocala meets. Spacious rooms, great for multi-night swim meet stays.
 
 ---
 
-## Rating Guide
+## Adding New Hotels
 
-| Stars | Meaning |
-|-------|---------|
-| ⭐⭐⭐⭐⭐ | Excellent - book again immediately |
-| ⭐⭐⭐⭐ | Good - would stay again |
-| ⭐⭐⭐ | Acceptable - if nothing else available |
-| ⭐⭐ | Below average - avoid if possible |
-| ⭐ | Poor - do not book again |
-
-## Data Fields for Hotels
-
-When adding a new hotel, capture:
-```json
-{
-  "address": "Full street address",
-  "city": "City name",
-  "state": "FL",
-  "context": "Why we stayed (swim meet, business, etc.)",
-  "room_type": "king/queen/suite/studio",
-  "amenities": ["kitchen", "pool", "breakfast"],
-  "value": "budget/good/excellent",
-  "tips": "Any notes for next time"
-}
-```
+When logging a new hotel stay, capture:
+1. Full address and phone number
+2. Room type (king, queen, suite, studio)
+3. Key amenities
+4. Value assessment (budget/good/excellent)
+5. Context (why we stayed - swim meet, family visit, etc.)
+6. Distance to venue
+7. Any tips for next time
