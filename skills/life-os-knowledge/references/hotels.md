@@ -1,8 +1,12 @@
 # Hotels Reference - Shapira Family
 
-## Florida - Swim Meet Hotels
+## Quick Lookup
 
-### Ocala Area (Ocala Aquatic Center)
+Query Supabase: `GET /rest/v1/insights?insight_type=eq.HOTEL&source=eq.life_os_knowledge`
+
+## Florida Swim Meet Hotels
+
+### Ocala Area
 
 **Staybridge Suites Ocala** ⭐⭐⭐⭐⭐
 - Address: 4627 NW Blitchton Rd, Ocala, FL 34482
@@ -11,16 +15,32 @@
 - Amenities: Full kitchen, free breakfast, spacious
 - Value: Excellent - great price for what you get
 - Last Stay: December 2025
-- Notes: Highly recommended for future Ocala meets
+- ✅ **RECOMMENDED** for future Ocala meets
 
 ---
 
-## Adding New Hotels
+## Rating Guide
 
-When logging a new hotel stay, capture:
-1. Full address
-2. Room type (king, queen, suite, studio)
-3. Key amenities
-4. Value assessment (budget/good/excellent)
-5. Context (why we stayed - swim meet, family visit, etc.)
-6. Any tips for next time
+| Stars | Meaning |
+|-------|---------|
+| ⭐⭐⭐⭐⭐ | Excellent - book again immediately |
+| ⭐⭐⭐⭐ | Good - would stay again |
+| ⭐⭐⭐ | Acceptable - if nothing else available |
+| ⭐⭐ | Below average - avoid if possible |
+| ⭐ | Poor - do not book again |
+
+## Data Fields for Hotels
+
+When adding a new hotel, capture:
+```json
+{
+  "address": "Full street address",
+  "city": "City name",
+  "state": "FL",
+  "context": "Why we stayed (swim meet, business, etc.)",
+  "room_type": "king/queen/suite/studio",
+  "amenities": ["kitchen", "pool", "breakfast"],
+  "value": "budget/good/excellent",
+  "tips": "Any notes for next time"
+}
+```
