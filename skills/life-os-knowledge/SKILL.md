@@ -9,22 +9,33 @@ Personal knowledge system for the Shapira family. Stores hotels, venues, travel 
 
 ## Data Storage
 
-**Database:** Supabase `mocerqjnksmhcjzxrewo`
+**Database:** Supabase mocerqjnksmhcjzxrewo.supabase.co  
 **Table:** `insights` (using insight_type for categorization)
 
-## Location Categories (insight_type values)
+## Schema
 
-- `HOTEL` - Overnight stays
-- `SWIM_VENUE` - Competition pools
-- `RESTAURANT` - Dining options (kosher-friendly noted)
+Uses the existing `insights` table with these insight_types:
+- `HOTEL` - Hotels and lodging
+- `SWIM_VENUE` - Competition pools and swim facilities  
+- `RESTAURANT` - Dining locations
 - `SERVICE_PROVIDER` - Contractors, professionals
-- `TRAVEL_ROUTE` - Common drives
+- `TRAVEL_ROUTE` - Common drives and logistics
 
-## Query Patterns
+### Key Fields
+| Field | Usage |
+|-------|-------|
+| insight_type | Category: HOTEL, SWIM_VENUE, etc. |
+| title | Location name |
+| description | JSON with full details (address, city, state, notes) |
+| confidence | Rating 1-5 |
+| related_date | Last visited date |
+| source | Always "life_os_knowledge" |
+
+## Query Examples
 
 ### Find hotels in a city
 ```python
-GET /rest/v1/insights?insight_type=eq.HOTEL&description=cs.Ocala
+GET /rest/v1/insights?insight_type=eq.HOTEL&description=cs."Ocala"
 ```
 
 ### Find swim venues
@@ -32,15 +43,12 @@ GET /rest/v1/insights?insight_type=eq.HOTEL&description=cs.Ocala
 GET /rest/v1/insights?insight_type=eq.SWIM_VENUE&order=confidence.desc
 ```
 
-### Search by context
-```python
-GET /rest/v1/insights?insight_type=in.(HOTEL,SWIM_VENUE)&description=cs.Michael
-```
-
-## Insert Pattern
+## Insert New Location
 
 ```python
-{
+import httpx, json
+
+data = {
     "insight_type": "HOTEL",
     "title": "Hotel Name",
     "description": json.dumps({
@@ -48,21 +56,35 @@ GET /rest/v1/insights?insight_type=in.(HOTEL,SWIM_VENUE)&description=cs.Michael
         "city": "City",
         "state": "FL",
         "context": "Why we use this",
-        "room_type": "suite/studio/etc",
-        "amenities": ["list", "of", "amenities"],
-        "value": "excellent/good/budget"
+        "room_type": "king suite",
+        "amenities": ["pool", "breakfast"],
+        "value": "excellent"
     }),
     "related_date": "2025-12-04",
     "priority": "medium",
     "status": "active",
     "source": "life_os_knowledge",
-    "confidence": 5  # 1-5 star rating
+    "confidence": 5
 }
+r = client.post(f"{SUPABASE_URL}/rest/v1/insights", headers=headers, json=data)
 ```
 
 ## Reference Files
 
-- `references/hotels.md` - Hotel reviews and preferences
-- `references/swim-venues.md` - Swim meet venue details  
-- `references/travel.md` - Travel routes and logistics
-- `scripts/query_locations.py` - Helper for location queries
+- `references/hotels.md` - Hotel reviews
+- `references/swim-venues.md` - Swim venue details
+- `references/travel.md` - Travel routes
+
+## Current Data (Dec 2025)
+
+### Hotels
+- **Staybridge Suites Ocala** ⭐⭐⭐⭐⭐ - 4627 NW Blitchton Rd, Ocala FL
+  - Context: Michael swim meets at Ocala Aquatic Center
+  - Room: Studio with queen beds, full kitchen
+  - Value: Excellent
+
+### Swim Venues  
+- **Ocala Aquatic Center** ⭐⭐⭐⭐⭐ - 2500 E Fort King St, Ocala FL
+  - Pool: FAST, 50m outdoor
+  - Drive from Satellite Beach: 2.5 hours (142 mi)
+  - Preferred hotel: Staybridge Suites Ocala
