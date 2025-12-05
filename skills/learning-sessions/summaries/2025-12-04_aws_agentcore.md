@@ -1,95 +1,162 @@
-# Learning Session: AWS AgentCore
+# Learning Session: AWS AgentCore → BrevardBidderAI Roadmap
 
 ## Video Information
-- **Title:** סוכני AI מאפס למאה - עם AWS AgentCore! (AI Agents from Zero to Hundred - with AWS AgentCore!)
-- **Channel:** בינה מלאכותית עם יובל אבידני YUV AI (@yuv-ai)
+- **Title:** סוכני AI מאפס למאה - עם AWS AgentCore! (AI Agents from Zero to Hundred)
+- **Channel:** YUV AI (יובל אבידני)
 - **URL:** https://youtube.com/watch?v=Ea1EpD-4sUU
 - **Date Watched:** December 4, 2025
+- **Relevance:** ⭐⭐⭐⭐⭐ CRITICAL - Direct BrevardBidderAI architecture validation
 
 ---
 
-## Key Takeaways from AWS AgentCore (AWS re:Invent 2025)
+## Executive Summary
 
-### What is AgentCore?
-Amazon Bedrock AgentCore is the most advanced platform for building and deploying AI agents securely at scale. It bridges the gap between proof-of-concept and production for AI agents.
-
-### Core Services
-
-| Service | Purpose |
-|---------|---------|
-| **AgentCore Runtime** | Secure, dynamic workloads up to 8 hours (longest in industry), framework agnostic |
-| **AgentCore Identity** | Secure access to AWS + third-party tools (GitHub, Salesforce, Slack) |
-| **AgentCore Gateway** | Transforms APIs/Lambda into agent-ready tools, supports MCP protocol |
-| **AgentCore Browser** | Managed web browser instances for web automation |
-| **AgentCore Code Interpreter** | Isolated environment for agent-generated code execution |
-| **AgentCore Memory** | Episodic memory - agents learn from experience over time |
-| **AgentCore Policy** | Natural-language boundaries on agent actions |
-| **AgentCore Evaluations** | 13 pre-built evaluators for agent quality monitoring |
-
-### Key Differentiators
-1. **Framework Agnostic:** Works with CrewAI, LangGraph, LlamaIndex, Strands, custom frameworks
-2. **Protocol Support:** MCP (Model Context Protocol), A2A (Agent2Agent)
-3. **Enterprise-Grade Security:** Uses automated reasoning (math-based verification)
-4. **Scalable:** From prototype to millions of users
-5. **Long-Running Tasks:** Up to 8 hours per session
-
-### Success Stories
-- **PGA TOUR:** 1,000% content writing speed increase, 95% cost reduction
-- **MongoDB:** Deployed agent-based application in 8 weeks (was months)
-- **Swisscom:** Launched B2C agent solution in 4 weeks
-- **Lyft:** 87% reduction in resolution time, 70% increase in agent usage
+AWS AgentCore (announced re:Invent 2025) is enterprise infrastructure for building and deploying AI agents at scale. **This directly validates BrevardBidderAI's "Agentic AI ecosystem" positioning** and provides a roadmap for V14+ development.
 
 ---
 
-## Application to BrevardBidderAI
+## AWS AgentCore: The 8 Services
 
-### Direct Relevance
-BrevardBidderAI is positioned as an "Agentic AI ecosystem" - AgentCore provides the enterprise infrastructure pattern to emulate.
-
-### Architecture Mapping
-
-| BrevardBidderAI Current | AWS AgentCore Equivalent |
-|-------------------------|--------------------------|
-| 12-Stage Pipeline | AgentCore Runtime (long-running tasks) |
-| Smart Router (multi-tier LLM) | Native support for any model |
-| BECA Scraper | AgentCore Browser + Code Interpreter |
-| Supabase Integration | AgentCore Memory |
-| Layer 8 IP Protection | AgentCore Policy + Identity |
-| XGBoost ML Models | AgentCore Evaluations |
-
-### Potential Improvements to Consider
-1. **MCP Protocol:** Standardize BrevardBidderAI tools as MCP-compatible
-2. **Policy Layer:** Implement natural-language constraints on bid recommendations
-3. **Episodic Memory:** Track deal outcomes to improve ML predictions
-4. **Gateway Pattern:** Expose APIs (BCPAO, AcclaimWeb) as agent-ready tools
-5. **Evaluation Suite:** Build pre-built evaluators for:
-   - Lien priority accuracy
-   - Max bid calculation correctness
-   - Title search completeness
-
-### V14 Roadmap Considerations
-- [ ] Evaluate AWS Bedrock for Smart Router PRODUCTION tier
-- [ ] Implement MCP-compatible tool definitions
-- [ ] Add AgentCore-style Policy layer for bid limits
-- [ ] Build evaluation framework for agent recommendations
+| Service | Purpose | BrevardBidderAI Equivalent |
+|---------|---------|---------------------------|
+| **Runtime** | Long-running tasks (up to 8 hours) | 12-Stage Pipeline |
+| **Identity** | Secure auth to tools/services | Layer 8 IP Protection |
+| **Gateway** | API → Agent-ready tools (MCP) | Smart Router |
+| **Browser** | Managed web automation | BECA Scraper |
+| **Code Interpreter** | Sandbox for generated code | Report Generation |
+| **Memory** | Episodic learning over time | Supabase historical_auctions |
+| **Policy** | Natural-language constraints | Max Bid Formula Rules |
+| **Evaluations** | Quality monitoring (13 pre-built) | XGBoost ML Accuracy |
 
 ---
 
-## Notable Quotes (from AWS sources)
+## BrevardBidderAI V14 Roadmap (Derived from AgentCore)
 
-> "AI agents will dramatically accelerate innovation and improve productivity across every industry." - Swami Sivasubramanian, AWS VP Agentic AI
+### Phase 1: Tool Standardization (MCP Protocol)
+```
+Current:
+  - bcpao_scraper.py
+  - acclaimweb_scraper.py  
+  - beca_scraper.py
+  - realtdm_scraper.py
 
-> "Being able to take advantage of the reasoning capabilities of these models, which is coupled with being able to do real-world things through tools, feels like a sustainable pattern." - AWS
+V14 Target:
+  - MCP-compatible tool definitions
+  - Unified tool discovery
+  - Hot-swappable data sources
+```
+
+### Phase 2: Policy Layer
+```
+Natural Language Rules:
+  - "Never bid above 75% of ARV minus repairs"
+  - "Skip properties with unresolved IRS liens"
+  - "Require human approval for bids over $100K"
+  - "Auto-skip HOA foreclosures with senior mortgage"
+
+Implementation:
+  - Policy checks at Smart Router level
+  - Decision logging with policy trace
+  - Override audit trail
+```
+
+### Phase 3: Episodic Memory
+```
+Current: historical_auctions table (1,393 rows)
+
+V14 Enhancement:
+  - Track deal outcomes (won/lost/profit)
+  - Feed outcomes back to ML model
+  - Learn from "near misses" (REVIEW → actual results)
+  - User preference learning (risk tolerance)
+```
+
+### Phase 4: Evaluation Framework
+```
+Pre-Built Evaluators:
+  1. Lien Priority Accuracy (vs actual sale outcome)
+  2. Max Bid Correctness (ARV prediction vs sale price)
+  3. Title Search Completeness (missed liens?)
+  4. ML Score Calibration (predicted vs actual third-party %)
+  5. Response Latency (pipeline stage timing)
+
+Alerts:
+  - ML accuracy drops below 60%
+  - False positive rate exceeds threshold
+  - Data source unavailable
+```
+
+---
+
+## Enterprise Validation (Why This Matters)
+
+### Companies Using AgentCore Pattern:
+| Company | Use Case | Result |
+|---------|----------|--------|
+| PGA TOUR | Content generation | 1,000% speed, 95% cost reduction |
+| MongoDB | Agent app deployment | 8 weeks vs months |
+| Swisscom | B2C agent | 4 weeks to launch |
+| Lyft | Customer support | 87% faster resolution |
+| Cox Automotive | Vehicle discovery | Omnichannel dealer experience |
+
+### BrevardBidderAI Positioning:
+- **Internal valuation:** $300-400K/year value vs $3.3K cost = 100x ROI
+- **Architecture:** Same pattern as enterprise AgentCore deployments
+- **Differentiator:** Domain-specific (foreclosure auctions) vs general-purpose
+
+---
+
+## Competitive Intelligence
+
+### AgentCore vs BrevardBidderAI Stack
+
+| Capability | AgentCore | BrevardBidderAI |
+|------------|-----------|-----------------|
+| Runtime | AWS managed | GitHub Actions |
+| Database | AWS services | Supabase |
+| Models | Bedrock (Claude, etc) | Smart Router (multi-tier) |
+| Cost | Pay-per-use AWS | $3.3K/year fixed |
+| Specialization | General purpose | Foreclosure-specific |
+
+**Conclusion:** BrevardBidderAI achieves similar architecture at fraction of cost through vertical specialization.
+
+---
+
+## Immediate Action Items
+
+### This Week:
+- [ ] Document current architecture using AgentCore terminology
+- [ ] Map 12-stage pipeline to AgentCore Runtime pattern
+
+### V14 Sprint:
+- [ ] Design MCP-compatible tool interface for scrapers
+- [ ] Implement Policy layer (natural language rules)
+- [ ] Build first 3 evaluators (lien accuracy, max bid, ML calibration)
+
+### Q1 2026:
+- [ ] Episodic memory enhancement (outcome tracking)
+- [ ] Consider AWS Bedrock for CRITICAL tier routing
+- [ ] Publish architecture whitepaper for investor deck
+
+---
+
+## Key Quotes
+
+> "AI agents will dramatically accelerate innovation and improve productivity across every industry." 
+> — Swami Sivasubramanian, AWS VP Agentic AI
+
+> "Being able to take advantage of the reasoning capabilities of these models, which is coupled with being able to do real-world things through tools, feels like a sustainable pattern."
+> — AWS re:Invent 2025
 
 ---
 
 ## Tags
-#AWS #AgentCore #AgenticAI #Architecture #BrevardBidderAI #Infrastructure #MCP #Enterprise
+#AWS #AgentCore #BrevardBidderAI #Architecture #V14Roadmap #AgenticAI #MCP #Enterprise #Valuation
 
 ---
 
-## Follow-Up Actions
-- [ ] Watch full video for implementation details
-- [ ] Research MCP protocol integration patterns
-- [ ] Compare AgentCore pricing vs current stack
-- [ ] Evaluate for BidDeedAI multi-county scaling
+## Credit
+**Ariel Shapira, Solo Founder**  
+Real Estate Developer & Founder, Everest Capital USA
+
+Analysis synthesized by Claude (AI Architect) based on AWS re:Invent 2025 coverage.
