@@ -71,50 +71,100 @@ jobs:
           except Exception as e:
               print(f"⚠️ Metadata warning: {e}")
 
-          # Get transcript using youtube_transcript_api
+          # Get transcript - try multiple languages
+          full_text = ""
+          transcript_source = ""
+          
+          # Method 1: youtube_transcript_api with language fallback
           try:
               from youtube_transcript_api import YouTubeTranscriptApi
-              transcript = YouTubeTranscriptApi.get_transcript(video_id)
-              full_text = " ".join([entry['text'] for entry in transcript])
-              print(f"\n✅ Transcript: {len(full_text)} characters, {len(transcript)} segments")
+              
+              # Try different language codes
+              languages_to_try = ['he', 'iw', 'en', 'en-US', 'auto']
+              
+              for lang in languages_to_try:
+                  try:
+                      if lang == 'auto':
+                          transcript = YouTubeTranscriptApi.get_transcript(video_id)
+                      else:
+                          transcript = YouTubeTranscriptApi.get_transcript(video_id, languages=[lang])
+                      full_text = " ".join([entry['text'] for entry in transcript])
+                      transcript_source = f"youtube_transcript_api ({lang})"
+                      print(f"✅ Got transcript via {transcript_source}: {len(full_text)} chars")
+                      break
+                  except Exception as lang_e:
+                      print(f"  - Language {lang}: {str(lang_e)[:50]}")
+                      continue
           except Exception as e:
-              print(f"❌ Transcript error: {e}")
-              # Try to get auto-generated captions via yt-dlp
+              print(f"❌ youtube_transcript_api failed: {e}")
+
+          # Method 2: yt-dlp subtitles if Method 1 failed
+          if not full_text or len(full_text) < 100:
+              print("\n🔄 Trying yt-dlp subtitle extraction...")
+              try:
+                  # Try auto-generated subs in multiple languages
+                  for lang in ['he', 'iw', 'en']:
+                      result = subprocess.run(
+                          ['yt-dlp', '--write-auto-sub', '--sub-lang', lang, 
+                           '--skip-download', '--sub-format', 'vtt', '-o', f'subtitle_{lang}', video_url],
+                          capture_output=True, text=True, timeout=120
+                      )
+                      
+                      vtt_file = f'subtitle_{lang}.{lang}.vtt'
+                      if os.path.exists(vtt_file):
+                          with open(vtt_file, 'r', encoding='utf-8') as f:
+                              vtt_content = f.read()
+                          # Parse VTT - remove timestamps and metadata
+                          lines = []
+                          for line in vtt_content.split('\n'):
+                              line = line.strip()
+                              if line and not line.startswith(('WEBVTT', 'Kind:', 'Language:', 'NOTE')) and '-->' not in line and not line.isdigit():
+                                  # Remove HTML tags
+                                  line = re.sub(r'<[^>]+>', '', line)
+                                  if line:
+                                      lines.append(line)
+                          full_text = ' '.join(lines)
+                          transcript_source = f"yt-dlp VTT ({lang})"
+                          print(f"✅ Got transcript via {transcript_source}: {len(full_text)} chars")
+                          break
+              except Exception as e2:
+                  print(f"❌ yt-dlp subtitle error: {e2}")
+
+          # Method 3: Try manual subtitle download
+          if not full_text or len(full_text) < 100:
+              print("\n🔄 Trying manual subtitle formats...")
               try:
                   result = subprocess.run(
-                      ['yt-dlp', '--write-auto-sub', '--sub-lang', 'en', '--skip-download', 
-                       '--sub-format', 'vtt', '-o', 'subtitle', video_url],
-                      capture_output=True, text=True, timeout=120
+                      ['yt-dlp', '--list-subs', video_url],
+                      capture_output=True, text=True, timeout=60
                   )
-                  if os.path.exists('subtitle.en.vtt'):
-                      with open('subtitle.en.vtt', 'r') as f:
-                          vtt_content = f.read()
-                      # Simple VTT parsing
-                      lines = [l for l in vtt_content.split('\n') if l and not l.startswith(('WEBVTT', 'Kind:', 'Language:')) and not '-->' in l]
-                      full_text = ' '.join(lines)
-                      print(f"✅ Got transcript from VTT: {len(full_text)} chars")
-                  else:
-                      full_text = "Transcript unavailable"
-              except Exception as e2:
-                  print(f"❌ VTT fallback error: {e2}")
-                  full_text = "Transcript unavailable"
+                  print(f"Available subtitles:\n{result.stdout}")
+              except Exception as e:
+                  print(f"Could not list subs: {e}")
 
           # Save output
+          if not full_text:
+              full_text = "Transcript unavailable - video may not have captions enabled"
+              
           output = {
               "video_id": video_id,
               "video_url": video_url,
               "title": metadata.get('title', 'Unknown'),
               "channel": metadata.get('channel', 'Unknown'),
               "duration_seconds": metadata.get('duration', 0),
-              "transcript": full_text[:50000],  # Limit size
-              "transcript_length": len(full_text)
+              "transcript": full_text[:100000],
+              "transcript_length": len(full_text),
+              "transcript_source": transcript_source or "none"
           }
 
-          with open('transcript.json', 'w') as f:
-              json.dump(output, f, indent=2)
+          with open('transcript.json', 'w', encoding='utf-8') as f:
+              json.dump(output, f, indent=2, ensure_ascii=False)
 
-          print("\n--- TRANSCRIPT PREVIEW (first 3000 chars) ---")
-          print(full_text[:3000])
+          print(f"\n{'='*60}")
+          print("TRANSCRIPT PREVIEW (first 5000 chars)")
+          print('='*60)
+          print(full_text[:5000])
+          print(f"\n{'='*60}")
 
           # Log to Supabase
           if log_to_supabase and supabase_key and len(full_text) > 100:
@@ -129,7 +179,7 @@ jobs:
                       "user_id": 1,
                       "insight_type": "learning_session",
                       "title": f"YouTube: {metadata.get('title', video_id)[:80]}",
-                      "description": f"Channel: {metadata.get('channel', 'Unknown')}. Duration: {metadata.get('duration', 0)//60} min. Transcript: {len(full_text)} chars. Video: {video_url}",
+                      "description": f"Channel: {metadata.get('channel', 'Unknown')}. Duration: {metadata.get('duration', 0)//60} min. Transcript: {len(full_text)} chars. Source: {transcript_source}. Video: {video_url}",
                       "priority": 2
                   }
                   
