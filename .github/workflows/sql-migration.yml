@@ -1,0 +1,44 @@
+name: Run SQL Migration
+
+on:
+  workflow_dispatch:
+
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        
+      - name: Run SQL Migration
+        env:
+          SUPABASE_URL: https://mocerqjnksmhcjzxrewo.supabase.co
+          SUPABASE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+        run: |
+          pip install supabase httpx
+          python3 << 'EOF'
+          import httpx
+          import json
+          import os
+          
+          SUPABASE_URL = os.environ["SUPABASE_URL"]
+          SUPABASE_KEY = os.environ["SUPABASE_KEY"]
+          
+          headers = {
+              "apikey": SUPABASE_KEY,
+              "Authorization": f"Bearer {SUPABASE_KEY}",
+              "Content-Type": "application/json",
+              "Prefer": "return=representation"
+          }
+          
+          # Check if table exists
+          with httpx.Client() as client:
+              r = client.get(f"{SUPABASE_URL}/rest/v1/life_os_locations?limit=1", headers=headers)
+              if r.status_code == 200:
+                  print("✅ Table already exists!")
+              else:
+                  print("Table doesn't exist - need manual creation")
+                  print("Run this SQL in Supabase dashboard:")
+                  with open("skills/life-os-knowledge/scripts/001_create_life_os_locations.sql") as f:
+                      print(f.read())
+          EOF
