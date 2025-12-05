@@ -28,7 +28,7 @@ jobs:
         run: |
           pip install youtube-transcript-api yt-dlp requests
           
-      - name: Extract transcript
+      - name: Extract transcript with multiple methods
         env:
           VIDEO_URL: ${{ github.event.inputs.video_url }}
           SUPABASE_URL: https://mocerqjnksmhcjzxrewo.supabase.co
@@ -56,91 +56,107 @@ jobs:
           video_id = match.group(1)
           print(f"📺 Video ID: {video_id}")
 
-          # Get video metadata via yt-dlp
+          # Get video metadata
           metadata = {"title": "Unknown", "channel": "Unknown", "duration": 0}
           try:
               result = subprocess.run(
                   ['yt-dlp', '--print-json', '--skip-download', '--no-warnings', video_url],
-                  capture_output=True, text=True, timeout=60
+                  capture_output=True, text=True, timeout=120
               )
               if result.returncode == 0 and result.stdout.strip():
                   metadata = json.loads(result.stdout)
                   print(f"📝 Title: {metadata.get('title', 'Unknown')}")
                   print(f"👤 Channel: {metadata.get('channel', 'Unknown')}")
                   print(f"⏱️ Duration: {metadata.get('duration', 0)} seconds")
+                  
+                  # Check available subtitles
+                  subs = metadata.get('subtitles', {})
+                  auto_subs = metadata.get('automatic_captions', {})
+                  print(f"📜 Manual subtitles: {list(subs.keys())}")
+                  print(f"🤖 Auto captions: {list(auto_subs.keys())}")
           except Exception as e:
-              print(f"⚠️ Metadata warning: {e}")
+              print(f"⚠️ Metadata error: {e}")
 
-          # Get transcript - try multiple languages
+          # METHOD 1: Try youtube-transcript-api with multiple languages
           full_text = ""
           transcript_source = ""
           
-          # Method 1: youtube_transcript_api with language fallback
           try:
               from youtube_transcript_api import YouTubeTranscriptApi
               
-              # Try different language codes
-              languages_to_try = ['he', 'iw', 'en', 'en-US', 'auto']
+              # Try different language codes for Hebrew
+              lang_codes = ['he', 'iw', 'en', 'en-US', 'a.he', 'a.iw', 'a.en']
               
-              for lang in languages_to_try:
+              for lang in lang_codes:
                   try:
-                      if lang == 'auto':
-                          transcript = YouTubeTranscriptApi.get_transcript(video_id)
-                      else:
-                          transcript = YouTubeTranscriptApi.get_transcript(video_id, languages=[lang])
+                      transcript = YouTubeTranscriptApi.get_transcript(video_id, languages=[lang])
                       full_text = " ".join([entry['text'] for entry in transcript])
-                      transcript_source = f"youtube_transcript_api ({lang})"
+                      transcript_source = f"youtube-transcript-api ({lang})"
                       print(f"✅ Got transcript via {transcript_source}: {len(full_text)} chars")
                       break
-                  except Exception as lang_e:
-                      print(f"  - Language {lang}: {str(lang_e)[:50]}")
+                  except Exception as e:
+                      print(f"   ❌ {lang}: {str(e)[:50]}")
                       continue
+                      
+              # If no specific language worked, try without language filter
+              if not full_text:
+                  try:
+                      transcript = YouTubeTranscriptApi.get_transcript(video_id)
+                      full_text = " ".join([entry['text'] for entry in transcript])
+                      transcript_source = "youtube-transcript-api (auto)"
+                      print(f"✅ Got transcript via {transcript_source}: {len(full_text)} chars")
+                  except Exception as e:
+                      print(f"   ❌ Auto: {e}")
+                      
           except Exception as e:
-              print(f"❌ youtube_transcript_api failed: {e}")
+              print(f"❌ youtube-transcript-api failed: {e}")
 
-          # Method 2: yt-dlp subtitles if Method 1 failed
-          if not full_text or len(full_text) < 100:
-              print("\n🔄 Trying yt-dlp subtitle extraction...")
+          # METHOD 2: Try yt-dlp subtitle download
+          if not full_text:
+              print("\n🔄 Trying yt-dlp subtitle download...")
               try:
-                  # Try auto-generated subs in multiple languages
-                  for lang in ['he', 'iw', 'en']:
+                  # Try Hebrew first, then auto-generated
+                  for sub_args in [
+                      ['--write-sub', '--sub-lang', 'he,iw,en'],
+                      ['--write-auto-sub', '--sub-lang', 'he,iw,en'],
+                      ['--write-auto-sub']
+                  ]:
                       result = subprocess.run(
-                          ['yt-dlp', '--write-auto-sub', '--sub-lang', lang, 
-                           '--skip-download', '--sub-format', 'vtt', '-o', f'subtitle_{lang}', video_url],
+                          ['yt-dlp'] + sub_args + ['--skip-download', '--sub-format', 'vtt', '-o', 'subs', video_url],
                           capture_output=True, text=True, timeout=120
                       )
                       
-                      vtt_file = f'subtitle_{lang}.{lang}.vtt'
-                      if os.path.exists(vtt_file):
-                          with open(vtt_file, 'r', encoding='utf-8') as f:
+                      # Check for downloaded subtitle files
+                      import glob
+                      vtt_files = glob.glob('subs*.vtt')
+                      if vtt_files:
+                          with open(vtt_files[0], 'r', encoding='utf-8') as f:
                               vtt_content = f.read()
+                          
                           # Parse VTT - remove timestamps and metadata
                           lines = []
                           for line in vtt_content.split('\n'):
                               line = line.strip()
-                              if line and not line.startswith(('WEBVTT', 'Kind:', 'Language:', 'NOTE')) and '-->' not in line and not line.isdigit():
+                              if line and not line.startswith(('WEBVTT', 'Kind:', 'Language:', 'NOTE')) and '-->' not in line and not re.match(r'^\d+$', line):
                                   # Remove HTML tags
-                                  line = re.sub(r'<[^>]+>', '', line)
-                                  if line:
-                                      lines.append(line)
+                                  clean_line = re.sub(r'<[^>]+>', '', line)
+                                  if clean_line:
+                                      lines.append(clean_line)
+                          
                           full_text = ' '.join(lines)
-                          transcript_source = f"yt-dlp VTT ({lang})"
+                          # Remove duplicate consecutive lines (common in VTT)
+                          words = full_text.split()
+                          deduped = []
+                          for i, word in enumerate(words):
+                              if i == 0 or word != words[i-1]:
+                                  deduped.append(word)
+                          full_text = ' '.join(deduped)
+                          
+                          transcript_source = f"yt-dlp ({vtt_files[0]})"
                           print(f"✅ Got transcript via {transcript_source}: {len(full_text)} chars")
                           break
-              except Exception as e2:
-                  print(f"❌ yt-dlp subtitle error: {e2}")
-
-          # Method 3: Try manual subtitle download
-          if not full_text or len(full_text) < 100:
-              print("\n🔄 Trying manual subtitle formats...")
-              try:
-                  result = subprocess.run(
-                      ['yt-dlp', '--list-subs', video_url],
-                      capture_output=True, text=True, timeout=60
-                  )
-                  print(f"Available subtitles:\n{result.stdout}")
               except Exception as e:
-                  print(f"Could not list subs: {e}")
+                  print(f"❌ yt-dlp subtitle download failed: {e}")
 
           # Save output
           if not full_text:
@@ -152,7 +168,7 @@ jobs:
               "title": metadata.get('title', 'Unknown'),
               "channel": metadata.get('channel', 'Unknown'),
               "duration_seconds": metadata.get('duration', 0),
-              "transcript": full_text[:100000],
+              "transcript": full_text[:100000],  # Limit size
               "transcript_length": len(full_text),
               "transcript_source": transcript_source or "none"
           }
@@ -160,11 +176,8 @@ jobs:
           with open('transcript.json', 'w', encoding='utf-8') as f:
               json.dump(output, f, indent=2, ensure_ascii=False)
 
-          print(f"\n{'='*60}")
-          print("TRANSCRIPT PREVIEW (first 5000 chars)")
-          print('='*60)
-          print(full_text[:5000])
-          print(f"\n{'='*60}")
+          print(f"\n--- TRANSCRIPT ({transcript_source or 'N/A'}) ---")
+          print(full_text[:5000] if len(full_text) > 100 else full_text)
 
           # Log to Supabase
           if log_to_supabase and supabase_key and len(full_text) > 100:
@@ -177,9 +190,16 @@ jobs:
                   
                   insight_data = {
                       "user_id": 1,
-                      "insight_type": "learning_session",
-                      "title": f"YouTube: {metadata.get('title', video_id)[:80]}",
-                      "description": f"Channel: {metadata.get('channel', 'Unknown')}. Duration: {metadata.get('duration', 0)//60} min. Transcript: {len(full_text)} chars. Source: {transcript_source}. Video: {video_url}",
+                      "insight_type": "youtube_transcript",
+                      "title": f"Transcript: {metadata.get('title', video_id)[:80]}",
+                      "description": json.dumps({
+                          "video_id": video_id,
+                          "channel": metadata.get('channel', 'Unknown'),
+                          "duration_min": metadata.get('duration', 0) // 60,
+                          "transcript_chars": len(full_text),
+                          "source": transcript_source,
+                          "transcript_preview": full_text[:1000]
+                      }, ensure_ascii=False),
                       "priority": 2
                   }
                   
@@ -200,7 +220,9 @@ jobs:
         if: always()
         with:
           name: transcript-${{ github.run_id }}
-          path: transcript.json
+          path: |
+            transcript.json
+            subs*.vtt
           retention-days: 30
           if-no-files-found: warn
 
