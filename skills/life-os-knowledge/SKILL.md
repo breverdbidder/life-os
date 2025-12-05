@@ -9,64 +9,60 @@ Personal knowledge system for the Shapira family. Stores hotels, venues, travel 
 
 ## Data Storage
 
-**Primary:** Supabase table `life_os_locations`
-**Database:** mocerqjnksmhcjzxrewo.supabase.co
+**Database:** Supabase `mocerqjnksmhcjzxrewo`
+**Table:** `insights` (using insight_type for categorization)
 
-## Schema: life_os_locations
+## Location Categories (insight_type values)
 
-| Column | Type | Description |
-|--------|------|-------------|
-| id | uuid | Primary key |
-| category | text | HOTEL, SWIM_VENUE, RESTAURANT, SERVICE_PROVIDER, TRAVEL_ROUTE |
-| name | text | Location name |
-| address | text | Full address |
-| city | text | City |
-| state | text | State |
-| context | text | Why we use this (e.g., "Michael swim meets") |
-| rating | int | 1-5 stars |
-| notes | jsonb | Flexible notes (room type, amenities, tips) |
-| last_visited | date | Most recent visit |
-| created_at | timestamp | Record creation |
+- `HOTEL` - Overnight stays
+- `SWIM_VENUE` - Competition pools
+- `RESTAURANT` - Dining options (kosher-friendly noted)
+- `SERVICE_PROVIDER` - Contractors, professionals
+- `TRAVEL_ROUTE` - Common drives
 
-## Usage Patterns
+## Query Patterns
 
-### Storing New Location
-```sql
-INSERT INTO life_os_locations (category, name, address, city, state, context, rating, notes, last_visited)
-VALUES ('HOTEL', 'Staybridge Suites Ocala', '4627 NW Blitchton Rd', 'Ocala', 'FL', 
-        'Michael swim meets at Ocala Aquatic Center', 5,
-        '{"room_type": "studio with queen beds", "amenities": ["kitchen", "breakfast"], "value": "excellent"}',
-        '2025-12-04');
+### Find hotels in a city
+```python
+GET /rest/v1/insights?insight_type=eq.HOTEL&description=cs.Ocala
 ```
 
-### Querying by Context
-```sql
-SELECT * FROM life_os_locations 
-WHERE context ILIKE '%swim%' AND city = 'Ocala';
+### Find swim venues
+```python
+GET /rest/v1/insights?insight_type=eq.SWIM_VENUE&order=confidence.desc
 ```
 
-### Querying by Category
-```sql
-SELECT * FROM life_os_locations 
-WHERE category = 'HOTEL' AND state = 'FL'
-ORDER BY rating DESC;
+### Search by context
+```python
+GET /rest/v1/insights?insight_type=in.(HOTEL,SWIM_VENUE)&description=cs.Michael
 ```
 
-## Categories
+## Insert Pattern
 
-- **HOTEL** - Overnight stays, include room type, value rating
-- **SWIM_VENUE** - Competition pools, include pool speed (fast/slow), parking, warmup info
-- **RESTAURANT** - Kosher-friendly, keto-friendly options noted
-- **SERVICE_PROVIDER** - Contractors, professionals, include contact info
-- **TRAVEL_ROUTE** - Common drives, include duration, stops, tips
-
-## Integration with Memory
-
-Memory stores pointers to frequently-accessed locations. Full details live in Supabase.
-Example memory: "Michael swim meets @ Ocala: Staybridge Suites (see life_os_locations)"
+```python
+{
+    "insight_type": "HOTEL",
+    "title": "Hotel Name",
+    "description": json.dumps({
+        "address": "123 Main St",
+        "city": "City",
+        "state": "FL",
+        "context": "Why we use this",
+        "room_type": "suite/studio/etc",
+        "amenities": ["list", "of", "amenities"],
+        "value": "excellent/good/budget"
+    }),
+    "related_date": "2025-12-04",
+    "priority": "medium",
+    "status": "active",
+    "source": "life_os_knowledge",
+    "confidence": 5  # 1-5 star rating
+}
+```
 
 ## Reference Files
 
 - `references/hotels.md` - Hotel reviews and preferences
-- `references/swim-venues.md` - Swim meet venue details
+- `references/swim-venues.md` - Swim meet venue details  
 - `references/travel.md` - Travel routes and logistics
+- `scripts/query_locations.py` - Helper for location queries
