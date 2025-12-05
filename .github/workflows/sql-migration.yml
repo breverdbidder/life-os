@@ -2,6 +2,11 @@ name: Run SQL Migration
 
 on:
   workflow_dispatch:
+    inputs:
+      migration_file:
+        description: 'Migration file to run (in migrations/ folder)'
+        required: false
+        default: '001_create_focus_scores.sql'
 
 jobs:
   migrate:
@@ -10,35 +15,46 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         
-      - name: Run SQL Migration
+      - name: Install psql
+        run: sudo apt-get install -y postgresql-client
+        
+      - name: Run Migration
         env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
           SUPABASE_URL: https://mocerqjnksmhcjzxrewo.supabase.co
           SUPABASE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
         run: |
-          pip install supabase httpx
-          python3 << 'EOF'
+          if [ -n "$SUPABASE_DB_URL" ]; then
+            echo "Running migration via psql..."
+            psql "$SUPABASE_DB_URL" -f migrations/${{ github.event.inputs.migration_file }}
+          else
+            echo "No DB URL, using REST API approach..."
+            pip install httpx
+            python3 << 'EOF'
           import httpx
           import json
           import os
           
-          SUPABASE_URL = os.environ["SUPABASE_URL"]
-          SUPABASE_KEY = os.environ["SUPABASE_KEY"]
+          url = os.environ["SUPABASE_URL"]
+          key = os.environ["SUPABASE_KEY"]
           
           headers = {
-              "apikey": SUPABASE_KEY,
-              "Authorization": f"Bearer {SUPABASE_KEY}",
-              "Content-Type": "application/json",
-              "Prefer": "return=representation"
+              "apikey": key,
+              "Authorization": f"Bearer {key}",
+              "Content-Type": "application/json"
           }
           
-          # Check if table exists
-          with httpx.Client() as client:
-              r = client.get(f"{SUPABASE_URL}/rest/v1/life_os_locations?limit=1", headers=headers)
-              if r.status_code == 200:
-                  print("✅ Table already exists!")
-              else:
-                  print("Table doesn't exist - need manual creation")
-                  print("Run this SQL in Supabase dashboard:")
-                  with open("skills/life-os-knowledge/scripts/001_create_life_os_locations.sql") as f:
-                      print(f.read())
+          # Try to access focus_scores table
+          r = httpx.get(f"{url}/rest/v1/focus_scores?limit=1", headers=headers)
+          print(f"Status: {r.status_code}")
+          print(f"Response: {r.text[:200]}")
+          
+          if r.status_code == 200:
+              print("✅ Table exists!")
+          elif "Could not find" in r.text:
+              print("❌ Table does not exist yet")
+              print("Migration requires direct database access")
+              print("Please set SUPABASE_DB_URL secret with format:")
+              print("postgresql://postgres:[PASSWORD]@db.mocerqjnksmhcjzxrewo.supabase.co:5432/postgres")
           EOF
+          fi
