@@ -1,0 +1,138 @@
+name: Extract YouTube Transcript
+
+on:
+  workflow_dispatch:
+    inputs:
+      video_url:
+        description: 'YouTube video URL'
+        required: true
+        default: 'https://youtube.com/watch?v=Ea1EpD-4sUU'
+      log_to_supabase:
+        description: 'Save to Supabase learning sessions'
+        required: false
+        default: 'true'
+
+jobs:
+  extract:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          
+      - name: Install dependencies
+        run: |
+          pip install youtube-transcript-api yt-dlp httpx
+          
+      - name: Extract transcript
+        id: transcript
+        env:
+          VIDEO_URL: ${{ github.event.inputs.video_url }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+          LOG_TO_SUPABASE: ${{ github.event.inputs.log_to_supabase }}
+        run: |
+          python3 << 'PYEOF'
+          import os
+          import re
+          import json
+          import httpx
+          from youtube_transcript_api import YouTubeTranscriptApi
+          
+          video_url = os.environ.get('VIDEO_URL', '')
+          supabase_url = os.environ.get('SUPABASE_URL', '')
+          supabase_key = os.environ.get('SUPABASE_KEY', '')
+          log_to_supabase = os.environ.get('LOG_TO_SUPABASE', 'true') == 'true'
+          
+          # Extract video ID
+          match = re.search(r'(?:v=|/)([a-zA-Z0-9_-]{11})', video_url)
+          if not match:
+              print("❌ Invalid YouTube URL")
+              exit(1)
+          
+          video_id = match.group(1)
+          print(f"📺 Video ID: {video_id}")
+          
+          # Get video metadata via yt-dlp
+          import subprocess
+          result = subprocess.run(
+              ['yt-dlp', '--print-json', '--skip-download', video_url],
+              capture_output=True, text=True
+          )
+          
+          metadata = {}
+          if result.returncode == 0:
+              try:
+                  metadata = json.loads(result.stdout)
+                  print(f"📝 Title: {metadata.get('title', 'Unknown')}")
+                  print(f"👤 Channel: {metadata.get('channel', 'Unknown')}")
+                  print(f"⏱️ Duration: {metadata.get('duration', 0)} seconds")
+              except:
+                  pass
+          
+          # Get transcript
+          try:
+              transcript = YouTubeTranscriptApi.get_transcript(video_id)
+              full_text = " ".join([entry['text'] for entry in transcript])
+              print(f"\n✅ Transcript: {len(full_text)} characters")
+              
+              # Save to file
+              output = {
+                  "video_id": video_id,
+                  "video_url": video_url,
+                  "title": metadata.get('title', 'Unknown'),
+                  "channel": metadata.get('channel', 'Unknown'),
+                  "duration_seconds": metadata.get('duration', 0),
+                  "transcript": full_text,
+                  "transcript_segments": len(transcript)
+              }
+              
+              with open('transcript.json', 'w') as f:
+                  json.dump(output, f, indent=2)
+              
+              print("\n--- TRANSCRIPT PREVIEW ---")
+              print(full_text[:2000])
+              
+              # Log to Supabase if enabled
+              if log_to_supabase and supabase_url and supabase_key:
+                  headers = {
+                      "apikey": supabase_key,
+                      "Authorization": f"Bearer {supabase_key}",
+                      "Content-Type": "application/json"
+                  }
+                  
+                  insight_data = {
+                      "user_id": 1,
+                      "insight_type": "learning_session",
+                      "title": f"YouTube: {metadata.get('title', video_id)[:80]}",
+                      "description": f"Channel: {metadata.get('channel', 'Unknown')}. Duration: {metadata.get('duration', 0)//60} min. Transcript: {len(full_text)} chars.",
+                      "priority": 2
+                  }
+                  
+                  response = httpx.post(
+                      f"{supabase_url}/rest/v1/insights",
+                      headers=headers,
+                      json=insight_data
+                  )
+                  print(f"\n📤 Logged to Supabase: {response.status_code}")
+                  
+          except Exception as e:
+              print(f"❌ Transcript error: {e}")
+              exit(1)
+          
+          PYEOF
+          
+      - name: Upload transcript artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: transcript-${{ github.run_id }}
+          path: transcript.json
+          retention-days: 30
+          
+      - name: Output transcript file
+        run: cat transcript.json
+
