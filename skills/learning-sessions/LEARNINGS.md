@@ -1,47 +1,64 @@
 # 📚 Consolidated Learnings
 
-A living document of key insights from learning sessions, automatically updated when important content is stored.
+A living document of key insights from learning sessions. Focus on actionable knowledge for BrevardBidderAI, Life OS, and Everest Capital.
 
 ---
 
 ## December 2025
 
-### AWS AgentCore (Dec 4, 2025)
-**Source:** [YUV AI - YouTube](https://youtube.com/watch?v=Ea1EpD-4sUU)
+### AWS AgentCore → BrevardBidderAI V14 Roadmap (Dec 4, 2025)
+**Source:** [YUV AI - YouTube](https://youtube.com/watch?v=Ea1EpD-4sUU)  
+**Relevance:** ⭐⭐⭐⭐⭐ CRITICAL
 
-**TL;DR:** AWS Bedrock AgentCore is enterprise infrastructure for AI agents. Framework-agnostic, 8-hour runtime, MCP protocol support.
+**TL;DR:** AWS AgentCore validates BrevardBidderAI's "Agentic AI ecosystem" positioning. Enterprise infrastructure pattern matches our architecture.
 
-**Key Services:**
-- Runtime, Identity, Gateway, Browser, Code Interpreter, Memory, Policy, Evaluations
+**The 8 AgentCore Services:**
+| Service | BrevardBidderAI Equivalent |
+|---------|---------------------------|
+| Runtime (8hr tasks) | 12-Stage Pipeline |
+| Gateway (MCP protocol) | Smart Router |
+| Browser | BECA Scraper |
+| Memory | Supabase + historical_auctions |
+| Policy | Max Bid Formula Rules |
+| Evaluations | XGBoost ML Accuracy |
 
-**Application to BrevardBidderAI:**
-- AgentCore pattern validates our "Agentic AI ecosystem" positioning
-- Consider MCP protocol for tool standardization
-- Policy layer concept for bid recommendation constraints
+**V14 Action Items:**
+- [ ] Implement MCP-compatible tool definitions for scrapers
+- [ ] Add Policy layer ("Never bid above 75% ARV minus repairs")
+- [ ] Build Evaluation framework (lien accuracy, max bid correctness)
+- [ ] Episodic memory - track deal outcomes to improve ML
 
-**Success Metrics:**
+**Enterprise Proof Points:**
 - PGA TOUR: 1,000% speed increase, 95% cost reduction
+- MongoDB: 8 weeks deployment vs months
 - Swisscom: B2C agent in 4 weeks
+
+**Valuation Impact:** AWS investing heavily in this category validates our $300-400K internal value assessment.
 
 ---
 
 ### Kernel.ai Entity Graph Architecture (Dec 4, 2025)
 **Source:** Research session
 
-**TL;DR:** B2B RevOps platform using entity graphs for CRM data cleaning and enrichment.
+**TL;DR:** B2B RevOps platform using entity graphs for CRM data cleaning.
 
 **Application to BrevardBidderAI:**
-- Entity deduplication patterns for property data
-- Relationship mapping concept for lien priority stacks
-- Continuous data processing vs batch approach
+- Entity deduplication for property records
+- Relationship mapping for lien priority stacks
+- Continuous processing vs batch approach
 
 ---
 
 ## How This File Works
 
-When Claude analyzes a learning session and you say "Log this" or it's marked as important:
-1. Full analysis saved to `summaries/YYYY-MM-DD_topic.md`
-2. Key points added to this LEARNINGS.md
-3. Metadata saved to Supabase `insights` table
+1. **Share YouTube URL** → Claude analyzes
+2. **Say "Log this"** → Saved to summaries/ + this file + Supabase
+3. **Quick reference here** → Full details in summaries/
 
-Browse summaries for full details. This file = quick reference.
+---
+
+## Index
+
+| Date | Topic | File |
+|------|-------|------|
+| Dec 4, 2025 | AWS AgentCore | `summaries/2025-12-04_aws_agentcore.md` |
