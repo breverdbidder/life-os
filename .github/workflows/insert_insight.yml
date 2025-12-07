@@ -1,0 +1,69 @@
+name: Insert Life OS Insight
+
+on:
+  workflow_dispatch:
+    inputs:
+      title:
+        description: 'Insight title'
+        required: true
+      description:
+        description: 'Insight description'
+        required: true
+      insight_type:
+        description: 'Type (learning, task_completion, michael_swim, health_log)'
+        required: true
+        default: 'learning'
+      source:
+        description: 'Source reference'
+        required: false
+        default: 'life_os'
+
+jobs:
+  insert:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Insert insight to Supabase
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+        run: |
+          echo "🔑 Testing Supabase connection..."
+          
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
+            "$SUPABASE_URL/rest/v1/insights?limit=1" \
+            -H "apikey: $SUPABASE_KEY" \
+            -H "Authorization: Bearer $SUPABASE_KEY")
+          
+          echo "Connection status: $STATUS"
+          
+          if [ "$STATUS" != "200" ]; then
+            echo "❌ Supabase connection failed"
+            exit 1
+          fi
+          
+          echo "✅ Connected to Supabase"
+          
+          RESULT=$(curl -s -X POST "$SUPABASE_URL/rest/v1/insights" \
+            -H "apikey: $SUPABASE_KEY" \
+            -H "Authorization: Bearer $SUPABASE_KEY" \
+            -H "Content-Type: application/json" \
+            -H "Prefer: return=representation" \
+            -d '{
+              "user_id": 1,
+              "insight_type": "${{ inputs.insight_type }}",
+              "title": "${{ inputs.title }}",
+              "description": "${{ inputs.description }}",
+              "priority": "medium",
+              "status": "active",
+              "source": "${{ inputs.source }}",
+              "action_taken": "logged_via_life_os_workflow"
+            }')
+          
+          echo "Result: $RESULT"
+          
+          if echo "$RESULT" | grep -q '"id"'; then
+            echo "✅ Insight inserted successfully"
+          else
+            echo "❌ Insert failed"
+            exit 1
+          fi
