@@ -1,0 +1,105 @@
+name: Autonomous Checkpoint Orchestrator
+
+on:
+  # Manual trigger with inputs
+  workflow_dispatch:
+    inputs:
+      task_description:
+        description: 'Task being executed'
+        required: true
+        default: 'Manual checkpoint'
+      token_count:
+        description: 'Estimated token count'
+        required: false
+        default: '0'
+      tool_count:
+        description: 'Number of tool calls'
+        required: false
+        default: '0'
+  
+  # Scheduled health check every 30 minutes
+  schedule:
+    - cron: '*/30 * * * *'
+
+env:
+  SUPABASE_URL: https://mocerqjnksmhcjzxrewo.supabase.co
+  SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+
+jobs:
+  checkpoint:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      
+      - name: Install dependencies
+        run: |
+          pip install requests anthropic
+      
+      - name: Run Checkpoint
+        if: github.event_name == 'workflow_dispatch'
+        env:
+          TASK_DESCRIPTION: ${{ github.event.inputs.task_description }}
+          TOKEN_COUNT: ${{ github.event.inputs.token_count }}
+          TOOL_COUNT: ${{ github.event.inputs.tool_count }}
+          SESSION_ID: "gh-${{ github.run_id }}"
+        run: |
+          python agents/orchestrator/autonomous_checkpoint_system.py --github-action
+      
+      - name: Health Check
+        if: github.event_name == 'schedule'
+        run: |
+          # Check for stale active checkpoints (>2 hours old)
+          python3 << 'EOF'
+          import requests
+          import json
+          from datetime import datetime, timedelta, timezone
+          
+          SUPABASE_URL = "https://mocerqjnksmhcjzxrewo.supabase.co"
+          SUPABASE_KEY = "${{ secrets.SUPABASE_KEY }}"
+          
+          headers = {
+              "apikey": SUPABASE_KEY,
+              "Authorization": f"Bearer {SUPABASE_KEY}",
+              "Content-Type": "application/json"
+          }
+          
+          # Get active checkpoints
+          r = requests.get(
+              f"{SUPABASE_URL}/rest/v1/insights?insight_type=eq.SESSION_CHECKPOINT&status=eq.active&order=created_at.desc",
+              headers=headers
+          )
+          
+          if r.status_code == 200:
+              checkpoints = r.json()
+              now = datetime.now(timezone.utc)
+              stale_threshold = now - timedelta(hours=2)
+              
+              stale_count = 0
+              for cp in checkpoints:
+                  created = datetime.fromisoformat(cp["created_at"].replace("Z", "+00:00"))
+                  if created < stale_threshold:
+                      stale_count += 1
+                      # Mark as completed (stale)
+                      requests.patch(
+                          f"{SUPABASE_URL}/rest/v1/insights?id=eq.{cp['id']}",
+                          headers=headers,
+                          json={"status": "completed", "action_taken": "stale_cleanup"}
+                      )
+                      print(f"🧹 Cleaned stale checkpoint: {cp['id']}")
+              
+              print(f"✅ Health check complete: {len(checkpoints)} active, {stale_count} cleaned")
+          else:
+              print(f"❌ Health check failed: {r.status_code}")
+          EOF
+      
+      - name: Report Status
+        run: |
+          echo "✅ Orchestrator run complete"
+          echo "Time: $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
