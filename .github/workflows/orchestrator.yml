@@ -132,11 +132,17 @@ jobs:
           data = json.load(sys.stdin)
           if data:
               cp = data[0]
-              desc = json.loads(cp.get('description', '{}'))
-              print(f\"  Session: {desc.get('session_id', 'N/A')}\")
-              print(f\"  Task: {desc.get('task', 'N/A')}\")
-              print(f\"  Completed: {len(desc.get('steps_completed', []))} steps\")
-              print(f\"  Token usage: {desc.get('token_ratio', 'N/A')}\")
+              desc_raw = cp.get('description', '')
+              # Try parsing as JSON, fallback to plain text
+              try:
+                  desc = json.loads(desc_raw) if desc_raw.startswith('{') else {}
+                  print(f\"  Session: {desc.get('session_id', 'N/A')}\")
+                  print(f\"  Task: {desc.get('task', 'N/A')}\")
+                  print(f\"  Completed: {len(desc.get('steps_completed', []))} steps\")
+                  print(f\"  Token usage: {desc.get('token_ratio', 'N/A')}\")
+              except:
+                  print(f\"  Description: {desc_raw[:200]}\")
+              print(f\"  Title: {cp.get('title', 'N/A')}\")
               print(f\"  Created: {cp.get('created_at', 'N/A')}\")
           "
           fi
