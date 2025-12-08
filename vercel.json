@@ -11,5 +11,6 @@
         { "key": "Expires", "value": "0" }
       ]
     }
-  ]
+  ],
+  "version": 2
 }
