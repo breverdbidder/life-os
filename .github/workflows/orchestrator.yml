@@ -73,7 +73,7 @@ jobs:
           python3 << 'EOF'
           import asyncio
           import sys
-          sys.path.insert(0, 'life-os-agents/orchestrator')
+          sys.path.insert(0, 'agents/orchestrator')
           from orchestrator import Orchestrator
           
           async def resume():
@@ -97,7 +97,7 @@ jobs:
           import asyncio
           import os
           import sys
-          sys.path.insert(0, 'life-os-agents/orchestrator')
+          sys.path.insert(0, 'agents/orchestrator')
           from orchestrator import Orchestrator
           
           async def new_task():
