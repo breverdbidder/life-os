@@ -1,92 +1,113 @@
-# BrevardBidderAI - AI Architect Rules
+# AI Architect Rules - BrevardBidderAI V13.4.0
 ## Author: Ariel Shapira, Solo Founder, Everest Capital USA
 
-## NEW SESSION PROTOCOL (MANDATORY)
+## SESSION PROTOCOL - CONNECTION RESILIENT
 
-**At the START of every new Claude session:**
+### On EVERY New Chat:
+```
+1. CHECK for active checkpoint:
+   - GET /api/checkpoint?action=check  (Vercel)
+   - OR python src/checkpoint_manager.py check
+   
+2. If checkpoint found:
+   - Resume IMMEDIATELY without asking
+   - Load state from checkpoint
+   - Continue where left off
+   
+3. If no checkpoint:
+   - Start fresh session
+   - Generate session_id: bba_YYYYMMDD_HHMMSS
+```
+
+### During Session - AGGRESSIVE AUTO-SAVE:
+```
+SAVE CHECKPOINT AFTER:
+- Every 3 tool calls (not 8)
+- Any file creation/modification
+- Any API deployment
+- Any database operation
+- Before any long-running operation
+
+This protects against:
+✗ Token limits (previous)
+✗ Internet disconnection (NEW)
+✗ Browser crash (NEW)
+✗ Mobile app backgrounded (NEW)
+```
+
+### Connection Loss Recovery:
+```
+The checkpoint manager now:
+1. ALWAYS saves locally first (~/.brevard_checkpoint_backup.json)
+2. Queues cloud saves if offline (~/.brevard_offline_queue.json)
+3. Auto-syncs queue when back online
+4. Compares local vs cloud timestamps - uses newest
+
+On reconnect after disconnect:
+- Check for local backup
+- Compare with cloud checkpoint
+- Use whichever is newer
+- Resume without losing work
+```
+
+### Heartbeat During Long Operations:
+```python
+# For operations >60 seconds, send heartbeat
+manager.heartbeat(session_id, "Running BECA scraper...")
+```
+
+## EXECUTION RULES (Unchanged)
+
+1. **NEVER ASK** - Execute autonomously
+2. **DEBUG & FIX** - If failure, diagnose → fix → retry
+3. **ZERO HUMAN-IN-LOOP** - Make decisions, don't ask permission
+4. **UPDATE STATE** - Always update PROJECT_STATE.json
+5. **USE GITHUB API** - REST API for all file operations
+6. **IP PROTECTION** - Credit "Ariel Shapira, Solo Founder" everywhere
+
+## CHECKPOINT COMMANDS
 
 ```bash
-# Check for active checkpoints
+# Check for active checkpoint
 python src/checkpoint_manager.py check
+
+# Manual save
+python src/checkpoint_manager.py save <session_id> "<task>" '{"state": "data"}'
+
+# Complete session
+python src/checkpoint_manager.py complete <session_id>
+
+# Force sync offline queue
+python src/checkpoint_manager.py sync
+
+# Heartbeat (for long ops)
+python src/checkpoint_manager.py heartbeat <session_id> "<current_task>"
 ```
 
-- If checkpoint found → **Load state and continue WITHOUT asking**
-- If no checkpoint → Start fresh session
-
-## AUTO-CHECKPOINT TRIGGERS
-
-Save checkpoint automatically when:
-1. **8+ tool calls** in current session
-2. **Before complex multi-step operations**
-3. **Context window approaching limit**
-4. **Before switching major tasks**
-
-### Save Command:
-```bash
-python src/checkpoint_manager.py save \
-  --task "Description of current work" \
-  --state '{"step": 3, "files": ["a.py"]}'
-```
-
-### Complete Command:
-```bash
-python src/checkpoint_manager.py complete
-```
-
-## EXECUTION RULES
-
-1. **NEVER ask Ariel execution questions** - Execute autonomously
-2. **Debug failures yourself** - Fix code, retry
-3. **Zero human-in-loop** - This is Agentic AI
-4. **Update PROJECT_STATE.json** after major changes
-
-## TECH STACK
-
-| Component | Platform |
-|-----------|----------|
-| Code | GitHub (breverdbidder/*) |
-| Database | Supabase (mocerqjnksmhcjzxrewo) |
-| Frontend | Vercel (brevard-bidder-landing-v2) |
-| CI/CD | GitHub Actions |
-| Compute | GitHub Actions runners |
-
-## SUPABASE CREDENTIALS (Fallback)
+## VERCEL API
 
 ```
-URL: https://mocerqjnksmhcjzxrewo.supabase.co
-KEY: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1vY2VycWpua3NtaGNqenhyZXdvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQ1MzI1MjYsImV4cCI6MjA4MDEwODUyNn0.ySFJIOngWWB0aqYra4PoGFuqcbdHOx1ZV6T9-klKQDw
+GET  /api/checkpoint?action=check  → List active checkpoints
+POST /api/checkpoint               → Save checkpoint
+PATCH /api/checkpoint              → Complete checkpoint
 ```
 
-## API ENDPOINTS
+## STATE LOCATIONS
 
-| Endpoint | Purpose |
+| Location | Purpose |
 |----------|---------|
-| /api/auctions | Auction data |
-| /api/analyze | Smart Router |
-| /api/calendar | Auction schedule |
-| /api/checkpoint | Session state |
+| Supabase `session_checkpoints` | Primary cloud storage |
+| `~/.brevard_checkpoint_backup.json` | Local instant backup |
+| `~/.brevard_offline_queue.json` | Offline save queue |
+| `PROJECT_STATE.json` | Project-level state |
 
-## CHECKPOINT TABLE SCHEMA
+## RECOVERY PRIORITY
 
-```sql
-CREATE TABLE session_checkpoints (
-    id SERIAL PRIMARY KEY,
-    session_id VARCHAR(100) UNIQUE NOT NULL,
-    task_description TEXT NOT NULL,
-    state_json JSONB DEFAULT '{}',
-    tool_calls_count INTEGER DEFAULT 0,
-    priority VARCHAR(20) DEFAULT 'medium',
-    status VARCHAR(20) DEFAULT 'active',
-    created_at TIMESTAMPTZ DEFAULT NOW(),
-    updated_at TIMESTAMPTZ DEFAULT NOW(),
-    completed_at TIMESTAMPTZ
-);
-```
+1. Local backup (if newer)
+2. Cloud checkpoint (if newer)
+3. PROJECT_STATE.json (fallback)
+4. Fresh start (last resort)
 
-## MEMORY RULES
-
-Always remember:
-- BrevardBidderAI = foreclosure auctions (NOT SaaS)
-- BidDeedAI = tax deed auctions
-- Credit: "Ariel Shapira, Solo Founder, Everest Capital USA"
-- NEVER use Google Drive - GitHub only
+---
+Last Updated: 2025-12-08
+Version: 2.0 - Connection Resilient
