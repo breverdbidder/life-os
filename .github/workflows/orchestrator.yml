@@ -1,0 +1,159 @@
+name: Life OS Orchestrator Agent
+
+on:
+  # Manual trigger with task input
+  workflow_dispatch:
+    inputs:
+      task:
+        description: 'Task to execute'
+        required: false
+        default: ''
+      action:
+        description: 'Action: resume, new, status'
+        required: true
+        default: 'resume'
+        type: choice
+        options:
+          - resume
+          - new
+          - status
+  
+  # Scheduled health check every 30 minutes
+  schedule:
+    - cron: '*/30 * * * *'
+  
+  # Webhook trigger for real-time tasks
+  repository_dispatch:
+    types: [life-os-task]
+
+env:
+  ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+  SUPABASE_URL: https://mocerqjnksmhcjzxrewo.supabase.co
+  SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+
+jobs:
+  orchestrate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      
+      - name: Install dependencies
+        run: |
+          pip install httpx asyncio
+      
+      - name: Check for active checkpoint
+        id: checkpoint
+        run: |
+          RESPONSE=$(curl -s "${{ env.SUPABASE_URL }}/rest/v1/insights?insight_type=eq.SESSION_CHECKPOINT&status=eq.active&order=created_at.desc&limit=1" \
+            -H "apikey: ${{ secrets.SUPABASE_KEY }}" \
+            -H "Authorization: Bearer ${{ secrets.SUPABASE_KEY }}")
+          
+          if echo "$RESPONSE" | python3 -c "import sys,json; d=json.load(sys.stdin); exit(0 if d else 1)" 2>/dev/null; then
+            echo "has_checkpoint=true" >> $GITHUB_OUTPUT
+            echo "checkpoint_data<<EOF" >> $GITHUB_OUTPUT
+            echo "$RESPONSE" >> $GITHUB_OUTPUT
+            echo "EOF" >> $GITHUB_OUTPUT
+            echo "✅ Found active checkpoint"
+          else
+            echo "has_checkpoint=false" >> $GITHUB_OUTPUT
+            echo "⚠️ No active checkpoint"
+          fi
+      
+      - name: Run Orchestrator (Resume)
+        if: github.event.inputs.action == 'resume' || (github.event_name == 'schedule' && steps.checkpoint.outputs.has_checkpoint == 'true')
+        run: |
+          python3 << 'EOF'
+          import asyncio
+          import sys
+          sys.path.insert(0, 'life-os-agents/orchestrator')
+          from orchestrator import Orchestrator
+          
+          async def resume():
+              orch = Orchestrator()
+              if await orch.resume_session():
+                  result = await orch.execute_task(
+                      orch.state.task,
+                      [orch.state.current_step] + orch.state.next_steps
+                  )
+                  print(f"Result: {result}")
+              else:
+                  print("No session to resume")
+          
+          asyncio.run(resume())
+          EOF
+      
+      - name: Run Orchestrator (New Task)
+        if: github.event.inputs.action == 'new' && github.event.inputs.task != ''
+        run: |
+          python3 << 'EOF'
+          import asyncio
+          import os
+          import sys
+          sys.path.insert(0, 'life-os-agents/orchestrator')
+          from orchestrator import Orchestrator
+          
+          async def new_task():
+              task = "${{ github.event.inputs.task }}"
+              orch = Orchestrator()
+              
+              # Simple task decomposition
+              steps = [
+                  f"Analyze requirements for: {task}",
+                  f"Execute primary action for: {task}",
+                  f"Verify and document results for: {task}"
+              ]
+              
+              result = await orch.execute_task(task, steps)
+              print(f"Result: {result}")
+          
+          asyncio.run(new_task())
+          EOF
+      
+      - name: Status Check
+        if: github.event.inputs.action == 'status' || github.event_name == 'schedule'
+        run: |
+          echo "📊 Life OS Orchestrator Status"
+          echo "=============================="
+          echo "Checkpoint found: ${{ steps.checkpoint.outputs.has_checkpoint }}"
+          
+          if [ "${{ steps.checkpoint.outputs.has_checkpoint }}" == "true" ]; then
+            echo ""
+            echo "Active checkpoint data:"
+            echo '${{ steps.checkpoint.outputs.checkpoint_data }}' | python3 -c "
+          import sys, json
+          data = json.load(sys.stdin)
+          if data:
+              cp = data[0]
+              desc = json.loads(cp.get('description', '{}'))
+              print(f\"  Session: {desc.get('session_id', 'N/A')}\")
+              print(f\"  Task: {desc.get('task', 'N/A')}\")
+              print(f\"  Completed: {len(desc.get('steps_completed', []))} steps\")
+              print(f\"  Token usage: {desc.get('token_ratio', 'N/A')}\")
+              print(f\"  Created: {cp.get('created_at', 'N/A')}\")
+          "
+          fi
+      
+      - name: Log completion
+        if: always()
+        run: |
+          curl -X POST "${{ env.SUPABASE_URL }}/rest/v1/insights" \
+            -H "apikey: ${{ secrets.SUPABASE_KEY }}" \
+            -H "Authorization: Bearer ${{ secrets.SUPABASE_KEY }}" \
+            -H "Content-Type: application/json" \
+            -d '{
+              "user_id": 1,
+              "insight_type": "ORCHESTRATOR_RUN",
+              "title": "Orchestrator execution - ${{ github.run_id }}",
+              "description": "{\"trigger\": \"${{ github.event_name }}\", \"action\": \"${{ github.event.inputs.action }}\", \"status\": \"${{ job.status }}\"}",
+              "priority": "low",
+              "status": "${{ job.status }}",
+              "source": "github_actions"
+            }'
