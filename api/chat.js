@@ -1,8 +1,9 @@
-// Life OS Chat API - Vercel Serverless Function
-// Proxies requests to Anthropic API - API key stays server-side
+// Life OS Chat API - Smart Router V5
+// DEFAULT: gemini-2.5-flash (1M context FREE)
+// Fallback: Anthropic API for complex operations
+// Author: Ariel Shapira, Solo Founder, Everest Capital USA
 
 export default async function handler(req, res) {
-  // CORS headers for your domain
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
@@ -15,8 +16,7 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  // Simple auth check - password in request must match env var
-  const { password, messages, session_id } = req.body;
+  const { password, messages, session_id, force_tier } = req.body;
   
   if (password !== process.env.LIFE_OS_PASSWORD) {
     return res.status(401).json({ error: 'Unauthorized' });
@@ -26,11 +26,9 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: 'Messages array required' });
   }
 
-  const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
-  
-  if (!ANTHROPIC_API_KEY) {
-    return res.status(500).json({ error: 'API key not configured' });
-  }
+  // Detect complexity to route to appropriate tier
+  const lastMessage = messages[messages.length - 1]?.content || '';
+  const tier = force_tier || detectTier(lastMessage);
 
   // System prompt with Life OS context
   const systemPrompt = `You are Claude, integrated with Ariel Shapira's Life OS - an ADHD-optimized productivity system.
@@ -41,79 +39,117 @@ CORE IDENTITY:
 - Family: Wife Mariam, Son Michael (16, D1 swimmer)
 - Style: Direct, no softening language, action-oriented
 
-DOMAINS:
-1. BUSINESS: Foreclosure auctions, BrevardBidderAI V13.4.0, insurance agencies
-2. MICHAEL D1 SWIMMING: Events (50/100/200 Free, 100 Fly, 100 Back), Keto M-Th, moderate F-Su
-3. FAMILY: Orthodox observance, Shabbat, holidays
-4. ARIEL PERSONAL: Health, learning, productivity
+DOMAINS: BUSINESS (Everest Capital, BrevardBidderAI), MICHAEL D1 SWIMMING, FAMILY, PERSONAL
 
-ADHD RULES:
-- Track task states: INITIATED → SOLUTION_PROVIDED → IN_PROGRESS → COMPLETED
-- Detect abandonment: context switches, incomplete tasks
-- Intervene with micro-commitments and chunking
-- No softening, celebrate completions with facts
-
-BREVARD BIDDER AI:
-- 12-stage pipeline: Discovery→Scraping→Title→Lien Priority→Tax Certs→Demographics→ML Score→Max Bid→Decision Log→Report→Disposition→Archive
-- Stack: GitHub + Supabase + Vercel + GitHub Actions (NO Google Drive)
-- Smart Router: FREE/ULTRA_CHEAP/BUDGET/PRODUCTION/CRITICAL tiers
-
-Current date: ${new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
-Current time FL: ${new Date().toLocaleTimeString('en-US', { timeZone: 'America/New_York', hour: '2-digit', minute: '2-digit' })} EST`;
+SMART ROUTER V5 ACTIVE:
+- Current Tier: ${tier}
+- Default Model: gemini-2.5-flash (1M context FREE)
+- Context Window: 1,000,000 tokens`;
 
   try {
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': ANTHROPIC_API_KEY,
-        'anthropic-version': '2023-06-01'
-      },
-      body: JSON.stringify({
-        model: 'claude-sonnet-4-20250514',
-        max_tokens: 4096,
-        system: systemPrompt,
-        messages: messages
-      })
+    let result;
+    
+    // Route based on tier
+    if (tier === 'FREE' && process.env.GOOGLE_API_KEY) {
+      // DEFAULT: Use Gemini 2.5 Flash (1M context FREE)
+      result = await callGemini(messages, systemPrompt, process.env.GOOGLE_API_KEY);
+    } else if (process.env.ANTHROPIC_API_KEY) {
+      // Fallback to Anthropic for complex operations
+      result = await callAnthropic(messages, systemPrompt, process.env.ANTHROPIC_API_KEY);
+    } else {
+      return res.status(500).json({ error: 'No API keys configured' });
+    }
+
+    return res.status(200).json({
+      content: result.content,
+      model: result.model,
+      tier: tier,
+      contextWindow: result.contextWindow,
+      cost: result.cost,
+      routing: {
+        detected_tier: tier,
+        model_used: result.model
+      }
     });
 
-    if (!response.ok) {
-      const errorData = await response.json();
-      console.error('Anthropic API error:', errorData);
-      return res.status(response.status).json({ error: errorData.error?.message || 'API error' });
-    }
-
-    const data = await response.json();
-    
-    // Log to Supabase if we have credentials
-    const SUPABASE_URL = process.env.SUPABASE_URL || 'https://mocerqjnksmhcjzxrewo.supabase.co';
-    const SUPABASE_KEY = process.env.SUPABASE_SERVICE_KEY;
-    
-    if (SUPABASE_KEY && session_id) {
-      try {
-        await fetch(`${SUPABASE_URL}/rest/v1/chat_sessions`, {
-          method: 'POST',
-          headers: {
-            'apikey': SUPABASE_KEY,
-            'Authorization': `Bearer ${SUPABASE_KEY}`,
-            'Content-Type': 'application/json',
-            'Prefer': 'resolution=merge-duplicates'
-          },
-          body: JSON.stringify({
-            session_id: session_id,
-            messages: JSON.stringify(messages),
-            last_response: data.content[0]?.text || '',
-            updated_at: new Date().toISOString()
-          })
-        });
-      } catch (logError) {
-        console.error('Failed to log to Supabase:', logError);
-      }
-    }
-
-    return res.status(200).json(data);
   } catch (error) {
-    console.error('Handler error:', error);
-    return res.status(500).json({ error: 'Internal server error' });
+    console.error('API Error:', error);
+    return res.status(500).json({ error: error.message });
   }
+}
+
+function detectTier(message) {
+  const lower = message.toLowerCase();
+  
+  // CRITICAL tier - high stakes decisions
+  if (/max bid|final approval|lien priority|legal review|high value/.test(lower)) return 'CRITICAL';
+  
+  // PRODUCTION tier - complex analysis
+  if (/analyze|strategy|market|complex|detailed report/.test(lower)) return 'PRODUCTION';
+  
+  // ULTRA_CHEAP tier - lien/title work
+  if (/lien analysis|title search|summarize/.test(lower)) return 'ULTRA_CHEAP';
+  
+  // DEFAULT: FREE tier (gemini-2.5-flash - 1M context)
+  return 'FREE';
+}
+
+async function callGemini(messages, systemPrompt, apiKey) {
+  const prompt = messages.map(m => `${m.role}: ${m.content}`).join('\n');
+  const fullPrompt = `${systemPrompt}\n\nConversation:\n${prompt}`;
+  
+  const response = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: fullPrompt }] }],
+        generationConfig: { maxOutputTokens: 8192, temperature: 0.7 }
+      })
+    }
+  );
+  
+  const data = await response.json();
+  
+  if (data.candidates?.[0]?.content?.parts?.[0]?.text) {
+    return {
+      content: data.candidates[0].content.parts[0].text,
+      model: 'gemini-2.5-flash',
+      contextWindow: 1000000,
+      cost: 0
+    };
+  }
+  
+  throw new Error(data.error?.message || 'Gemini API error');
+}
+
+async function callAnthropic(messages, systemPrompt, apiKey) {
+  const response = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-api-key': apiKey,
+      'anthropic-version': '2023-06-01'
+    },
+    body: JSON.stringify({
+      model: 'claude-sonnet-4-20250514',
+      max_tokens: 8192,
+      system: systemPrompt,
+      messages: messages
+    })
+  });
+  
+  const data = await response.json();
+  
+  if (data.content?.[0]?.text) {
+    return {
+      content: data.content[0].text,
+      model: 'claude-sonnet-4-20250514',
+      contextWindow: 200000,
+      cost: 3.0
+    };
+  }
+  
+  throw new Error(data.error?.message || 'Anthropic API error');
 }
