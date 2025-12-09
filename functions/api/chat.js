@@ -53,7 +53,7 @@ YOU HAVE TOOLS - USE THEM:
 - github_read_file: Read any file from repos
 - supabase_query: Query database tables
 
-ALWAYS use tools when asked about code, files, data, or status. Do not say you cannot access systems.
+IMPORTANT: Keep tool usage minimal. Use 1-2 tools max per response. Be direct and concise.
 
 REPOS: breverdbidder/life-os, breverdbidder/brevard-bidder-scraper, breverdbidder/brevard-bidder-landing
 
@@ -132,7 +132,7 @@ Current: ${now.toLocaleDateString('en-US', { weekday: 'long', month: 'short', da
           });
           if (!resp.ok) return { error: `File not found: ${path}` };
           const content = await resp.text();
-          return { content: content.substring(0, 6000) };
+          return { content: content.substring(0, 4000) };
         }
         
         if (name === "supabase_query") {
@@ -148,8 +148,7 @@ Current: ${now.toLocaleDateString('en-US', { weekday: 'long', month: 'short', da
             }
           });
           if (!resp.ok) return { error: `Query failed: ${resp.status}` };
-          const rows = await resp.json();
-          return { rows, count: rows.length };
+          return await resp.json();
         }
         
         return { error: "Unknown tool" };
@@ -158,8 +157,16 @@ Current: ${now.toLocaleDateString('en-US', { weekday: 'long', month: 'short', da
       }
     }
 
-    // Call Anthropic API
-    async function callAnthropic(msgs) {
+    // Build conversation messages
+    let conversationMessages = [...messages];
+    let data;
+    let iterations = 0;
+    const maxIterations = 3; // Reduced from 5 to avoid timeout
+    let allTextContent = [];
+
+    while (iterations < maxIterations) {
+      iterations++;
+      
       const response = await fetch('https://api.anthropic.com/v1/messages', {
         method: 'POST',
         headers: {
@@ -169,70 +176,76 @@ Current: ${now.toLocaleDateString('en-US', { weekday: 'long', month: 'short', da
         },
         body: JSON.stringify({
           model: 'claude-sonnet-4-20250514',
-          max_tokens: 4096,
+          max_tokens: 2048,
           system: systemPrompt,
           tools: tools,
-          messages: msgs
+          messages: conversationMessages
         })
       });
 
       if (!response.ok) {
         const err = await response.json();
-        throw new Error(err.error?.message || `API error ${response.status}`);
+        return new Response(JSON.stringify({ error: err.error?.message || 'API error' }), {
+          status: response.status,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
       }
 
-      return response.json();
-    }
-
-    // Build conversation with tool loop
-    let conversationMessages = [...messages];
-    let data;
-    
-    for (let i = 0; i < 5; i++) {
-      data = await callAnthropic(conversationMessages);
+      data = await response.json();
       
-      // If not a tool call, we're done
+      // Collect text content from this iteration
+      const textBlocks = data.content.filter(b => b.type === 'text');
+      allTextContent.push(...textBlocks);
+      
+      // If no tool use, we're done
       if (data.stop_reason !== 'tool_use') {
         break;
       }
       
-      // Extract tool calls
-      const toolCalls = data.content.filter(b => b.type === 'tool_use');
-      if (toolCalls.length === 0) break;
-      
-      // Execute each tool
+      // Execute all tool calls
+      const toolUseBlocks = data.content.filter(b => b.type === 'tool_use');
       const toolResults = [];
-      for (const tc of toolCalls) {
-        const result = await executeTool(tc.name, tc.input);
+      
+      for (const toolUse of toolUseBlocks) {
+        const result = await executeTool(toolUse.name, toolUse.input);
         toolResults.push({
           type: 'tool_result',
-          tool_use_id: tc.id,
+          tool_use_id: toolUse.id,
           content: JSON.stringify(result)
         });
       }
       
-      // Add to conversation for next iteration
+      // Add assistant response and tool results to conversation
       conversationMessages.push({ role: 'assistant', content: data.content });
       conversationMessages.push({ role: 'user', content: toolResults });
     }
 
-    // Log to Supabase (fire and forget)
+    // Ensure we always return text content
+    if (data.stop_reason === 'tool_use' && allTextContent.length > 0) {
+      // Loop didn't complete but we have some text - return it
+      data.content = allTextContent;
+      data.stop_reason = 'end_turn';
+    }
+
+    // Log to Supabase
     if (env.SUPABASE_SERVICE_KEY && session_id) {
-      fetch(`${env.SUPABASE_URL}/rest/v1/chat_sessions`, {
-        method: 'POST',
-        headers: {
-          'apikey': env.SUPABASE_SERVICE_KEY,
-          'Authorization': `Bearer ${env.SUPABASE_SERVICE_KEY}`,
-          'Content-Type': 'application/json',
-          'Prefer': 'resolution=merge-duplicates'
-        },
-        body: JSON.stringify({
-          session_id: session_id,
-          messages: JSON.stringify(messages),
-          last_response: data?.content?.find(b => b.type === 'text')?.text || '',
-          updated_at: new Date().toISOString()
-        })
-      }).catch(() => {});
+      try {
+        await fetch(`${env.SUPABASE_URL}/rest/v1/chat_sessions`, {
+          method: 'POST',
+          headers: {
+            'apikey': env.SUPABASE_SERVICE_KEY,
+            'Authorization': `Bearer ${env.SUPABASE_SERVICE_KEY}`,
+            'Content-Type': 'application/json',
+            'Prefer': 'resolution=merge-duplicates'
+          },
+          body: JSON.stringify({
+            session_id: session_id,
+            messages: JSON.stringify(messages),
+            last_response: data?.content?.find(b => b.type === 'text')?.text || '',
+            updated_at: new Date().toISOString()
+          })
+        });
+      } catch (e) { /* ignore */ }
     }
 
     return new Response(JSON.stringify(data), {
