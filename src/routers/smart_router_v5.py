@@ -1,10 +1,10 @@
 """
 BrevardBidderAI Smart Router V5
 ===============================
-Multi-tier LLM routing with Gemini 1.5 Flash FREE tier (1M context)
+Multi-tier LLM routing with Gemini 2.5 Flash FREE tier (1M context)
 
 Tiers:
-- FREE: gemini-1.5-flash (1M context) - Bulk processing, reports, scraping
+- FREE: gemini-2.5-flash (1M context) - Bulk processing, reports, scraping
 - ULTRA_CHEAP: DeepSeek V3.2 ($0.28/1M) - Lien analysis, title search  
 - BUDGET: claude-3-haiku - Quick classifications
 - PRODUCTION: claude-sonnet - Complex decisions
@@ -40,7 +40,7 @@ class ModelConfig:
     
 MODELS = {
     RouterTier.FREE: ModelConfig(
-        name="gemini-1.5-flash",
+        name="gemini-2.5-flash-preview-05-20",  # Latest FREE model with 1M context
         provider="google",
         max_tokens=8192,
         context_window=1_000_000,  # 1M context - KEY ADVANTAGE
@@ -83,7 +83,7 @@ MODELS = {
 
 # Task type to tier mapping
 TASK_ROUTING = {
-    # FREE tier (Gemini 1.5 Flash - 1M context)
+    # FREE tier (Gemini 2.5 Flash - 1M context)
     "report_generation": RouterTier.FREE,
     "bulk_scraping": RouterTier.FREE,
     "data_enrichment": RouterTier.FREE,
@@ -115,7 +115,7 @@ TASK_ROUTING = {
 class SmartRouterV5:
     """
     Smart Router V5 - Routes requests to optimal LLM tier based on task type.
-    Key feature: Gemini 1.5 Flash FREE tier with 1M context for bulk operations.
+    Key feature: Gemini 2.5 Flash FREE tier with 1M context for bulk operations.
     """
     
     def __init__(self):
@@ -134,7 +134,7 @@ class SmartRouterV5:
     
     def should_use_free_tier(self, prompt: str, task_type: str) -> bool:
         """
-        Determine if FREE tier (Gemini 1.5 Flash) should be used.
+        Determine if FREE tier (Gemini 2.5 Flash) should be used.
         Returns True for large context operations that benefit from 1M window.
         """
         token_estimate = self.estimate_tokens(prompt)
@@ -151,8 +151,9 @@ class SmartRouterV5:
         return False
     
     async def call_gemini(self, prompt: str, system: str = "") -> Dict[str, Any]:
-        """Call Gemini 1.5 Flash API (FREE tier - 1M context)."""
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={self.google_api_key}"
+        """Call Gemini 2.5 Flash API (FREE tier - 1M context)."""
+        model = MODELS[RouterTier.FREE].name
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={self.google_api_key}"
         
         contents = []
         if system:
@@ -178,7 +179,7 @@ class SmartRouterV5:
         
         return {
             "content": text,
-            "model": "gemini-1.5-flash",
+            "model": model,
             "tier": RouterTier.FREE.value,
             "input_tokens": usage.get("promptTokenCount", 0),
             "output_tokens": usage.get("candidatesTokenCount", 0),
@@ -340,7 +341,8 @@ if __name__ == "__main__":
         
         # Test FREE tier routing
         print("Testing Smart Router V5...")
-        print(f"Gemini 1.5 Flash context window: {MODELS[RouterTier.FREE].context_window:,} tokens")
+        print(f"Gemini 2.5 Flash context window: {MODELS[RouterTier.FREE].context_window:,} tokens")
+        print(f"Model: {MODELS[RouterTier.FREE].name}")
         
         # Simulate task routing
         test_tasks = [
