@@ -750,7 +750,7 @@
                 }
                 
                 const data = await response.json();
-                const assistantContent = data.content[0]?.text || 'No response';
+                const assistantContent = data.content?.filter(b => b.type === 'text').map(b => b.text).join('\n\n') || 'No response';
                 
                 // Add assistant message
                 messages.push({ role: 'assistant', content: assistantContent });
