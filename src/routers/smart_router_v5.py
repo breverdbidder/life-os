@@ -40,7 +40,7 @@ class ModelConfig:
     
 MODELS = {
     RouterTier.FREE: ModelConfig(
-        name="gemini-2.5-flash-preview-05-20",  # Latest FREE model with 1M context
+        name="gemini-2.5-flash",  # Latest FREE model with 1M context
         provider="google",
         max_tokens=8192,
         context_window=1_000_000,  # 1M context - KEY ADVANTAGE
