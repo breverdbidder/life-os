@@ -1,0 +1,18 @@
+{
+  "name": "Life OS Chat",
+  "short_name": "Life OS",
+  "description": "Secure AI assistant for Shapira Life OS",
+  "start_url": "/chat.html",
+  "display": "standalone",
+  "background_color": "#0f0f1a",
+  "theme_color": "#8b5cf6",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect fill='%238b5cf6' width='100' height='100' rx='20'/><text y='.9em' font-size='80' x='50%' text-anchor='middle'>🧠</text></svg>",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
