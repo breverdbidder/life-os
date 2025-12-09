@@ -1,10 +1,9 @@
 // Life OS Chat API - Cloudflare Pages Function
-// Proxies requests to Anthropic API - API key stays server-side
+// Proxies requests to Anthropic API with GitHub + Supabase tools
 
 export async function onRequest(context) {
   const { request, env } = context;
   
-  // CORS headers
   const corsHeaders = {
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Methods': 'POST, OPTIONS',
@@ -26,7 +25,6 @@ export async function onRequest(context) {
     const body = await request.json();
     const { password, messages, session_id } = body;
 
-    // Simple auth check
     if (password !== env.LIFE_OS_PASSWORD) {
       return new Response(JSON.stringify({ error: 'Unauthorized' }), {
         status: 401,
@@ -48,7 +46,6 @@ export async function onRequest(context) {
       });
     }
 
-    // System prompt with Life OS context
     const now = new Date();
     const systemPrompt = `You are Claude, integrated with Ariel Shapira's Life OS - an ADHD-optimized productivity system.
 
@@ -58,28 +55,148 @@ CORE IDENTITY:
 - Family: Wife Mariam, Son Michael (16, D1 swimmer)
 - Style: Direct, no softening language, action-oriented
 
-DOMAINS:
-1. BUSINESS: Foreclosure auctions, BrevardBidderAI V13.4.0, insurance agencies
-2. MICHAEL D1 SWIMMING: Events (50/100/200 Free, 100 Fly, 100 Back), Keto M-Th, moderate F-Su
-3. FAMILY: Orthodox observance, Shabbat, holidays
-4. ARIEL PERSONAL: Health, learning, productivity
+YOU HAVE TOOLS TO ACCESS:
+- GitHub repositories (read files, check workflows, view code)
+- Supabase database (query tables: activities, insights, historical_auctions, daily_metrics, chat_sessions)
 
-ADHD RULES:
-- Track task states: INITIATED → SOLUTION_PROVIDED → IN_PROGRESS → COMPLETED
-- Detect abandonment: context switches, incomplete tasks
-- Intervene with micro-commitments and chunking
-- No softening, celebrate completions with facts
+USE TOOLS PROACTIVELY when asked about:
+- BrevardBidderAI status, code, or data
+- Swim times, nutrition logs
+- Task history, focus scores
+- Any data that might be in the repos or database
 
-BREVARD BIDDER AI:
-- 12-stage pipeline: Discovery→Scraping→Title→Lien Priority→Tax Certs→Demographics→ML Score→Max Bid→Decision Log→Report→Disposition→Archive
-- Stack: GitHub + Supabase + Cloudflare (NO Google Drive)
-- Smart Router: FREE/ULTRA_CHEAP/BUDGET/PRODUCTION/CRITICAL tiers
+REPOS AVAILABLE:
+- breverdbidder/life-os (Life OS dashboard, orchestrator)
+- breverdbidder/brevard-bidder-scraper (BrevardBidderAI main codebase)
+- breverdbidder/brevard-bidder-landing (Landing page)
 
-Current date: ${now.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
-Current time FL: ${now.toLocaleTimeString('en-US', { timeZone: 'America/New_York', hour: '2-digit', minute: '2-digit' })} EST`;
+SUPABASE TABLES:
+- insights (category, content, metadata, created_at)
+- activities (description, domain, status, created_at)
+- historical_auctions (auction data)
+- daily_metrics (focus scores, productivity)
+- chat_sessions (conversation logs)
 
-    // Call Anthropic API
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
+Current: ${now.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric', year: 'numeric' })} ${now.toLocaleTimeString('en-US', { timeZone: 'America/New_York', hour: '2-digit', minute: '2-digit' })} EST`;
+
+    // Tool definitions
+    const tools = [
+      {
+        name: "github_read_file",
+        description: "Read a file from a GitHub repository",
+        input_schema: {
+          type: "object",
+          properties: {
+            repo: {
+              type: "string",
+              description: "Repository in format owner/repo (e.g., breverdbidder/life-os)"
+            },
+            path: {
+              type: "string",
+              description: "Path to file (e.g., README.md or src/index.js)"
+            }
+          },
+          required: ["repo", "path"]
+        }
+      },
+      {
+        name: "github_list_files",
+        description: "List files in a GitHub repository directory",
+        input_schema: {
+          type: "object",
+          properties: {
+            repo: {
+              type: "string",
+              description: "Repository in format owner/repo"
+            },
+            path: {
+              type: "string",
+              description: "Directory path (empty string for root)"
+            }
+          },
+          required: ["repo"]
+        }
+      },
+      {
+        name: "supabase_query",
+        description: "Query data from Supabase database",
+        input_schema: {
+          type: "object",
+          properties: {
+            table: {
+              type: "string",
+              description: "Table name (insights, activities, historical_auctions, daily_metrics, chat_sessions)"
+            },
+            select: {
+              type: "string",
+              description: "Columns to select (default: *)"
+            },
+            filter: {
+              type: "string",
+              description: "Filter in format: column=eq.value or column=gt.value"
+            },
+            order: {
+              type: "string",
+              description: "Order by column (e.g., created_at.desc)"
+            },
+            limit: {
+              type: "number",
+              description: "Max rows to return (default: 10)"
+            }
+          },
+          required: ["table"]
+        }
+      }
+    ];
+
+    // Execute tool calls
+    async function executeTool(name, input) {
+      if (name === "github_read_file") {
+        const { repo, path } = input;
+        const url = `https://raw.githubusercontent.com/${repo}/main/${path}`;
+        const resp = await fetch(url, {
+          headers: { 'Authorization': `token ${env.GITHUB_TOKEN}` }
+        });
+        if (!resp.ok) return { error: `File not found: ${path}` };
+        const content = await resp.text();
+        return { content: content.substring(0, 8000) }; // Limit size
+      }
+      
+      if (name === "github_list_files") {
+        const { repo, path = "" } = input;
+        const url = `https://api.github.com/repos/${repo}/contents/${path}`;
+        const resp = await fetch(url, {
+          headers: { 
+            'Authorization': `token ${env.GITHUB_TOKEN}`,
+            'Accept': 'application/vnd.github.v3+json'
+          }
+        });
+        if (!resp.ok) return { error: `Path not found: ${path}` };
+        const files = await resp.json();
+        return { files: files.map(f => ({ name: f.name, type: f.type, path: f.path })) };
+      }
+      
+      if (name === "supabase_query") {
+        const { table, select = "*", filter, order, limit = 10 } = input;
+        let url = `${env.SUPABASE_URL}/rest/v1/${table}?select=${select}&limit=${limit}`;
+        if (filter) url += `&${filter}`;
+        if (order) url += `&order=${order}`;
+        
+        const resp = await fetch(url, {
+          headers: {
+            'apikey': env.SUPABASE_SERVICE_KEY,
+            'Authorization': `Bearer ${env.SUPABASE_SERVICE_KEY}`
+          }
+        });
+        if (!resp.ok) return { error: `Query failed: ${await resp.text()}` };
+        return { data: await resp.json() };
+      }
+      
+      return { error: "Unknown tool" };
+    }
+
+    // Initial API call
+    let response = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -90,26 +207,69 @@ Current time FL: ${now.toLocaleTimeString('en-US', { timeZone: 'America/New_York
         model: 'claude-sonnet-4-20250514',
         max_tokens: 4096,
         system: systemPrompt,
+        tools: tools,
         messages: messages
       })
     });
 
     if (!response.ok) {
       const errorData = await response.json();
-      console.error('Anthropic API error:', errorData);
       return new Response(JSON.stringify({ error: errorData.error?.message || 'API error' }), {
         status: response.status,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
     }
 
-    const data = await response.json();
+    let data = await response.json();
+    
+    // Handle tool use loop (max 5 iterations)
+    let iterations = 0;
+    while (data.stop_reason === 'tool_use' && iterations < 5) {
+      iterations++;
+      
+      const toolUseBlocks = data.content.filter(b => b.type === 'tool_use');
+      const toolResults = [];
+      
+      for (const toolUse of toolUseBlocks) {
+        const result = await executeTool(toolUse.name, toolUse.input);
+        toolResults.push({
+          type: 'tool_result',
+          tool_use_id: toolUse.id,
+          content: JSON.stringify(result)
+        });
+      }
+      
+      // Continue conversation with tool results
+      const newMessages = [
+        ...messages,
+        { role: 'assistant', content: data.content },
+        { role: 'user', content: toolResults }
+      ];
+      
+      response = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': env.ANTHROPIC_API_KEY,
+          'anthropic-version': '2023-06-01'
+        },
+        body: JSON.stringify({
+          model: 'claude-sonnet-4-20250514',
+          max_tokens: 4096,
+          system: systemPrompt,
+          tools: tools,
+          messages: newMessages
+        })
+      });
+      
+      if (!response.ok) break;
+      data = await response.json();
+    }
 
-    // Log to Supabase if we have credentials
+    // Log to Supabase
     if (env.SUPABASE_SERVICE_KEY && session_id) {
       try {
-        const supabaseUrl = env.SUPABASE_URL || 'https://mocerqjnksmhcjzxrewo.supabase.co';
-        await fetch(`${supabaseUrl}/rest/v1/chat_sessions`, {
+        await fetch(`${env.SUPABASE_URL}/rest/v1/chat_sessions`, {
           method: 'POST',
           headers: {
             'apikey': env.SUPABASE_SERVICE_KEY,
@@ -120,13 +280,11 @@ Current time FL: ${now.toLocaleTimeString('en-US', { timeZone: 'America/New_York
           body: JSON.stringify({
             session_id: session_id,
             messages: JSON.stringify(messages),
-            last_response: data.content[0]?.text || '',
+            last_response: data.content?.find(b => b.type === 'text')?.text || '',
             updated_at: new Date().toISOString()
           })
         });
-      } catch (logError) {
-        console.error('Failed to log to Supabase:', logError);
-      }
+      } catch (e) { /* ignore logging errors */ }
     }
 
     return new Response(JSON.stringify(data), {
