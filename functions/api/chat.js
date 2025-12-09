@@ -148,7 +148,8 @@ Current: ${now.toLocaleDateString('en-US', { weekday: 'long', month: 'short', da
             }
           });
           if (!resp.ok) return { error: `Query failed: ${resp.status}` };
-          return { data: await resp.json() };
+          const rows = await resp.json();
+          return { rows, count: rows.length };
         }
         
         return { error: "Unknown tool" };
@@ -157,15 +158,8 @@ Current: ${now.toLocaleDateString('en-US', { weekday: 'long', month: 'short', da
       }
     }
 
-    // Build conversation messages
-    let conversationMessages = [...messages];
-    let data;
-    let iterations = 0;
-    const maxIterations = 5;
-
-    while (iterations < maxIterations) {
-      iterations++;
-      
+    // Call Anthropic API
+    async function callAnthropic(msgs) {
       const response = await fetch('https://api.anthropic.com/v1/messages', {
         method: 'POST',
         headers: {
@@ -178,62 +172,67 @@ Current: ${now.toLocaleDateString('en-US', { weekday: 'long', month: 'short', da
           max_tokens: 4096,
           system: systemPrompt,
           tools: tools,
-          messages: conversationMessages
+          messages: msgs
         })
       });
 
       if (!response.ok) {
         const err = await response.json();
-        return new Response(JSON.stringify({ error: err.error?.message || 'API error' }), {
-          status: response.status,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-        });
+        throw new Error(err.error?.message || `API error ${response.status}`);
       }
 
-      data = await response.json();
+      return response.json();
+    }
+
+    // Build conversation with tool loop
+    let conversationMessages = [...messages];
+    let data;
+    
+    for (let i = 0; i < 5; i++) {
+      data = await callAnthropic(conversationMessages);
       
-      // If no tool use, we're done
+      // If not a tool call, we're done
       if (data.stop_reason !== 'tool_use') {
         break;
       }
       
-      // Execute all tool calls
-      const toolUseBlocks = data.content.filter(b => b.type === 'tool_use');
-      const toolResults = [];
+      // Extract tool calls
+      const toolCalls = data.content.filter(b => b.type === 'tool_use');
+      if (toolCalls.length === 0) break;
       
-      for (const toolUse of toolUseBlocks) {
-        const result = await executeTool(toolUse.name, toolUse.input);
+      // Execute each tool
+      const toolResults = [];
+      for (const tc of toolCalls) {
+        const result = await executeTool(tc.name, tc.input);
         toolResults.push({
           type: 'tool_result',
-          tool_use_id: toolUse.id,
+          tool_use_id: tc.id,
           content: JSON.stringify(result)
         });
       }
       
-      // Add assistant response and tool results to conversation
+      // Add to conversation for next iteration
       conversationMessages.push({ role: 'assistant', content: data.content });
       conversationMessages.push({ role: 'user', content: toolResults });
     }
 
-    // Log to Supabase
+    // Log to Supabase (fire and forget)
     if (env.SUPABASE_SERVICE_KEY && session_id) {
-      try {
-        await fetch(`${env.SUPABASE_URL}/rest/v1/chat_sessions`, {
-          method: 'POST',
-          headers: {
-            'apikey': env.SUPABASE_SERVICE_KEY,
-            'Authorization': `Bearer ${env.SUPABASE_SERVICE_KEY}`,
-            'Content-Type': 'application/json',
-            'Prefer': 'resolution=merge-duplicates'
-          },
-          body: JSON.stringify({
-            session_id: session_id,
-            messages: JSON.stringify(messages),
-            last_response: data?.content?.find(b => b.type === 'text')?.text || '',
-            updated_at: new Date().toISOString()
-          })
-        });
-      } catch (e) { /* ignore */ }
+      fetch(`${env.SUPABASE_URL}/rest/v1/chat_sessions`, {
+        method: 'POST',
+        headers: {
+          'apikey': env.SUPABASE_SERVICE_KEY,
+          'Authorization': `Bearer ${env.SUPABASE_SERVICE_KEY}`,
+          'Content-Type': 'application/json',
+          'Prefer': 'resolution=merge-duplicates'
+        },
+        body: JSON.stringify({
+          session_id: session_id,
+          messages: JSON.stringify(messages),
+          last_response: data?.content?.find(b => b.type === 'text')?.text || '',
+          updated_at: new Date().toISOString()
+        })
+      }).catch(() => {});
     }
 
     return new Response(JSON.stringify(data), {
