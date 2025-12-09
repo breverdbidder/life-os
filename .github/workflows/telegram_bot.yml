@@ -1,0 +1,63 @@
+name: Life OS Telegram Bot
+
+on:
+  # Keep bot running via scheduled restarts
+  schedule:
+    - cron: '0 */6 * * *'  # Every 6 hours
+  
+  workflow_dispatch:
+    inputs:
+      action:
+        description: 'Action: start, stop, status'
+        required: true
+        default: 'start'
+        type: choice
+        options:
+          - start
+          - status
+
+env:
+  TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+  ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+  SUPABASE_URL: https://mocerqjnksmhcjzxrewo.supabase.co
+  SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+
+jobs:
+  run-bot:
+    runs-on: ubuntu-latest
+    timeout-minutes: 350  # Just under 6 hours (GitHub limit)
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      
+      - name: Install dependencies
+        run: |
+          pip install python-telegram-bot httpx
+      
+      - name: Run Bot
+        if: github.event.inputs.action == 'start' || github.event_name == 'schedule'
+        run: |
+          timeout 20700 python agents/orchestrator/telegram_bot.py || true
+          # 20700 seconds = 5h 45min (leave buffer for cleanup)
+      
+      - name: Log completion
+        if: always()
+        run: |
+          curl -X POST "${{ env.SUPABASE_URL }}/rest/v1/insights" \
+            -H "apikey: ${{ secrets.SUPABASE_KEY }}" \
+            -H "Authorization: Bearer ${{ secrets.SUPABASE_KEY }}" \
+            -H "Content-Type: application/json" \
+            -d '{
+              "user_id": 1,
+              "insight_type": "TELEGRAM_BOT_RUN",
+              "title": "Telegram bot session - ${{ github.run_id }}",
+              "description": "{\"trigger\": \"${{ github.event_name }}\", \"status\": \"${{ job.status }}\"}",
+              "status": "${{ job.status }}",
+              "source": "github_actions"
+            }'
