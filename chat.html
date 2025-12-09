@@ -620,7 +620,7 @@
             }
             
             // Store password temporarily (session only)
-            sessionStorage.setItem('lifeos_pwd', password);
+            localStorage.setItem('lifeos_pwd', password);
             
             // Show chat screen
             document.getElementById('login-screen').style.display = 'none';
@@ -645,7 +645,7 @@
         }
         
         function logout() {
-            sessionStorage.removeItem('lifeos_pwd');
+            localStorage.removeItem('lifeos_pwd');
             password = '';
             document.getElementById('chat-screen').style.display = 'none';
             document.getElementById('login-screen').style.display = 'flex';
@@ -654,7 +654,7 @@
         
         // Check for existing session
         window.addEventListener('load', () => {
-            const savedPwd = sessionStorage.getItem('lifeos_pwd');
+            const savedPwd = localStorage.getItem('lifeos_pwd');
             if (savedPwd) {
                 password = savedPwd;
                 document.getElementById('login-screen').style.display = 'none';
@@ -732,15 +732,16 @@
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        password: sessionStorage.getItem('lifeos_pwd'),
+                        password: localStorage.getItem('lifeos_pwd'),
                         messages: messages,
                         session_id: sessionId
                     })
                 });
                 
                 if (response.status === 401) {
-                    showLoginError('Session expired');
-                    logout();
+                    // Don't auto-logout on 401 - might be temporary
+                    // Just show error and let user try again
+                    renderMessage('assistant', '⚠️ Authentication error. Please refresh and re-enter password.');
                     return;
                 }
                 
