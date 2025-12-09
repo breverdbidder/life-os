@@ -1,5 +1,7 @@
 {
-  "rewrites": [{ "source": "/(.*)", "destination": "/" }],
+  "rewrites": [
+    { "source": "/api/chat", "destination": "/api/chat.js" }
+  ],
   "headers": [
     {
       "source": "/(.*)",
