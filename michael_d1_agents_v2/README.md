@@ -1,16 +1,16 @@
-# Michael Shapira D1 Pathway V2 - Enhanced Multi-Agent System
+# Michael Shapira D1 Pathway V2.1 - Enhanced Multi-Agent System
 
 ## 🏊 Overview
 
 An advanced LangGraph-based multi-agent AI orchestration system for Michael Shapira's D1 collegiate swimming pathway. **Primary Target: University of Florida Class of 2027**.
 
-### V2 Enhancements over V1:
-- **11 Specialized Agents** (vs 5 in V1)
+### V2.1 Features:
+- **12 Specialized Agents** (NEW: Meet Preparation & Motivation Agent)
 - **XGBoost ML Integration** per agent
 - **Bridge Integration** (Claude Chat ↔ Orchestrator API)
 - **Event Bus** (Pub/Sub for inter-agent communication)
 - **Shared State Repository**
-- **Priority Queue Management**
+- **Automated Meet Prep Document Generation** (48-72 hrs before meets)
 
 ---
 
@@ -70,7 +70,7 @@ An advanced LangGraph-based multi-agent AI orchestration system for Michael Shap
 
 ---
 
-## 🤖 11 Specialized Agents
+## 🤖 12 Specialized Agents
 
 | # | Agent | XGBoost Model | Primary Function |
 |---|-------|---------------|------------------|
@@ -85,6 +85,7 @@ An advanced LangGraph-based multi-agent AI orchestration system for Michael Shap
 | 9 | **Goals & Improvement** | GOAL_ACHIEVEMENT | UF 2027 target tracking, milestone management |
 | 10 | **Events Schedule** | MEET_QUALIFIER | Meet calendar, qualification cuts, coach attendance |
 | 11 | **School Comparison** | PROGRAM_MATCHER | Multi-factor school ranking, fit analysis |
+| **12** | **Meet Prep & Motivation** | **MOTIVATION_OPTIMIZER** | **Mental/physical prep, 48-72hr pre-meet docs** |
 
 ---
 
