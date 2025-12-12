@@ -31,12 +31,13 @@ jobs:
           from datetime import datetime
           from playwright.async_api import async_playwright
 
-          # Satellite Beach High School Swimmers
+          # Satellite Beach High School Swimmers - ALL 5
           SWIMMERS = {
-              "3250085": {"name": "Michael Shapira", "school": "Satellite Sr High School"},
-              "2928537": {"name": "Bastian Soto", "school": "Satellite Sr High School"},
-              "1518102": {"name": "Gavin Domboru", "school": "Satellite Sr High School"},
-              "1754554": {"name": "Max Morgan", "school": "Satellite Sr High School"}
+              "3250085": {"name": "Michael Shapira", "class": 2027},
+              "2928537": {"name": "Bastian Soto", "class": 2027},
+              "1518102": {"name": "Gavin Domboru", "class": 2027},
+              "1754554": {"name": "Max Morgan", "class": 2026},
+              "2662363": {"name": "Sawyer Davis", "class": 2026, "note": "Ohio State Commit, 2A State Champion"}
           }
 
           def parse_time_to_seconds(time_str):
@@ -57,21 +58,21 @@ jobs:
               print(f"URL: {url}")
               
               try:
-                  # Navigate to swimmer page
                   await page.goto(url, wait_until="networkidle", timeout=60000)
-                  await page.wait_for_timeout(5000)  # Extra wait for JS
+                  await page.wait_for_timeout(5000)
                   
                   data = {
                       "swimmer_id": swimmer_id,
                       "name": swimmer_info["name"],
-                      "school": swimmer_info["school"],
+                      "class_of": swimmer_info.get("class"),
+                      "school": "Satellite Sr High School",
+                      "team": "Swim Melbourne (MELB-FL)",
+                      "note": swimmer_info.get("note", ""),
                       "scraped_at": datetime.now().isoformat(),
                       "profile": {},
-                      "personal_bests": {},
-                      "recent_times": []
+                      "personal_bests": {}
                   }
                   
-                  # Get full page text for parsing
                   body_text = await page.locator("body").text_content()
                   
                   # Extract Power Index
@@ -86,64 +87,43 @@ jobs:
                       data["profile"]["florida_rank"] = int(fl_rank.group(1))
                       print(f"  Florida Rank: {data['profile']['florida_rank']}")
                   
-                  # Extract Class Year
+                  # Extract Class Year from page
                   class_match = re.search(r'Class\s*[·:\s]*(\d{4})', body_text)
                   if class_match:
                       data["profile"]["class_of"] = int(class_match.group(1))
-                      print(f"  Class: {data['profile']['class_of']}")
                   
-                  # Try to find the best times table
-                  # SwimCloud shows PBs in a table with event names and times
                   html = await page.content()
                   
-                  # Look for time patterns in the page
-                  # Pattern: "50 Y Free" or "100 Y Fly" followed by time like "21.86" or "1:48.50"
+                  # Time patterns - improved to catch more formats
                   time_patterns = [
-                      (r'50\s*Y(?:ard)?\s*Free(?:style)?[\s\S]{0,100}?(\d{2}\.\d{2})', '50 Free'),
-                      (r'100\s*Y(?:ard)?\s*Free(?:style)?[\s\S]{0,100}?(\d{2}\.\d{2}|\d:\d{2}\.\d{2})', '100 Free'),
-                      (r'200\s*Y(?:ard)?\s*Free(?:style)?[\s\S]{0,100}?(\d:\d{2}\.\d{2})', '200 Free'),
-                      (r'50\s*Y(?:ard)?\s*Fly[\s\S]{0,100}?(\d{2}\.\d{2})', '50 Fly'),
-                      (r'100\s*Y(?:ard)?\s*Fly[\s\S]{0,100}?(\d{2}\.\d{2}|\d:\d{2}\.\d{2})', '100 Fly'),
-                      (r'50\s*Y(?:ard)?\s*Back[\s\S]{0,100}?(\d{2}\.\d{2})', '50 Back'),
-                      (r'100\s*Y(?:ard)?\s*Back[\s\S]{0,100}?(\d{2}\.\d{2}|\d:\d{2}\.\d{2})', '100 Back'),
-                      (r'50\s*Y(?:ard)?\s*Breast[\s\S]{0,100}?(\d{2}\.\d{2})', '50 Breast'),
-                      (r'100\s*Y(?:ard)?\s*Breast[\s\S]{0,100}?(\d{2}\.\d{2}|\d:\d{2}\.\d{2})', '100 Breast'),
-                      (r'200\s*Y(?:ard)?\s*IM[\s\S]{0,100}?(\d:\d{2}\.\d{2})', '200 IM'),
+                      (r'50\s*Y(?:ard)?\s*Free(?:style)?[^\d]{0,50}?(\d{2}\.\d{2})', '50 Free'),
+                      (r'100\s*Y(?:ard)?\s*Free(?:style)?[^\d]{0,50}?(\d{2}\.\d{2}|\d:\d{2}\.\d{2})', '100 Free'),
+                      (r'200\s*Y(?:ard)?\s*Free(?:style)?[^\d]{0,50}?(\d:\d{2}\.\d{2})', '200 Free'),
+                      (r'500\s*Y(?:ard)?\s*Free(?:style)?[^\d]{0,50}?(\d:\d{2}\.\d{2})', '500 Free'),
+                      (r'50\s*Y(?:ard)?\s*Fly[^\d]{0,50}?(\d{2}\.\d{2})', '50 Fly'),
+                      (r'100\s*Y(?:ard)?\s*Fly[^\d]{0,50}?(\d{2}\.\d{2}|\d:\d{2}\.\d{2})', '100 Fly'),
+                      (r'50\s*Y(?:ard)?\s*Back[^\d]{0,50}?(\d{2}\.\d{2})', '50 Back'),
+                      (r'100\s*Y(?:ard)?\s*Back[^\d]{0,50}?(\d{2}\.\d{2}|\d:\d{2}\.\d{2})', '100 Back'),
+                      (r'200\s*Y(?:ard)?\s*Back[^\d]{0,50}?(\d:\d{2}\.\d{2})', '200 Back'),
+                      (r'50\s*Y(?:ard)?\s*Breast[^\d]{0,50}?(\d{2}\.\d{2})', '50 Breast'),
+                      (r'100\s*Y(?:ard)?\s*Breast[^\d]{0,50}?(\d{2}\.\d{2}|\d:\d{2}\.\d{2})', '100 Breast'),
+                      (r'200\s*Y(?:ard)?\s*Breast[^\d]{0,50}?(\d:\d{2}\.\d{2})', '200 Breast'),
+                      (r'200\s*Y(?:ard)?\s*IM[^\d]{0,50}?(\d:\d{2}\.\d{2})', '200 IM'),
+                      (r'400\s*Y(?:ard)?\s*IM[^\d]{0,50}?(\d:\d{2}\.\d{2})', '400 IM'),
                   ]
                   
                   for pattern, event_name in time_patterns:
                       matches = re.findall(pattern, html, re.I)
                       if matches:
-                          # Take the first (usually best) time
                           time_str = matches[0]
                           seconds = parse_time_to_seconds(time_str)
-                          data["personal_bests"][event_name] = {
-                              "time": time_str,
-                              "seconds": seconds
-                          }
+                          if seconds and seconds > 10:  # Filter out spurious matches
+                              data["personal_bests"][event_name] = {
+                                  "time": time_str,
+                                  "seconds": seconds
+                              }
                   
-                  # Try clicking on "Best Times" tab if it exists
-                  try:
-                      best_times_tab = page.locator("text=Best Times").first
-                      if await best_times_tab.is_visible():
-                          await best_times_tab.click()
-                          await page.wait_for_timeout(2000)
-                          
-                          # Re-extract times after clicking
-                          html = await page.content()
-                          for pattern, event_name in time_patterns:
-                              matches = re.findall(pattern, html, re.I)
-                              if matches and event_name not in data["personal_bests"]:
-                                  time_str = matches[0]
-                                  seconds = parse_time_to_seconds(time_str)
-                                  data["personal_bests"][event_name] = {
-                                      "time": time_str,
-                                      "seconds": seconds
-                                  }
-                  except:
-                      pass
-                  
-                  # Also try the times page directly
+                  # Also try the times page
                   try:
                       times_url = f"https://www.swimcloud.com/swimmer/{swimmer_id}/times/"
                       await page.goto(times_url, wait_until="networkidle", timeout=30000)
@@ -155,22 +135,17 @@ jobs:
                           if matches and event_name not in data["personal_bests"]:
                               time_str = matches[0]
                               seconds = parse_time_to_seconds(time_str)
-                              data["personal_bests"][event_name] = {
-                                  "time": time_str,
-                                  "seconds": seconds
-                              }
+                              if seconds and seconds > 10:
+                                  data["personal_bests"][event_name] = {
+                                      "time": time_str,
+                                      "seconds": seconds
+                                  }
                   except Exception as e:
                       print(f"  Times page error: {e}")
                   
-                  # Print found times
-                  print(f"  Personal Bests Found:")
-                  for event, time_data in data["personal_bests"].items():
+                  print(f"  Personal Bests Found: {len(data['personal_bests'])} events")
+                  for event, time_data in sorted(data["personal_bests"].items()):
                       print(f"    {event}: {time_data['time']}")
-                  
-                  if not data["personal_bests"]:
-                      print(f"  ⚠️ No times extracted - saving page for debugging")
-                      # Save a snippet of the page for debugging
-                      data["debug_snippet"] = body_text[:2000]
                   
                   return data
                   
@@ -179,13 +154,12 @@ jobs:
                   return {
                       "swimmer_id": swimmer_id,
                       "name": swimmer_info["name"],
-                      "error": str(e),
-                      "scraped_at": datetime.now().isoformat()
+                      "error": str(e)
                   }
 
           async def main():
-              print("🏊 Satellite Beach High School SwimCloud Scraper")
-              print(f"   Scraping {len(SWIMMERS)} swimmers")
+              print("🏊 Satellite Beach High School SwimCloud Scraper V2")
+              print(f"   Scraping {len(SWIMMERS)} swimmers (including Sawyer Davis)")
               print("="*60)
               
               results = {}
@@ -204,15 +178,15 @@ jobs:
                   for swimmer_id, swimmer_info in SWIMMERS.items():
                       data = await scrape_swimmer_times(page, swimmer_id, swimmer_info)
                       results[swimmer_info["name"]] = data
-                      await asyncio.sleep(3)  # Be polite between requests
+                      await asyncio.sleep(3)
                   
                   await browser.close()
               
-              # Save results
               output = {
                   "scraped_at": datetime.now().isoformat(),
                   "school": "Satellite Beach High School",
                   "team": "Swim Melbourne (MELB-FL)",
+                  "swimmer_count": len(SWIMMERS),
                   "swimmers": results
               }
               
@@ -220,15 +194,21 @@ jobs:
                   json.dump(output, f, indent=2)
               
               print("\n" + "="*60)
-              print("SUMMARY")
+              print("SATELLITE BEACH HIGH SCHOOL - FINAL SUMMARY")
               print("="*60)
               for name, data in results.items():
                   pbs = data.get("personal_bests", {})
-                  print(f"\n{name}:")
-                  print(f"  Power Index: {data.get('profile', {}).get('power_index', 'N/A')}")
-                  print(f"  Times: {len(pbs)} events")
-                  for event, time_data in pbs.items():
-                      print(f"    {event}: {time_data['time']}")
+                  pi = data.get('profile', {}).get('power_index', 'N/A')
+                  fl_rank = data.get('profile', {}).get('florida_rank', 'N/A')
+                  note = data.get('note', '')
+                  print(f"\n{name} (Class {data.get('class_of', 'N/A')})")
+                  if note:
+                      print(f"  ⭐ {note}")
+                  print(f"  Power Index: {pi} | FL Rank: {fl_rank}")
+                  print(f"  Events: {len(pbs)}")
+                  for event in ['50 Free', '100 Free', '200 Free', '50 Fly', '100 Fly', '100 Back', '100 Breast']:
+                      if event in pbs:
+                          print(f"    {event}: {pbs[event]['time']}")
               
               print(f"\n💾 Saved to satellite_beach_swimmers.json")
               return output
@@ -250,7 +230,7 @@ jobs:
           mkdir -p michael_d1_agents_v3/data
           cp satellite_beach_swimmers.json michael_d1_agents_v3/data/
           git add michael_d1_agents_v3/data/satellite_beach_swimmers.json
-          git diff --staged --quiet || git commit -m "data: Satellite Beach swimmers scraped $(date +'%Y-%m-%d %H:%M')"
+          git diff --staged --quiet || git commit -m "data: Satellite Beach 5 swimmers (incl Sawyer Davis) $(date +'%Y-%m-%d %H:%M')"
           git push || echo "Nothing to push"
       
       - name: Display Results
