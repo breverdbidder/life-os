@@ -1,4 +1,4 @@
-# API Mega Library - BrevardBidderAI & Life OS Resources
+# API Mega Library - BidDeed.AI & Life OS Resources
 
 **Source Repository:** [cporter202/API-mega-list](https://github.com/cporter202/API-mega-list)  
 **Total APIs:** 10,498 across 18 categories  
@@ -32,7 +32,7 @@
 
 ---
 
-## 🏠 REAL ESTATE APIs - BrevardBidderAI Priority
+## 🏠 REAL ESTATE APIs - BidDeed.AI Priority
 
 ### Property Data Aggregators
 | API | Description | Use Case |
@@ -51,7 +51,7 @@
 | [Compass Urls Spider](https://apify.com/hello.datawizards/compass-urls-spider) | Compass | Property details, agent info |
 | [Idealista Scraper](https://apify.com/igolaizola/idealista-scraper) | Idealista | Spain/Italy/Portugal properties |
 
-### BrevardBidderAI Integration Opportunities
+### BidDeed.AI Integration Opportunities
 1. **Supplement BCPAO data** with Zillow/Realtor valuations
 2. **Agent contact enrichment** via Realtor.com agent scraper
 3. **Comparable sales analysis** via MLS API
@@ -64,7 +64,7 @@
 ### AI Agents
 | API | Description | Integration |
 |-----|-------------|-------------|
-| [AI Web Agent](https://apify.com/apify/ai-web-agent) | Natural language web browsing, form filling | BrevardBidderAI automation |
+| [AI Web Agent](https://apify.com/apify/ai-web-agent) | Natural language web browsing, form filling | BidDeed.AI automation |
 | [AI Company Researcher Agent](https://apify.com/louisdeconinck/ai-company-researcher-agent) | AI-powered company research | Plaintiff research |
 | [AI Real Estate Agent](https://apify.com/harvestlabs/ai-real-estate-agent) | Property search by criteria | Automated property analysis |
 | [Deep Job Search Agent](https://apify.com/fantastic-jobs/deep-job-search-agent) | Multi-source job aggregation | Life OS job tracking |
@@ -101,7 +101,7 @@
 
 **Census API Key Request:** https://api.census.gov/data/key_signup.html
 
-### BrevardBidderAI Census Integration
+### BidDeed.AI Census Integration
 Already using Census API for demographics - expand to:
 - Housing characteristics (vacancy rates)
 - Income estimates by tract
@@ -184,7 +184,7 @@ Already using Census API for demographics - expand to:
 
 ### GitHub Deployment
 ```bash
-# BrevardBidderAI
+# BidDeed.AI
 breverdbidder/brevard-bidder-scraper/docs/API_MEGA_LIBRARY.md
 
 # Life OS
@@ -212,7 +212,7 @@ VALUES (
 
 ## Priority Integration Roadmap
 
-### Phase 1 - Immediate (BrevardBidderAI V14)
+### Phase 1 - Immediate (BidDeed.AI V14)
 1. ✅ Census API (already integrated)
 2. 🔄 Real Estate Aggregator API - supplement BCPAO valuations
 3. 🔄 AI Web Agent - automate BECA document retrieval

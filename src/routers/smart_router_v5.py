@@ -1,5 +1,5 @@
 """
-BrevardBidderAI Smart Router V5
+BidDeed.AI Smart Router V5
 ===============================
 Multi-tier LLM routing with Gemini 2.5 Flash FREE tier (1M context)
 

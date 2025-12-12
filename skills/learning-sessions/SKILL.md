@@ -39,7 +39,7 @@ When transcripts are unavailable (no captions, Hebrew videos, etc.):
 2. [Point 2]
 
 ### Application to My Business
-- **BrevardBidderAI:** [How this applies]
+- **BidDeed.AI:** [How this applies]
 - **Life OS:** [How this applies]
 
 ### Actionable Items

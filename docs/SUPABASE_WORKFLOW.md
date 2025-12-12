@@ -75,11 +75,11 @@ curl -X POST \
 
 ## 🔗 CROSS-REPO INTEGRATION
 
-Life OS shares the Supabase instance with BrevardBidderAI:
+Life OS shares the Supabase instance with BidDeed.AI:
 - Same database: `mocerqjnksmhcjzxrewo`
 - Same workflow trigger pattern
 - Different insight_types for separation
 
 ---
 
-*This document syncs with BrevardBidderAI CLOUD_ECOSYSTEM_ARCHITECTURE.md*
+*This document syncs with BidDeed.AI CLOUD_ECOSYSTEM_ARCHITECTURE.md*

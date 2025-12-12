@@ -184,7 +184,7 @@ class LifeOSBot:
 You have FULL context awareness - the bot monitors your token usage and auto-checkpoints.
 Never worry about context limits - they're handled automatically.
 
-Domains: BUSINESS (BrevardBidderAI, foreclosures), MICHAEL (D1 swimming), FAMILY, PERSONAL
+Domains: BUSINESS (BidDeed.AI, foreclosures), MICHAEL (D1 swimming), FAMILY, PERSONAL
 Style: Direct, no softening, action-oriented."""
 
 

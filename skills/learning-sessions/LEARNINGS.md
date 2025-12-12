@@ -1,19 +1,19 @@
 # 📚 Consolidated Learnings
 
-A living document of key insights from learning sessions. Focus on actionable knowledge for BrevardBidderAI, Life OS, and Everest Capital.
+A living document of key insights from learning sessions. Focus on actionable knowledge for BidDeed.AI, Life OS, and Everest Capital.
 
 ---
 
 ## December 2025
 
-### AWS AgentCore → BrevardBidderAI V14 Roadmap (Dec 4, 2025)
+### AWS AgentCore → BidDeed.AI V14 Roadmap (Dec 4, 2025)
 **Source:** [YUV AI - YouTube](https://youtube.com/watch?v=Ea1EpD-4sUU)  
 **Relevance:** ⭐⭐⭐⭐⭐ CRITICAL
 
-**TL;DR:** AWS AgentCore validates BrevardBidderAI's "Agentic AI ecosystem" positioning. Enterprise infrastructure pattern matches our architecture.
+**TL;DR:** AWS AgentCore validates BidDeed.AI's "Agentic AI ecosystem" positioning. Enterprise infrastructure pattern matches our architecture.
 
 **The 8 AgentCore Services:**
-| Service | BrevardBidderAI Equivalent |
+| Service | BidDeed.AI Equivalent |
 |---------|---------------------------|
 | Runtime (8hr tasks) | 12-Stage Pipeline |
 | Gateway (MCP protocol) | Smart Router |
@@ -42,7 +42,7 @@ A living document of key insights from learning sessions. Focus on actionable kn
 
 **TL;DR:** B2B RevOps platform using entity graphs for CRM data cleaning.
 
-**Application to BrevardBidderAI:**
+**Application to BidDeed.AI:**
 - Entity deduplication for property records
 - Relationship mapping for lien priority stacks
 - Continuous processing vs batch approach

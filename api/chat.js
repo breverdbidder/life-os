@@ -39,7 +39,7 @@ CORE IDENTITY:
 - Family: Wife Mariam, Son Michael (16, D1 swimmer)
 - Style: Direct, no softening language, action-oriented
 
-DOMAINS: BUSINESS (Everest Capital, BrevardBidderAI), MICHAEL D1 SWIMMING, FAMILY, PERSONAL
+DOMAINS: BUSINESS (Everest Capital, BidDeed.AI), MICHAEL D1 SWIMMING, FAMILY, PERSONAL
 
 SMART ROUTER V5 ACTIVE:
 - Current Tier: ${tier}

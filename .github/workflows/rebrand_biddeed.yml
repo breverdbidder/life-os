@@ -13,12 +13,12 @@ jobs:
           token: ${{ secrets.GH_PAT }}
           persist-credentials: true
 
-      - name: Execute Rebrand - BrevardBidderAI → BidDeed.AI
+      - name: Execute Rebrand - BidDeed.AI → BidDeed.AI
         run: |
           echo "🏔️ Executing Everest Capital rebrand..."
           
-          # Replace BrevardBidderAI → BidDeed.AI in all relevant files
-          find . -type f \( -name "*.py" -o -name "*.md" -o -name "*.js" -o -name "*.ts" -o -name "*.yml" -o -name "*.yaml" -o -name "*.json" -o -name "*.html" -o -name "*.txt" -o -name "*.ps1" -o -name "*.sh" -o -name "*.bat" -o -name "*.example" -o -name "*.sql" -o -name "*.jsx" -o -name "*.tsx" -o -name "LICENSE" \) -exec sed -i 's/BrevardBidderAI/BidDeed.AI/g' {} \;
+          # Replace BidDeed.AI → BidDeed.AI in all relevant files
+          find . -type f \( -name "*.py" -o -name "*.md" -o -name "*.js" -o -name "*.ts" -o -name "*.yml" -o -name "*.yaml" -o -name "*.json" -o -name "*.html" -o -name "*.txt" -o -name "*.ps1" -o -name "*.sh" -o -name "*.bat" -o -name "*.example" -o -name "*.sql" -o -name "*.jsx" -o -name "*.tsx" -o -name "LICENSE" \) -exec sed -i 's/BidDeed.AI/BidDeed.AI/g' {} \;
           
           # Replace Python variable names
           find . -type f -name "*.py" -exec sed -i 's/brevard_bidder/biddeed/g' {} \;
@@ -33,9 +33,9 @@ jobs:
           if git diff --staged --quiet; then
             echo "No changes to commit"
           else
-            git commit -m "🏔️ REBRAND: BrevardBidderAI → BidDeed.AI (Everest Capital)
+            git commit -m "🏔️ REBRAND: BidDeed.AI → BidDeed.AI (Everest Capital)
 
-          - Replaced all BrevardBidderAI references with BidDeed.AI
+          - Replaced all BidDeed.AI references with BidDeed.AI
           - Updated Python module names (brevard_bidder → biddeed)
           - Part of Everest Capital USA brand consolidation
           

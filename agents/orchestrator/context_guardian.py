@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Context Guardian - Prevents Claude.ai context limit crashes
-Part of BrevardBidderAI Agentic AI Ecosystem
+Part of BidDeed.AI Agentic AI Ecosystem
 
 Problem: Claude.ai can't self-monitor. Hits 200K limit = conversation dead.
 Solution: Pre-emptive checkpointing at 150K, state persistence, auto-resume.
@@ -304,7 +304,7 @@ if __name__ == "__main__":
         # Would query Supabase for active sessions and check their status
     else:
         # Demo usage
-        guardian = ContextGuardian("brevard_bidder_pipeline")
+        guardian = ContextGuardian("biddeed_pipeline")
         
         # Simulate adding context
         for i in range(10):

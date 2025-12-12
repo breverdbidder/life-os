@@ -1,23 +1,23 @@
-# Learning Session: AWS AgentCore → BrevardBidderAI Roadmap
+# Learning Session: AWS AgentCore → BidDeed.AI Roadmap
 
 ## Video Information
 - **Title:** סוכני AI מאפס למאה - עם AWS AgentCore! (AI Agents from Zero to Hundred)
 - **Channel:** YUV AI (יובל אבידני)
 - **URL:** https://youtube.com/watch?v=Ea1EpD-4sUU
 - **Date Watched:** December 4, 2025
-- **Relevance:** ⭐⭐⭐⭐⭐ CRITICAL - Direct BrevardBidderAI architecture validation
+- **Relevance:** ⭐⭐⭐⭐⭐ CRITICAL - Direct BidDeed.AI architecture validation
 
 ---
 
 ## Executive Summary
 
-AWS AgentCore (announced re:Invent 2025) is enterprise infrastructure for building and deploying AI agents at scale. **This directly validates BrevardBidderAI's "Agentic AI ecosystem" positioning** and provides a roadmap for V14+ development.
+AWS AgentCore (announced re:Invent 2025) is enterprise infrastructure for building and deploying AI agents at scale. **This directly validates BidDeed.AI's "Agentic AI ecosystem" positioning** and provides a roadmap for V14+ development.
 
 ---
 
 ## AWS AgentCore: The 8 Services
 
-| Service | Purpose | BrevardBidderAI Equivalent |
+| Service | Purpose | BidDeed.AI Equivalent |
 |---------|---------|---------------------------|
 | **Runtime** | Long-running tasks (up to 8 hours) | 12-Stage Pipeline |
 | **Identity** | Secure auth to tools/services | Layer 8 IP Protection |
@@ -30,7 +30,7 @@ AWS AgentCore (announced re:Invent 2025) is enterprise infrastructure for buildi
 
 ---
 
-## BrevardBidderAI V14 Roadmap (Derived from AgentCore)
+## BidDeed.AI V14 Roadmap (Derived from AgentCore)
 
 ### Phase 1: Tool Standardization (MCP Protocol)
 ```
@@ -99,7 +99,7 @@ Alerts:
 | Lyft | Customer support | 87% faster resolution |
 | Cox Automotive | Vehicle discovery | Omnichannel dealer experience |
 
-### BrevardBidderAI Positioning:
+### BidDeed.AI Positioning:
 - **Internal valuation:** $300-400K/year value vs $3.3K cost = 100x ROI
 - **Architecture:** Same pattern as enterprise AgentCore deployments
 - **Differentiator:** Domain-specific (foreclosure auctions) vs general-purpose
@@ -108,9 +108,9 @@ Alerts:
 
 ## Competitive Intelligence
 
-### AgentCore vs BrevardBidderAI Stack
+### AgentCore vs BidDeed.AI Stack
 
-| Capability | AgentCore | BrevardBidderAI |
+| Capability | AgentCore | BidDeed.AI |
 |------------|-----------|-----------------|
 | Runtime | AWS managed | GitHub Actions |
 | Database | AWS services | Supabase |
@@ -118,7 +118,7 @@ Alerts:
 | Cost | Pay-per-use AWS | $3.3K/year fixed |
 | Specialization | General purpose | Foreclosure-specific |
 
-**Conclusion:** BrevardBidderAI achieves similar architecture at fraction of cost through vertical specialization.
+**Conclusion:** BidDeed.AI achieves similar architecture at fraction of cost through vertical specialization.
 
 ---
 
@@ -151,7 +151,7 @@ Alerts:
 ---
 
 ## Tags
-#AWS #AgentCore #BrevardBidderAI #Architecture #V14Roadmap #AgenticAI #MCP #Enterprise #Valuation
+#AWS #AgentCore #BidDeed.AI #Architecture #V14Roadmap #AgenticAI #MCP #Enterprise #Valuation
 
 ---
 

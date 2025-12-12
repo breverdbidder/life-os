@@ -1,4 +1,4 @@
-# AI Architect Rules - BrevardBidderAI V13.4.0
+# AI Architect Rules - BidDeed.AI V13.4.0
 ## Author: Ariel Shapira, Solo Founder, Everest Capital USA
 
 ## SESSION PROTOCOL - CONNECTION RESILIENT

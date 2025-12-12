@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-BrevardBidderAI - Enhanced Checkpoint Manager V2
+BidDeed.AI - Enhanced Checkpoint Manager V2
 Handles: Token limits, Internet disconnection, Session crashes
 Author: Ariel Shapira, Solo Founder, Everest Capital USA
 
