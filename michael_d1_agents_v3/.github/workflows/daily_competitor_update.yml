@@ -1,0 +1,35 @@
+name: Daily Competitor Update
+on:
+  schedule:
+    - cron: '0 6 * * *'  # 6 AM UTC daily
+  workflow_dispatch:  # Manual trigger
+
+env:
+  SUPABASE_URL: https://mocerqjnksmhcjzxrewo.supabase.co
+  
+jobs:
+  update-competitors:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          
+      - name: Install dependencies
+        run: |
+          pip install httpx supabase xgboost pandas numpy
+          
+      - name: Run competitor update
+        env:
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+          SWIMCLOUD_CREDENTIALS: ${{ secrets.SWIMCLOUD_CREDENTIALS }}
+        run: |
+          cd michael_d1_agents_v3
+          python orchestrator_v3.py competitor_update
+          
+      - name: Log completion
+        run: echo "✅ Competitor update completed at $(date)"
