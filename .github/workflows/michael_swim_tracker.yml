@@ -1,0 +1,94 @@
+name: Michael Swim D1 Tracker
+
+on:
+  schedule:
+    # Run daily at 6 AM EST (11 AM UTC)
+    - cron: '0 11 * * *'
+  workflow_dispatch:
+    inputs:
+      run_full_analysis:
+        description: 'Run full D1 analysis'
+        required: false
+        default: 'true'
+
+env:
+  SUPABASE_URL: https://mocerqjnksmhcjzxrewo.supabase.co
+  SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+
+jobs:
+  track-swim-times:
+    runs-on: ubuntu-latest
+    name: Track Michael's Swim Times
+    
+    steps:
+      - name: Checkout Life OS
+        uses: actions/checkout@v4
+      
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      
+      - name: Install dependencies
+        run: |
+          pip install requests beautifulsoup4 lxml
+          pip install SwimScraper || echo "SwimScraper install failed, using custom scraper"
+      
+      - name: Run Michael Swim Tracker
+        id: tracker
+        run: |
+          cd src
+          python michael_swim_tracker.py 2>&1 | tee tracker_output.txt
+          
+          # Extract JSON output
+          grep -A 1000 "JSON OUTPUT:" tracker_output.txt | tail -n +2 > analysis.json || true
+          
+          # Set output
+          if [ -f analysis.json ]; then
+            echo "analysis_complete=true" >> $GITHUB_OUTPUT
+            echo "d1_score=$(jq -r '.overall_d1_score' analysis.json)" >> $GITHUB_OUTPUT
+          fi
+      
+      - name: Upload Analysis Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: michael-d1-analysis-${{ github.run_number }}
+          path: src/analysis.json
+          retention-days: 90
+      
+      - name: Insert to Supabase insights
+        if: steps.tracker.outputs.analysis_complete == 'true'
+        run: |
+          # Insert insight record
+          TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+          D1_SCORE="${{ steps.tracker.outputs.d1_score }}"
+          
+          curl -X POST "$SUPABASE_URL/rest/v1/insights" \
+            -H "apikey: $SUPABASE_KEY" \
+            -H "Authorization: Bearer $SUPABASE_KEY" \
+            -H "Content-Type: application/json" \
+            -H "Prefer: return=minimal" \
+            -d "{
+              \"category\": \"michael_swim\",
+              \"subcategory\": \"daily_tracker\",
+              \"title\": \"D1 Tracker Run - Score: ${D1_SCORE}\",
+              \"content\": $(cat src/analysis.json | jq -c .),
+              \"tags\": [\"swimming\", \"d1\", \"michael\", \"automated\"],
+              \"created_at\": \"$TIMESTAMP\"
+            }"
+          
+          echo "✅ Inserted to Supabase insights"
+      
+      - name: Summary
+        run: |
+          echo "## 🏊 Michael Shapira D1 Swim Tracker" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Run Date:** $(date)" >> $GITHUB_STEP_SUMMARY
+          echo "**D1 Score:** ${{ steps.tracker.outputs.d1_score }}/100" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Target Events" >> $GITHUB_STEP_SUMMARY
+          echo "- 50 Free, 100 Free, 200 Free" >> $GITHUB_STEP_SUMMARY
+          echo "- 100 Fly, 100 Back" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Graduation:** Class of 2027" >> $GITHUB_STEP_SUMMARY
+          echo "**Goal:** D1 Swimming Scholarship" >> $GITHUB_STEP_SUMMARY
