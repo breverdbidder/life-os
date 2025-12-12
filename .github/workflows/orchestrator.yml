@@ -9,7 +9,7 @@ on:
         required: false
         default: ''
       action:
-        description: 'Action: resume, new, status'
+        description: 'Action: resume, new, status, cloudflare'
         required: true
         default: 'resume'
         type: choice
@@ -17,6 +17,7 @@ on:
           - resume
           - new
           - status
+          - cloudflare
   
   # Scheduled health check every 30 minutes
   schedule:
@@ -30,6 +31,8 @@ env:
   ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
   SUPABASE_URL: https://mocerqjnksmhcjzxrewo.supabase.co
   SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+  CF_TOKEN: ${{ secrets.CF_TOKEN }}
+  CF_ACCOUNT: 83ab3f2fbbabd1a9b01a018fb4efe219
 
 jobs:
   orchestrate:
@@ -47,7 +50,7 @@ jobs:
       
       - name: Install dependencies
         run: |
-          pip install httpx asyncio
+          pip install httpx asyncio requests
       
       - name: Check for active checkpoint
         id: checkpoint
@@ -66,6 +69,71 @@ jobs:
             echo "has_checkpoint=false" >> $GITHUB_OUTPUT
             echo "⚠️ No active checkpoint"
           fi
+      
+      - name: Cloudflare Status Check
+        id: cloudflare
+        if: github.event.inputs.action == 'cloudflare' || github.event.inputs.action == 'status' || github.event_name == 'schedule'
+        run: |
+          echo "☁️ Cloudflare Pages Status"
+          echo "=========================="
+          
+          RESPONSE=$(curl -s "https://api.cloudflare.com/client/v4/accounts/${{ env.CF_ACCOUNT }}/pages/projects" \
+            -H "Authorization: Bearer ${{ env.CF_TOKEN }}" \
+            -H "Content-Type: application/json")
+          
+          python3 << 'EOF'
+          import json
+          import os
+          import sys
+          
+          data = json.loads('''$RESPONSE'''.replace("'", '"'))
+          
+          alerts = []
+          for project in data.get("result", []):
+              name = project["name"]
+              latest = project.get("latest_deployment", {})
+              status = latest.get("latest_stage", {}).get("status", "unknown")
+              commit = latest.get("deployment_trigger", {}).get("metadata", {}).get("commit_message", "N/A")[:50]
+              
+              icon = "✅" if status == "success" else "❌" if status == "failure" else "⏳"
+              print(f"{icon} {name}: {status}")
+              print(f"   URL: {project['subdomain']}")
+              print(f"   Last: {commit}")
+              print()
+              
+              if status == "failure":
+                  alerts.append(name)
+          
+          if alerts:
+              print(f"⚠️ ALERTS: {', '.join(alerts)} have failed deployments")
+              with open(os.environ.get('GITHUB_OUTPUT', '/dev/null'), 'a') as f:
+                  f.write(f"has_alerts=true\n")
+                  f.write(f"alert_projects={','.join(alerts)}\n")
+          else:
+              with open(os.environ.get('GITHUB_OUTPUT', '/dev/null'), 'a') as f:
+                  f.write("has_alerts=false\n")
+          EOF
+        env:
+          RESPONSE: ${{ env.RESPONSE }}
+      
+      - name: Auto-remediate failed deployments
+        if: steps.cloudflare.outputs.has_alerts == 'true'
+        run: |
+          echo "🔧 Attempting auto-remediation..."
+          for PROJECT in $(echo "${{ steps.cloudflare.outputs.alert_projects }}" | tr ',' ' '); do
+            echo "Redeploying $PROJECT..."
+            curl -s -X POST "https://api.cloudflare.com/client/v4/accounts/${{ env.CF_ACCOUNT }}/pages/projects/$PROJECT/deployments" \
+              -H "Authorization: Bearer ${{ env.CF_TOKEN }}" \
+              -H "Content-Type: application/json" \
+              -d '{"branch": "main"}' | python3 -c "
+          import sys, json
+          data = json.load(sys.stdin)
+          if data.get('success'):
+              print(f\"  ✅ Triggered: {data['result']['short_id']}\")
+          else:
+              print(f\"  ❌ Failed: {data.get('errors')}\")
+          "
+          done
       
       - name: Run Orchestrator (Resume)
         if: github.event.inputs.action == 'resume' || (github.event_name == 'schedule' && steps.checkpoint.outputs.has_checkpoint == 'true')
@@ -158,7 +226,7 @@ jobs:
               "user_id": 1,
               "insight_type": "ORCHESTRATOR_RUN",
               "title": "Orchestrator execution - ${{ github.run_id }}",
-              "description": "{\"trigger\": \"${{ github.event_name }}\", \"action\": \"${{ github.event.inputs.action }}\", \"status\": \"${{ job.status }}\"}",
+              "description": "{\"trigger\": \"${{ github.event_name }}\", \"action\": \"${{ github.event.inputs.action }}\", \"status\": \"${{ job.status }}\", \"cloudflare_alerts\": \"${{ steps.cloudflare.outputs.has_alerts }}\"}",
               "priority": "low",
               "status": "${{ job.status }}",
               "source": "github_actions"
