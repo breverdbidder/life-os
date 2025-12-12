@@ -1,0 +1,547 @@
+name: XGBoost Swim Meet Predictor
+
+on:
+  workflow_dispatch:
+    inputs:
+      meet_name:
+        description: 'Meet Name'
+        default: 'Harry Meisel Championships East'
+      meet_date:
+        description: 'Meet Date'
+        default: '2025-12-13'
+
+jobs:
+  predict:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    
+    env:
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      
+      - name: Install dependencies
+        run: |
+          pip install xgboost pandas numpy scikit-learn requests
+      
+      - name: Run XGBoost Swim Predictor
+        run: |
+          python3 << 'PYTHON_EOF'
+          import json
+          import numpy as np
+          import pandas as pd
+          from datetime import datetime, timedelta
+          import xgboost as xgb
+          from sklearn.model_selection import train_test_split
+          import requests
+          import os
+
+          print("="*70)
+          print("🏊 XGBOOST SWIM MEET PREDICTOR V1.0")
+          print("   Harry Meisel Championships East - Dec 13-14, 2025")
+          print("="*70)
+
+          # =================================================================
+          # VERIFIED SATELLITE BEACH DATA (from V4 scraper)
+          # =================================================================
+          
+          SATELLITE_BEACH_SWIMMERS = {
+              "Michael Shapira": {
+                  "id": "3250085",
+                  "class": 2027,
+                  "power_index": 49.62,
+                  "fl_rank": 116,
+                  "pbs": {
+                      "50 Free": 21.86,
+                      "100 Free": 48.80,
+                      "200 Free": 113.03,  # 1:53.03
+                      "50 Fly": 25.39,
+                      "100 Fly": 55.87,
+                      "100 Back": 62.52,  # 1:02.52
+                      "50 Breast": 35.85,
+                      "100 Breast": 78.38,
+                      "200 IM": 139.60  # 2:19.60
+                  }
+              },
+              "Bastian Soto": {
+                  "id": "2928537",
+                  "class": 2027,
+                  "power_index": 29.41,
+                  "fl_rank": 43,
+                  "pbs": {
+                      "50 Free": 21.30,
+                      "100 Free": 48.98,
+                      "200 Free": 111.62,
+                      "50 Fly": 23.08,
+                      "100 Fly": 49.67,
+                      "100 Back": 53.77,
+                      "50 Breast": 29.75,
+                      "100 Breast": 75.45,
+                      "200 IM": 124.16
+                  }
+              },
+              "Gavin Domboru": {
+                  "id": "1518102",
+                  "class": 2027,
+                  "power_index": 59.89,
+                  "pbs": {
+                      "50 Free": 23.42,
+                      "100 Free": 50.43,
+                      "200 Free": 109.88,
+                      "50 Fly": 24.74,
+                      "100 Fly": 53.70,
+                      "100 Back": 54.25,
+                      "50 Breast": 31.20,
+                      "100 Breast": 80.94,
+                      "200 IM": 126.64
+                  }
+              },
+              "Max Morgan": {
+                  "id": "2652914",
+                  "class": 2026,
+                  "power_index": 55.04,
+                  "pbs": {
+                      "50 Fly": 25.20,
+                      "50 Breast": 26.96,
+                      "100 Breast": 59.18
+                  }
+              },
+              "Sawyer Davis": {
+                  "id": "2662363",
+                  "class": 2026,
+                  "power_index": 18.99,
+                  "fl_rank": 27,
+                  "note": "Ohio State Commit, 2A State Champion",
+                  "pbs": {
+                      "50 Free": 20.49,
+                      "100 Free": 45.24,
+                      "200 Free": 121.69,
+                      "50 Fly": 23.57,
+                      "100 Fly": 51.57,
+                      "100 Back": 53.89,
+                      "50 Breast": 32.41,
+                      "200 IM": 119.85
+                  }
+              }
+          }
+
+          # =================================================================
+          # HARRY MEISEL HEAT SHEET DATA (Michael's events)
+          # =================================================================
+          
+          MICHAEL_EVENTS = {
+              "50 Free": {
+                  "event_num": 42,
+                  "heat": 1,
+                  "lane": 3,
+                  "seed_time": 23.22,
+                  "pb": 21.86,
+                  "competitors": [
+                      {"name": "Bastian Soto", "seed": 21.99, "pb": 21.30},
+                      {"name": "Logan Kiser", "seed": 24.50, "pb": 24.83},
+                      {"name": "Field Average", "seed": 24.5, "pb": 24.0},
+                  ]
+              },
+              "50 Fly": {
+                  "event_num": 28,
+                  "heat": 1,
+                  "lane": 3,
+                  "seed_time": 25.79,
+                  "pb": 25.39,
+                  "competitors": [
+                      {"name": "Bastian Soto", "seed": 23.50, "pb": 23.08},
+                      {"name": "Gavin Domboru", "seed": 25.50, "pb": 24.74},
+                      {"name": "Field Average", "seed": 26.5, "pb": 26.0},
+                  ]
+              },
+              "100 Free": {
+                  "event_num": 26,
+                  "heat": 1,
+                  "lane": 6,
+                  "seed_time": 50.82,
+                  "pb": 48.80,
+                  "competitors": [
+                      {"name": "Bastian Soto", "seed": 49.50, "pb": 48.98},
+                      {"name": "Gavin Domboru", "seed": 51.00, "pb": 50.43},
+                      {"name": "Field Average", "seed": 52.0, "pb": 51.0},
+                  ]
+              },
+              "100 Back": {
+                  "event_num": 34,
+                  "heat": 1,
+                  "lane": 2,
+                  "seed_time": 61.62,
+                  "pb": 62.52,
+                  "competitors": [
+                      {"name": "Locky Landry", "seed": 52.00, "pb": 51.44},
+                      {"name": "Gavin Domboru", "seed": 55.00, "pb": 54.25},
+                      {"name": "Bastian Soto", "seed": 54.50, "pb": 53.77},
+                      {"name": "Field Average", "seed": 58.0, "pb": 57.0},
+                  ]
+              }
+          }
+
+          # =================================================================
+          # XGBOOST MODEL - SWIM TIME PREDICTION
+          # =================================================================
+          
+          class SwimXGBoostPredictor:
+              """XGBoost model for swim time and placement prediction."""
+              
+              def __init__(self):
+                  self.model = None
+                  self.feature_names = [
+                      'pb_time', 'seed_time', 'seed_vs_pb_gap', 
+                      'power_index', 'days_since_pb', 'event_distance',
+                      'taper_factor', 'home_meet_bonus', 'morning_session'
+                  ]
+              
+              def _generate_training_data(self):
+                  """Generate synthetic training data based on swim physics."""
+                  np.random.seed(42)
+                  n_samples = 1000
+                  
+                  # Generate realistic swim data
+                  pb_times = np.random.uniform(20, 120, n_samples)  # 20s to 2min
+                  seed_times = pb_times * np.random.uniform(1.0, 1.1, n_samples)  # Seeds usually slower
+                  seed_vs_pb_gap = seed_times - pb_times
+                  power_indices = np.random.uniform(10, 80, n_samples)
+                  days_since_pb = np.random.randint(7, 180, n_samples)
+                  event_distance = np.random.choice([50, 100, 200, 500], n_samples)
+                  taper_factor = np.random.uniform(0.95, 1.02, n_samples)  # Tapered = faster
+                  home_meet = np.random.binomial(1, 0.3, n_samples)
+                  morning = np.random.binomial(1, 0.5, n_samples)
+                  
+                  # Calculate actual times (with noise)
+                  # Base: PB * taper_factor * random variation
+                  base_improvement = 0.98 + (power_indices / 1000)  # Better PI = more improvement potential
+                  time_variation = np.random.normal(1.0, 0.02, n_samples)
+                  home_bonus = 1 - (home_meet * 0.005)  # 0.5% faster at home
+                  morning_penalty = 1 + (morning * 0.003)  # 0.3% slower in morning
+                  
+                  actual_times = pb_times * base_improvement * taper_factor * time_variation * home_bonus * morning_penalty
+                  
+                  X = np.column_stack([
+                      pb_times, seed_times, seed_vs_pb_gap, power_indices,
+                      days_since_pb, event_distance, taper_factor, home_meet, morning
+                  ])
+                  
+                  return X, actual_times
+              
+              def train(self):
+                  """Train the XGBoost model."""
+                  print("\n📊 Training XGBoost Swim Predictor...")
+                  
+                  X, y = self._generate_training_data()
+                  X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+                  
+                  self.model = xgb.XGBRegressor(
+                      n_estimators=100,
+                      max_depth=6,
+                      learning_rate=0.1,
+                      objective='reg:squarederror',
+                      random_state=42
+                  )
+                  
+                  self.model.fit(X_train, y_train)
+                  
+                  # Evaluate
+                  train_score = self.model.score(X_train, y_train)
+                  test_score = self.model.score(X_test, y_test)
+                  
+                  print(f"   Train R²: {train_score:.4f}")
+                  print(f"   Test R²: {test_score:.4f}")
+                  
+                  # Feature importance
+                  importances = self.model.feature_importances_
+                  print("\n   Feature Importance:")
+                  for name, imp in sorted(zip(self.feature_names, importances), key=lambda x: -x[1])[:5]:
+                      print(f"     {name}: {imp:.3f}")
+                  
+                  return self
+              
+              def predict_time(self, pb_time, seed_time, power_index, 
+                              days_since_pb=14, event_distance=100, 
+                              taper_factor=0.98, home_meet=0, morning=0):
+                  """Predict race time for a swimmer."""
+                  
+                  seed_vs_pb_gap = seed_time - pb_time
+                  
+                  X = np.array([[
+                      pb_time, seed_time, seed_vs_pb_gap, power_index,
+                      days_since_pb, event_distance, taper_factor, home_meet, morning
+                  ]])
+                  
+                  predicted = self.model.predict(X)[0]
+                  
+                  # Apply constraints (can't be faster than 95% of PB typically)
+                  min_possible = pb_time * 0.95
+                  max_possible = pb_time * 1.05
+                  
+                  return np.clip(predicted, min_possible, max_possible)
+              
+              def predict_placement_probability(self, michael_predicted, competitors_predicted):
+                  """Calculate probability of each placement."""
+                  
+                  all_times = [michael_predicted] + competitors_predicted
+                  n = len(all_times)
+                  
+                  # Monte Carlo simulation with time uncertainty
+                  n_simulations = 10000
+                  placements = []
+                  
+                  for _ in range(n_simulations):
+                      # Add random variation (±1.5% for short events)
+                      variation = np.random.normal(1.0, 0.015, n)
+                      sim_times = np.array(all_times) * variation
+                      
+                      # Michael's placement (0-indexed, so add 1)
+                      michael_place = 1 + np.sum(sim_times[0] > sim_times[1:])
+                      placements.append(michael_place)
+                  
+                  placements = np.array(placements)
+                  
+                  # Calculate probabilities for each place
+                  probs = {}
+                  for place in range(1, n + 1):
+                      probs[place] = np.mean(placements == place)
+                  
+                  # Podium probability (top 3)
+                  podium_prob = np.mean(placements <= 3)
+                  
+                  # Win probability
+                  win_prob = probs.get(1, 0)
+                  
+                  return {
+                      "placement_probs": probs,
+                      "podium_prob": podium_prob,
+                      "win_prob": win_prob,
+                      "expected_place": np.mean(placements),
+                      "best_case": int(np.min(placements)),
+                      "worst_case": int(np.max(placements))
+                  }
+
+          def format_time(seconds):
+              """Format seconds to swim time string."""
+              if seconds >= 60:
+                  mins = int(seconds // 60)
+                  secs = seconds % 60
+                  return f"{mins}:{secs:05.2f}"
+              return f"{seconds:.2f}"
+
+          # =================================================================
+          # MAIN ANALYSIS
+          # =================================================================
+          
+          print("\n" + "="*70)
+          print("TRAINING XGBOOST MODEL")
+          print("="*70)
+          
+          predictor = SwimXGBoostPredictor()
+          predictor.train()
+          
+          # Michael's profile
+          michael = SATELLITE_BEACH_SWIMMERS["Michael Shapira"]
+          
+          print("\n" + "="*70)
+          print("🏊 MICHAEL SHAPIRA - HARRY MEISEL PREDICTIONS")
+          print("="*70)
+          print(f"   Power Index: {michael['power_index']} | FL Rank: {michael['fl_rank']}")
+          print(f"   Class: {michael['class']}")
+          
+          results = {
+              "meet": "Harry Meisel Championships East",
+              "date": "2025-12-13/14",
+              "swimmer": "Michael Shapira",
+              "power_index": michael["power_index"],
+              "events": {}
+          }
+          
+          for event_name, event_data in MICHAEL_EVENTS.items():
+              print(f"\n{'─'*70}")
+              print(f"📊 EVENT: {event_name} (Event #{event_data['event_num']})")
+              print(f"   Heat {event_data['heat']}, Lane {event_data['lane']}")
+              print(f"{'─'*70}")
+              
+              pb = event_data["pb"]
+              seed = event_data["seed_time"]
+              distance = int(event_name.split()[0])
+              
+              print(f"   Michael's PB: {format_time(pb)}")
+              print(f"   Seed Time: {format_time(seed)} (gap: +{seed - pb:.2f}s)")
+              
+              # Predict Michael's time
+              michael_predicted = predictor.predict_time(
+                  pb_time=pb,
+                  seed_time=seed,
+                  power_index=michael["power_index"],
+                  days_since_pb=14,  # Recent form
+                  event_distance=distance,
+                  taper_factor=0.985,  # Championship meet
+                  home_meet=0,
+                  morning=0  # Finals
+              )
+              
+              print(f"\n   🎯 PREDICTED TIME: {format_time(michael_predicted)}")
+              
+              # Calculate improvement ranges
+              best_case = pb * 0.97  # 3% drop (big meet energy)
+              realistic = michael_predicted
+              conservative = pb * 1.01  # Match PB
+              
+              print(f"      Best Case: {format_time(best_case)} (3% drop)")
+              print(f"      Realistic: {format_time(realistic)}")
+              print(f"      Conservative: {format_time(conservative)}")
+              
+              # Predict competitor times
+              print(f"\n   👥 COMPETITOR ANALYSIS:")
+              competitors_predicted = []
+              
+              for comp in event_data["competitors"]:
+                  comp_pb = comp["pb"]
+                  comp_seed = comp["seed"]
+                  
+                  # Use generic PI for non-Satellite Beach swimmers
+                  comp_pi = 50  # Default
+                  if comp["name"] in SATELLITE_BEACH_SWIMMERS:
+                      comp_pi = SATELLITE_BEACH_SWIMMERS[comp["name"]].get("power_index", 50)
+                  
+                  comp_predicted = predictor.predict_time(
+                      pb_time=comp_pb,
+                      seed_time=comp_seed,
+                      power_index=comp_pi,
+                      days_since_pb=30,
+                      event_distance=distance,
+                      taper_factor=0.99,
+                      home_meet=0,
+                      morning=0
+                  )
+                  
+                  competitors_predicted.append(comp_predicted)
+                  
+                  comparison = "FASTER" if comp_predicted < michael_predicted else "SLOWER"
+                  diff = abs(michael_predicted - comp_predicted)
+                  print(f"      {comp['name']}: {format_time(comp_predicted)} ({comparison} by {diff:.2f}s)")
+              
+              # Calculate placement probabilities
+              placement = predictor.predict_placement_probability(michael_predicted, competitors_predicted)
+              
+              print(f"\n   📈 PLACEMENT PROBABILITY:")
+              for place, prob in sorted(placement["placement_probs"].items()):
+                  if prob > 0.01:  # Only show >1%
+                      bar = "█" * int(prob * 20)
+                      print(f"      {place}{'st' if place==1 else 'nd' if place==2 else 'rd' if place==3 else 'th'}: {prob*100:5.1f}% {bar}")
+              
+              print(f"\n   🏆 WIN PROBABILITY: {placement['win_prob']*100:.1f}%")
+              print(f"   🥉 PODIUM PROBABILITY: {placement['podium_prob']*100:.1f}%")
+              print(f"   📊 EXPECTED PLACE: {placement['expected_place']:.1f}")
+              
+              # Store results
+              results["events"][event_name] = {
+                  "event_num": event_data["event_num"],
+                  "heat": event_data["heat"],
+                  "lane": event_data["lane"],
+                  "pb": pb,
+                  "seed": seed,
+                  "predicted_time": round(michael_predicted, 2),
+                  "predicted_time_formatted": format_time(michael_predicted),
+                  "best_case": round(best_case, 2),
+                  "conservative": round(conservative, 2),
+                  "win_probability": round(placement["win_prob"], 3),
+                  "podium_probability": round(placement["podium_prob"], 3),
+                  "expected_place": round(placement["expected_place"], 1),
+                  "placement_probs": {str(k): round(v, 3) for k, v in placement["placement_probs"].items()}
+              }
+          
+          # =================================================================
+          # STRATEGIC SUMMARY
+          # =================================================================
+          
+          print("\n" + "="*70)
+          print("🎯 STRATEGIC SUMMARY - HARRY MEISEL CHAMPIONSHIPS")
+          print("="*70)
+          
+          # Sort by podium probability
+          events_by_podium = sorted(
+              results["events"].items(),
+              key=lambda x: x[1]["podium_probability"],
+              reverse=True
+          )
+          
+          print("\n   EVENTS RANKED BY PODIUM PROBABILITY:")
+          for i, (event, data) in enumerate(events_by_podium, 1):
+              podium = data["podium_probability"] * 100
+              win = data["win_probability"] * 100
+              target = data["predicted_time_formatted"]
+              emoji = "🥇" if podium > 70 else "🥈" if podium > 50 else "🥉" if podium > 30 else "📊"
+              print(f"   {i}. {emoji} {event}: {podium:.0f}% podium, {win:.0f}% win → Target: {target}")
+          
+          print("\n   🎯 KEY TARGETS:")
+          for event, data in results["events"].items():
+              improvement = data["pb"] - data["predicted_time"]
+              print(f"      {event}: {data['predicted_time_formatted']} (PB-{improvement:.2f}s)")
+          
+          # Time goals
+          print("\n   ⏱️ TIME GOALS FOR NEW PBs:")
+          print(f"      50 Free: Sub-21.50 (current PB: 21.86)")
+          print(f"      100 Free: Sub-48.50 (current PB: 48.80)")
+          print(f"      50 Fly: Sub-25.00 (current PB: 25.39)")
+          print(f"      100 Back: Sub-62.00 (current PB: 62.52)")
+          
+          # Save results
+          with open("harry_meisel_predictions.json", "w") as f:
+              json.dump(results, f, indent=2)
+          
+          print(f"\n💾 Predictions saved to harry_meisel_predictions.json")
+          
+          # Save to Supabase if available
+          SUPABASE_URL = os.environ.get("SUPABASE_URL")
+          SUPABASE_KEY = os.environ.get("SUPABASE_KEY")
+          
+          if SUPABASE_KEY:
+              payload = {
+                  "category": "michael_swim",
+                  "subcategory": "meet_prediction",
+                  "title": f"XGBoost Predictions - Harry Meisel {datetime.now().strftime('%Y-%m-%d')}",
+                  "insight": json.dumps(results),
+                  "importance": "high"
+              }
+              
+              resp = requests.post(
+                  f"{SUPABASE_URL}/rest/v1/insights",
+                  headers={
+                      "apikey": SUPABASE_KEY,
+                      "Authorization": f"Bearer {SUPABASE_KEY}",
+                      "Content-Type": "application/json"
+                  },
+                  json=payload
+              )
+              print(f"{'✅' if resp.status_code in [200,201] else '❌'} Saved to Supabase")
+          
+          print("\n" + "="*70)
+          print("🏊 PREDICTION COMPLETE - GOOD LUCK MICHAEL!")
+          print("="*70)
+          PYTHON_EOF
+      
+      - name: Upload Predictions
+        uses: actions/upload-artifact@v4
+        with:
+          name: harry-meisel-predictions-${{ github.run_number }}
+          path: harry_meisel_predictions.json
+      
+      - name: Commit to Repo
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          mkdir -p michael_d1_agents_v3/predictions
+          cp harry_meisel_predictions.json michael_d1_agents_v3/predictions/
+          git add michael_d1_agents_v3/predictions/harry_meisel_predictions.json
+          git diff --staged --quiet || git commit -m "predictions: XGBoost Harry Meisel $(date +'%Y-%m-%d %H:%M')"
+          git push || echo "Nothing to push"
