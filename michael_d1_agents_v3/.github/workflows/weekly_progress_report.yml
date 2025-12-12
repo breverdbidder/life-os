@@ -1,0 +1,41 @@
+name: Weekly Progress Report
+on:
+  schedule:
+    - cron: '0 14 * * 0'  # Sundays at 2 PM UTC (10 AM EST)
+  workflow_dispatch:  # Manual trigger
+
+env:
+  SUPABASE_URL: https://mocerqjnksmhcjzxrewo.supabase.co
+  
+jobs:
+  generate-weekly-report:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          
+      - name: Install dependencies
+        run: |
+          pip install httpx supabase xgboost pandas numpy
+          
+      - name: Generate weekly progress report
+        env:
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+        run: |
+          cd michael_d1_agents_v3
+          python orchestrator_v3.py weekly_report
+          
+      - name: Upload report artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: weekly-progress-report-${{ github.run_id }}
+          path: michael_d1_agents_v3/reports/
+          retention-days: 30
+          
+      - name: Log completion
+        run: echo "✅ Weekly report generated at $(date)"
