@@ -1,0 +1,43 @@
+name: Execute BidDeed.AI Rebrand
+
+on:
+  workflow_dispatch:
+
+jobs:
+  rebrand:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Execute Rebrand - BrevardBidderAI → BidDeed.AI
+        run: |
+          echo "🏔️ Executing Everest Capital rebrand..."
+          
+          # Replace BrevardBidderAI → BidDeed.AI in all relevant files
+          find . -type f \( -name "*.py" -o -name "*.md" -o -name "*.js" -o -name "*.ts" -o -name "*.yml" -o -name "*.yaml" -o -name "*.json" -o -name "*.html" -o -name "*.txt" -o -name "*.ps1" -o -name "*.sh" -o -name "*.bat" -o -name "*.example" -o -name "*.sql" -o -name "*.jsx" -o -name "*.tsx" -o -name "LICENSE" \) -exec sed -i 's/BrevardBidderAI/BidDeed.AI/g' {} \;
+          
+          # Replace Python variable names
+          find . -type f -name "*.py" -exec sed -i 's/brevard_bidder/biddeed/g' {} \;
+          
+          echo "✅ Rebrand complete"
+
+      - name: Commit Changes
+        run: |
+          git config user.name "Everest AI Architect"
+          git config user.email "ai@everestcapital.us"
+          git add -A
+          git diff --staged --quiet || git commit -m "🏔️ REBRAND: BrevardBidderAI → BidDeed.AI (Everest Capital)
+
+          - Replaced all BrevardBidderAI references with BidDeed.AI
+          - Updated Python module names (brevard_bidder → biddeed)
+          - Part of Everest Capital USA brand consolidation
+          
+          Brand Architecture:
+          - EVEREST CAPITAL USA (Parent)
+            └── BidDeed.AI (Product)
+                └── The Everest Ascent™ (Methodology)"
+          git push
+          echo "✅ Changes pushed to main"
