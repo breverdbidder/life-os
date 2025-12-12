@@ -1,0 +1,132 @@
+{
+  "meet": {
+    "name": "Harry Meisel Championships East",
+    "dates": "December 13-14, 2025",
+    "location": "Treasure Coast Swimming",
+    "heat_sheet_generated": "2025-12-09T10:38:00"
+  },
+  "athlete": {
+    "name": "Michael Shapira",
+    "age": 16,
+    "team": "MELB-FL",
+    "swimcloud_id": "3250085",
+    "verified_pbs": {
+      "50_free": 21.86,
+      "100_free": 48.80,
+      "100_fly": 55.87,
+      "200_free": 113.03
+    }
+  },
+  "events": [
+    {
+      "event_number": 42,
+      "event_name": "Boys 50 Yard Freestyle",
+      "heat": 1,
+      "total_heats": 8,
+      "michael_lane": 3,
+      "michael_seed": 23.22,
+      "michael_pb": 21.86,
+      "pb_vs_seed_gap": -1.36,
+      "competitors": [
+        {"lane": 4, "name": "Soto, Bastian", "age": 16, "team": "MELB-FL", "seed": 22.39, "is_teammate": true, "threat_level": "HIGH"},
+        {"lane": 5, "name": "Gordon, Aaron T", "age": 17, "team": "TMSC-FL", "seed": 22.48, "is_teammate": false, "threat_level": "HIGH"},
+        {"lane": 6, "name": "Morgan, Max T", "age": 15, "team": "MELB-FL", "seed": 23.26, "is_teammate": true, "threat_level": "MEDIUM"},
+        {"lane": 2, "name": "Ahmad, Kellen T", "age": 16, "team": "TMSC-FL", "seed": 23.57, "is_teammate": false, "threat_level": "MEDIUM"},
+        {"lane": 7, "name": "Domboru, Gavin R", "age": 15, "team": "MELB-FL", "seed": 23.59, "is_teammate": true, "threat_level": "MEDIUM"},
+        {"lane": 1, "name": "Hornecker, Roger", "age": 16, "team": "TMSC-FL", "seed": 23.88, "is_teammate": false, "threat_level": "LOW"},
+        {"lane": 8, "name": "Gambino, Jack", "age": 17, "team": "TCSC-FL", "seed": 24.01, "is_teammate": false, "threat_level": "LOW"}
+      ],
+      "strategy": "GO OUT FAST. PB (21.86) puts you in contention for TOP 3. Soto and Gordon are threats - stay with them off the wall.",
+      "target_time": 21.50,
+      "podium_probability": 0.65
+    },
+    {
+      "event_number": 28,
+      "event_name": "Boys 50 Yard Butterfly",
+      "heat": 1,
+      "total_heats": 6,
+      "michael_lane": 3,
+      "michael_seed": 25.79,
+      "michael_pb": null,
+      "competitors": [
+        {"lane": 4, "name": "Soto, Bastian", "age": 16, "team": "MELB-FL", "seed": 23.34, "is_teammate": true, "threat_level": "HIGH"},
+        {"lane": 5, "name": "Gordon, Aaron T", "age": 17, "team": "TMSC-FL", "seed": 24.77, "is_teammate": false, "threat_level": "HIGH"},
+        {"lane": 6, "name": "Ahmad, Kellen T", "age": 16, "team": "TMSC-FL", "seed": 26.52, "is_teammate": false, "threat_level": "MEDIUM"},
+        {"lane": 2, "name": "Kiser, Logan G", "age": 17, "team": "TMSC-FL", "seed": 27.46, "is_teammate": false, "threat_level": "LOW"},
+        {"lane": 7, "name": "Badilla, Vincent N", "age": 14, "team": "MELB-FL", "seed": 27.58, "is_teammate": true, "threat_level": "LOW"},
+        {"lane": 1, "name": "Scarlett, Blake C", "age": 14, "team": "STTB-FL", "seed": 27.60, "is_teammate": false, "threat_level": "LOW"},
+        {"lane": 8, "name": "Sutphin, Ethan M", "age": 14, "team": "TCSC-FL", "seed": 27.64, "is_teammate": false, "threat_level": "LOW"}
+      ],
+      "strategy": "PODIUM POTENTIAL. 3rd place is YOURS to lose. Attack the first 25, maintain stroke rate. Target sub-25.0.",
+      "target_time": 24.90,
+      "podium_probability": 0.75
+    },
+    {
+      "event_number": 26,
+      "event_name": "Boys 100 Yard Freestyle",
+      "heat": 1,
+      "total_heats": 7,
+      "michael_lane": 6,
+      "michael_seed": 50.82,
+      "michael_pb": 48.80,
+      "pb_vs_seed_gap": -2.02,
+      "competitors": [
+        {"lane": 4, "name": "Gordon, Aaron T", "age": 17, "team": "TMSC-FL", "seed": 47.51, "is_teammate": false, "threat_level": "HIGH"},
+        {"lane": 5, "name": "Soto, Bastian", "age": 16, "team": "MELB-FL", "seed": 48.98, "is_teammate": true, "threat_level": "HIGH"},
+        {"lane": 3, "name": "Domboru, Gavin R", "age": 15, "team": "MELB-FL", "seed": 50.43, "is_teammate": true, "threat_level": "MEDIUM"},
+        {"lane": 2, "name": "Sutphin, Ethan M", "age": 14, "team": "TCSC-FL", "seed": 52.44, "is_teammate": false, "threat_level": "LOW"},
+        {"lane": 7, "name": "Kiser, Logan G", "age": 17, "team": "TMSC-FL", "seed": 52.67, "is_teammate": false, "threat_level": "LOW"},
+        {"lane": 1, "name": "Ahmad, Kellen T", "age": 16, "team": "TMSC-FL", "seed": 53.12, "is_teammate": false, "threat_level": "LOW"},
+        {"lane": 8, "name": "Badilla, Vincent N", "age": 14, "team": "MELB-FL", "seed": 53.69, "is_teammate": true, "threat_level": "LOW"}
+      ],
+      "strategy": "YOUR PB (48.80) BEATS YOUR SEED BY 2 SECONDS. Go out in 23.5, hold the back half. Push to the wall.",
+      "target_time": 48.50,
+      "podium_probability": 0.55
+    },
+    {
+      "event_number": 34,
+      "event_name": "Boys 100 Yard Backstroke",
+      "heat": 1,
+      "total_heats": 4,
+      "michael_lane": 2,
+      "michael_seed": 61.62,
+      "michael_pb": null,
+      "competitors": [
+        {"lane": 4, "name": "Landry, Locky L", "age": 10, "team": "TCA-FL", "seed": 51.44, "is_teammate": false, "threat_level": "HIGH"},
+        {"lane": 5, "name": "Soto, Bastian", "age": 16, "team": "MELB-FL", "seed": 53.77, "is_teammate": true, "threat_level": "HIGH"},
+        {"lane": 3, "name": "Gordon, Aaron T", "age": 17, "team": "TMSC-FL", "seed": 54.59, "is_teammate": false, "threat_level": "HIGH"},
+        {"lane": 6, "name": "Domboru, Gavin R", "age": 15, "team": "MELB-FL", "seed": 55.29, "is_teammate": true, "threat_level": "HIGH"},
+        {"lane": 7, "name": "Sutphin, Ethan M", "age": 14, "team": "TCSC-FL", "seed": 62.01, "is_teammate": false, "threat_level": "LOW"},
+        {"lane": 1, "name": "Sambevski, Jackson D", "age": 13, "team": "TCA-FL", "seed": 63.39, "is_teammate": false, "threat_level": "LOW"},
+        {"lane": 8, "name": "Baxter, Ian D", "age": 16, "team": "TMSC-FL", "seed": 66.12, "is_teammate": false, "threat_level": "LOW"}
+      ],
+      "strategy": "DEVELOPMENT EVENT. Focus on technique - strong underwater pullouts, maintain tempo. Target sub-1:00.",
+      "target_time": 59.90,
+      "podium_probability": 0.15
+    }
+  ],
+  "relay": {
+    "event_number": 43,
+    "event_name": "Mixed 200 Yard Medley Relay",
+    "team_name": "MELB-FL B",
+    "heat": 1,
+    "lane": 5,
+    "seed": "1:52.38",
+    "michael_leg": "Freestyle (Anchor)",
+    "swimmers": [
+      {"name": "Schmidt, Sophia C", "gender": "F", "age": 13, "leg": "Backstroke"},
+      {"name": "Sewlal, Kira V", "gender": "F", "age": 13, "leg": "Breaststroke"},
+      {"name": "Domboru, Gavin R", "gender": "M", "age": 15, "leg": "Butterfly"},
+      {"name": "Shapira, Michael A", "gender": "M", "age": 16, "leg": "Freestyle"}
+    ],
+    "strategy": "Michael anchors FREE. Expect ~25-26 incoming. Attack the water, fast turns."
+  },
+  "key_rivals": [
+    {"name": "Soto, Bastian", "team": "MELB-FL", "relationship": "Teammate", "events_shared": ["50 Free", "50 Fly", "100 Free", "100 Back", "Relay"], "threat_assessment": "Fastest on team. Primary training partner."},
+    {"name": "Gordon, Aaron T", "team": "TMSC-FL", "relationship": "Competitor", "events_shared": ["50 Free", "50 Fly", "100 Free", "100 Back"], "threat_assessment": "TMSC #1. Strong across all events."},
+    {"name": "Ahmad, Kellen T", "team": "TMSC-FL", "relationship": "Competitor", "events_shared": ["50 Free", "50 Fly", "100 Free"], "threat_assessment": "Beatable in 50s."},
+    {"name": "Domboru, Gavin R", "team": "MELB-FL", "relationship": "Teammate", "events_shared": ["50 Free", "100 Free", "100 Back", "Relay"], "threat_assessment": "Versatile backstroker."}
+  ],
+  "generated_at": "2025-12-12T19:58:00Z",
+  "data_source": "Heat Sheet PDF - Harry Meisel Championships East"
+}
