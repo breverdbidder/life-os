@@ -1,0 +1,142 @@
+{
+  "version": "1.0.0",
+  "created": "2025-12-12",
+  "author": "Claude Opus 4.5 (AI Architect)",
+  "owner": "Ariel Shapira, Everest Capital USA",
+  
+  "supabase": {
+    "project_ref": "mocerqjnksmhcjzxrewo",
+    "url": "https://mocerqjnksmhcjzxrewo.supabase.co"
+  },
+  
+  "domains": {
+    "BUSINESS": {
+      "description": "BidDeed.AI foreclosure auction intelligence",
+      "tables": [
+        "orchestrated_tasks",
+        "langgraph_state",
+        "langgraph_transitions",
+        "historical_auctions",
+        "bid_decisions",
+        "auction_results",
+        "decision_log",
+        "everest_ascent_stages"
+      ]
+    },
+    "MICHAEL": {
+      "description": "Michael's D1 swimming journey",
+      "tables": [
+        "michael_swim_times",
+        "michael_nutrition",
+        "michael_recruiting"
+      ]
+    },
+    "FAMILY": {
+      "description": "Family events and calendar",
+      "tables": [
+        "family_events"
+      ]
+    },
+    "PERSONAL": {
+      "description": "Ariel's personal tracking",
+      "tables": [
+        "tasks",
+        "task_states",
+        "activities",
+        "daily_metrics",
+        "focus_scores",
+        "health_logs",
+        "insights",
+        "learning_sessions",
+        "goals",
+        "task_interventions",
+        "abandonment_patterns",
+        "task_completion_streaks"
+      ]
+    }
+  },
+  
+  "natural_language_routes": {
+    "swim|swimming|100 free|50 free|200 free|fly|back|times": "michael_swim_times",
+    "calories|protein|carbs|keto|nutrition|ate|food|meal": "michael_nutrition",
+    "coach|recruiting|d1|college|university|school": "michael_recruiting",
+    "sleep|energy|focus|tired|health|wellness": "health_logs",
+    "shabbat|family|dinner|birthday|holiday|event": "family_events",
+    "learned|watched|youtube|article|podcast|video": "learning_sessions",
+    "insight|realized|idea|thought": "insights",
+    "task|todo|need to|should|must|reminder": "tasks",
+    "deploy|claude code|fix|feature|pr|pipeline": "orchestrated_tasks",
+    "auction|foreclosure|bid|property|case": "bid_decisions"
+  },
+  
+  "priority_mapping": {
+    "critical": "P0",
+    "urgent": "P0",
+    "high": "P1",
+    "important": "P1",
+    "medium": "P2",
+    "normal": "P2",
+    "low": "P3",
+    "whenever": "P3"
+  },
+  
+  "task_types": [
+    "code_fix",
+    "feature",
+    "refactor",
+    "test",
+    "docs",
+    "deploy"
+  ],
+  
+  "repositories": {
+    "brevard-bidder-scraper": {
+      "full_name": "breverdbidder/brevard-bidder-scraper",
+      "description": "BECA V22 scraping, ML models, auction analysis",
+      "default_task_type": "code_fix"
+    },
+    "life-os": {
+      "full_name": "breverdbidder/life-os",
+      "description": "Life OS, daily reports, ADHD tracking",
+      "default_task_type": "feature"
+    },
+    "brevard-bidder-landing": {
+      "full_name": "breverdbidder/brevard-bidder-landing",
+      "description": "BidDeed.AI landing page",
+      "default_task_type": "feature"
+    },
+    "spd-site-plan-dev": {
+      "full_name": "breverdbidder/spd-site-plan-dev",
+      "description": "Site Plan Development agent",
+      "default_task_type": "feature"
+    }
+  },
+  
+  "michael_swim_events": {
+    "50 Free": {"d1_cutoff": 20.5, "unit": "seconds"},
+    "100 Free": {"d1_cutoff": 45.0, "unit": "seconds"},
+    "200 Free": {"d1_cutoff": 100.0, "unit": "seconds"},
+    "100 Fly": {"d1_cutoff": 49.0, "unit": "seconds"},
+    "100 Back": {"d1_cutoff": 50.0, "unit": "seconds"}
+  },
+  
+  "keto_schedule": {
+    "monday": true,
+    "tuesday": true,
+    "wednesday": true,
+    "thursday": true,
+    "friday": false,
+    "saturday": false,
+    "sunday": false
+  },
+  
+  "adhd_settings": {
+    "intervention_levels": {
+      "level_1": {"minutes": 30, "message": "Quick check: still on it?"},
+      "level_2": {"minutes": 60, "message": "Pattern noticed. Continue or defer?"},
+      "level_3": {"minutes": 90, "message": "ACCOUNTABILITY: Status? Be honest."}
+    },
+    "peak_focus_hours": {"start": 9, "end": 11},
+    "energy_dip_hours": {"start": 14, "end": 16}
+  }
+}
