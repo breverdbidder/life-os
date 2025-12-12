@@ -6,7 +6,12 @@ on:
 jobs:
   scrape:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
+    
+    env:
+      APIFY_API_TOKEN: ${{ secrets.APIFY_API_TOKEN }}
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
     
     steps:
       - uses: actions/checkout@v4
@@ -16,21 +21,24 @@ jobs:
         with:
           python-version: '3.11'
       
-      - name: Install Playwright
-        run: |
-          pip install playwright beautifulsoup4
-          playwright install chromium
-          playwright install-deps chromium
+      - name: Install dependencies
+        run: pip install requests
       
-      - name: Deep Scrape All Satellite Beach Swimmers
+      - name: Scrape All Swimmers with Apify
         run: |
           python3 << 'PYTHON_EOF'
-          import asyncio
+          import os
           import json
+          import time
           import re
-          from datetime import datetime
-          from playwright.async_api import async_playwright
+          import requests
+          from datetime import datetime, timezone
 
+          APIFY_TOKEN = os.environ.get('APIFY_API_TOKEN')
+          SUPABASE_URL = os.environ.get('SUPABASE_URL', 'https://mocerqjnksmhcjzxrewo.supabase.co')
+          SUPABASE_KEY = os.environ.get('SUPABASE_KEY')
+
+          # ALL 5 Satellite Beach swimmers
           SWIMMERS = {
               "3250085": {"name": "Michael Shapira", "class": 2027},
               "2928537": {"name": "Bastian Soto", "class": 2027},
@@ -39,265 +47,336 @@ jobs:
               "2662363": {"name": "Sawyer Davis", "class": 2026, "note": "Ohio State Commit, 2A State Champion"}
           }
 
-          def parse_time(time_str):
-              """Convert time string to seconds."""
-              try:
-                  time_str = time_str.strip()
-                  if ':' in time_str:
-                      parts = time_str.split(':')
-                      return round(float(parts[0]) * 60 + float(parts[1]), 2)
-                  return round(float(time_str), 2)
-              except:
-                  return None
-
-          async def scrape_swimmer_deep(page, swimmer_id, swimmer_info):
-              """Deep scrape - get ALL times from times page."""
-              print(f"\n{'='*70}")
-              print(f"DEEP SCRAPE: {swimmer_info['name']} (ID: {swimmer_id})")
-              print(f"{'='*70}")
+          def run_apify_scraper_for_swimmer(swimmer_id, swimmer_info):
+              """Run Apify Web Scraper for a single swimmer"""
               
-              data = {
+              print(f"\n{'='*60}")
+              print(f"🏊 SCRAPING: {swimmer_info['name']} (ID: {swimmer_id})")
+              print(f"{'='*60}")
+              
+              # URLs to scrape - profile AND times page
+              urls = [
+                  f"https://www.swimcloud.com/swimmer/{swimmer_id}/",
+                  f"https://www.swimcloud.com/swimmer/{swimmer_id}/times/",
+                  f"https://www.swimcloud.com/swimmer/{swimmer_id}/times/?page=1&course=Y"
+              ]
+              
+              # Comprehensive pageFunction to extract ALL data
+              page_function = '''
+          async function pageFunction(context) {
+              const { request, page, log } = context;
+              log.info('Processing: ' + request.url);
+              
+              // Wait for full page load
+              await page.waitForSelector('body', { timeout: 30000 });
+              await page.waitForTimeout(5000);
+              
+              const data = await page.evaluate(() => {
+                  const result = {
+                      name: '',
+                      power_index: null,
+                      florida_rank: null,
+                      class_of: null,
+                      team: '',
+                      times: {},
+                      all_times_found: [],
+                      raw_text: ''
+                  };
+                  
+                  // Get full page text
+                  const bodyText = document.body.innerText;
+                  result.raw_text = bodyText.substring(0, 10000);
+                  
+                  // Extract swimmer name
+                  const h1 = document.querySelector('h1');
+                  if (h1) result.name = h1.textContent.trim();
+                  
+                  // Extract Power Index
+                  const piMatch = bodyText.match(/Power\\s*index\\s*(\\d+\\.?\\d*)/i);
+                  if (piMatch) result.power_index = parseFloat(piMatch[1]);
+                  
+                  // Extract Florida Rank
+                  const flMatch = bodyText.match(/Florida\\s*rank\\s*(\\d+)/i);
+                  if (flMatch) result.florida_rank = parseInt(flMatch[1]);
+                  
+                  // Extract Class Year
+                  const classMatch = bodyText.match(/Class\\s*[·:]?\\s*(\\d{4})/i);
+                  if (classMatch) result.class_of = parseInt(classMatch[1]);
+                  
+                  // Extract Team
+                  const teamLink = document.querySelector('a[href*="/team/"]');
+                  if (teamLink) result.team = teamLink.textContent.trim();
+                  
+                  // COMPREHENSIVE TIME EXTRACTION
+                  // Pattern: Event name + time
+                  const events = [
+                      { name: '50 Free', pattern: /50\\s*(?:Y(?:ard)?)?\\s*Free[\\s\\S]{0,100}?(\\d{2}\\.\\d{2})/gi },
+                      { name: '100 Free', pattern: /100\\s*(?:Y(?:ard)?)?\\s*Free[\\s\\S]{0,100}?(\\d{2}\\.\\d{2}|\\d:\\d{2}\\.\\d{2})/gi },
+                      { name: '200 Free', pattern: /200\\s*(?:Y(?:ard)?)?\\s*Free[\\s\\S]{0,100}?(\\d:\\d{2}\\.\\d{2})/gi },
+                      { name: '500 Free', pattern: /500\\s*(?:Y(?:ard)?)?\\s*Free[\\s\\S]{0,100}?(\\d:\\d{2}\\.\\d{2})/gi },
+                      { name: '50 Fly', pattern: /50\\s*(?:Y(?:ard)?)?\\s*(?:Fly|Butterfly)[\\s\\S]{0,100}?(\\d{2}\\.\\d{2})/gi },
+                      { name: '100 Fly', pattern: /100\\s*(?:Y(?:ard)?)?\\s*(?:Fly|Butterfly)[\\s\\S]{0,100}?(\\d{2}\\.\\d{2}|\\d:\\d{2}\\.\\d{2})/gi },
+                      { name: '200 Fly', pattern: /200\\s*(?:Y(?:ard)?)?\\s*(?:Fly|Butterfly)[\\s\\S]{0,100}?(\\d:\\d{2}\\.\\d{2})/gi },
+                      { name: '50 Back', pattern: /50\\s*(?:Y(?:ard)?)?\\s*Back[\\s\\S]{0,100}?(\\d{2}\\.\\d{2})/gi },
+                      { name: '100 Back', pattern: /100\\s*(?:Y(?:ard)?)?\\s*Back[\\s\\S]{0,100}?(\\d{2}\\.\\d{2}|\\d:\\d{2}\\.\\d{2})/gi },
+                      { name: '200 Back', pattern: /200\\s*(?:Y(?:ard)?)?\\s*Back[\\s\\S]{0,100}?(\\d:\\d{2}\\.\\d{2})/gi },
+                      { name: '50 Breast', pattern: /50\\s*(?:Y(?:ard)?)?\\s*Breast[\\s\\S]{0,100}?(\\d{2}\\.\\d{2})/gi },
+                      { name: '100 Breast', pattern: /100\\s*(?:Y(?:ard)?)?\\s*Breast[\\s\\S]{0,100}?(\\d{2}\\.\\d{2}|\\d:\\d{2}\\.\\d{2})/gi },
+                      { name: '200 Breast', pattern: /200\\s*(?:Y(?:ard)?)?\\s*Breast[\\s\\S]{0,100}?(\\d:\\d{2}\\.\\d{2})/gi },
+                      { name: '200 IM', pattern: /200\\s*(?:Y(?:ard)?)?\\s*(?:IM|Individual)[\\s\\S]{0,100}?(\\d:\\d{2}\\.\\d{2})/gi },
+                      { name: '400 IM', pattern: /400\\s*(?:Y(?:ard)?)?\\s*(?:IM|Individual)[\\s\\S]{0,100}?(\\d:\\d{2}\\.\\d{2})/gi }
+                  ];
+                  
+                  for (const event of events) {
+                      const matches = [...bodyText.matchAll(event.pattern)];
+                      if (matches.length > 0) {
+                          // Get all times for this event
+                          const timesFound = matches.map(m => m[1]).filter(t => {
+                              // Validate time is reasonable
+                              const secs = t.includes(':') ? 
+                                  parseFloat(t.split(':')[0]) * 60 + parseFloat(t.split(':')[1]) :
+                                  parseFloat(t);
+                              return secs > 15 && secs < 600;
+                          });
+                          
+                          if (timesFound.length > 0) {
+                              // Convert to seconds and find best (lowest)
+                              const withSeconds = timesFound.map(t => {
+                                  const secs = t.includes(':') ? 
+                                      parseFloat(t.split(':')[0]) * 60 + parseFloat(t.split(':')[1]) :
+                                      parseFloat(t);
+                                  return { time: t, seconds: secs };
+                              });
+                              
+                              // Sort by seconds (fastest first)
+                              withSeconds.sort((a, b) => a.seconds - b.seconds);
+                              
+                              result.times[event.name] = {
+                                  time: withSeconds[0].time,
+                                  seconds: withSeconds[0].seconds
+                              };
+                              
+                              result.all_times_found.push({
+                                  event: event.name,
+                                  times: withSeconds.slice(0, 5)
+                              });
+                          }
+                      }
+                  }
+                  
+                  // Also try table extraction
+                  const rows = document.querySelectorAll('tr');
+                  rows.forEach(row => {
+                      const text = row.textContent;
+                      for (const event of events) {
+                          if (!result.times[event.name]) {
+                              const match = event.pattern.exec(text);
+                              if (match) {
+                                  const t = match[1];
+                                  const secs = t.includes(':') ? 
+                                      parseFloat(t.split(':')[0]) * 60 + parseFloat(t.split(':')[1]) :
+                                      parseFloat(t);
+                                  if (secs > 15 && secs < 600) {
+                                      result.times[event.name] = { time: t, seconds: secs };
+                                  }
+                              }
+                          }
+                      }
+                  });
+                  
+                  return result;
+              });
+              
+              return {
+                  url: request.url,
+                  swimmer_id: request.url.match(/swimmer\\/(\\d+)/)?.[1],
+                  ...data,
+                  scraped_at: new Date().toISOString()
+              };
+          }
+          '''
+              
+              scraper_input = {
+                  "startUrls": [{"url": url} for url in urls],
+                  "pageFunction": page_function,
+                  "proxyConfiguration": {
+                      "useApifyProxy": True,
+                      "apifyProxyGroups": ["RESIDENTIAL"]
+                  },
+                  "maxConcurrency": 1,
+                  "maxRequestsPerCrawl": 10,
+                  "waitUntil": "networkidle",
+                  "pageLoadTimeoutSecs": 60
+              }
+              
+              print(f"📡 Starting Apify Web Scraper...")
+              
+              response = requests.post(
+                  "https://api.apify.com/v2/acts/apify~web-scraper/runs",
+                  headers={
+                      "Authorization": f"Bearer {APIFY_TOKEN}",
+                      "Content-Type": "application/json"
+                  },
+                  json=scraper_input,
+                  timeout=60
+              )
+              
+              if response.status_code != 201:
+                  print(f"❌ Failed to start: {response.status_code}")
+                  return None
+              
+              run_data = response.json()
+              run_id = run_data["data"]["id"]
+              print(f"✅ Run started: {run_id}")
+              
+              # Wait for completion
+              max_wait = 180
+              start = time.time()
+              
+              while time.time() - start < max_wait:
+                  time.sleep(10)
+                  
+                  status_resp = requests.get(
+                      f"https://api.apify.com/v2/actor-runs/{run_id}",
+                      headers={"Authorization": f"Bearer {APIFY_TOKEN}"},
+                      timeout=30
+                  )
+                  
+                  status_data = status_resp.json()["data"]
+                  status = status_data["status"]
+                  elapsed = int(time.time() - start)
+                  
+                  print(f"   [{elapsed}s] {status}")
+                  
+                  if status in ["SUCCEEDED", "FAILED", "ABORTED", "TIMED-OUT"]:
+                      break
+              
+              if status != "SUCCEEDED":
+                  print(f"❌ Run failed: {status}")
+                  return None
+              
+              # Get results
+              dataset_id = status_data["defaultDatasetId"]
+              results = requests.get(
+                  f"https://api.apify.com/v2/datasets/{dataset_id}/items",
+                  headers={"Authorization": f"Bearer {APIFY_TOKEN}"},
+                  timeout=30
+              ).json()
+              
+              # Combine results from all pages
+              combined = {
                   "swimmer_id": swimmer_id,
                   "name": swimmer_info["name"],
                   "class_of": swimmer_info.get("class"),
-                  "school": "Satellite Sr High School",
-                  "team": "Swim Melbourne (MELB-FL)",
                   "note": swimmer_info.get("note", ""),
-                  "scraped_at": datetime.now().isoformat(),
                   "profile": {},
-                  "personal_bests": {},
-                  "all_times": {}
+                  "personal_bests": {}
               }
               
-              try:
-                  # First get profile info
-                  url = f"https://www.swimcloud.com/swimmer/{swimmer_id}/"
-                  await page.goto(url, wait_until="networkidle", timeout=60000)
-                  await page.wait_for_timeout(3000)
+              for item in results:
+                  if item.get("power_index"):
+                      combined["profile"]["power_index"] = item["power_index"]
+                  if item.get("florida_rank"):
+                      combined["profile"]["florida_rank"] = item["florida_rank"]
+                  if item.get("class_of"):
+                      combined["profile"]["class_of"] = item["class_of"]
+                  if item.get("team"):
+                      combined["profile"]["team"] = item["team"]
                   
-                  body_text = await page.locator("body").text_content()
-                  
-                  # Power Index
-                  pi_match = re.search(r'Power\s*index\s*(\d+\.?\d*)', body_text, re.I)
-                  if pi_match:
-                      data["profile"]["power_index"] = float(pi_match.group(1))
-                  
-                  # Florida Rank
-                  fl_rank = re.search(r'Florida\s*rank\s*(\d+)', body_text, re.I)
-                  if fl_rank:
-                      data["profile"]["florida_rank"] = int(fl_rank.group(1))
-                  
-                  print(f"  Profile: PI={data['profile'].get('power_index', 'N/A')}, FL Rank={data['profile'].get('florida_rank', 'N/A')}")
-                  
-                  # Now go to TIMES page for full history
-                  times_url = f"https://www.swimcloud.com/swimmer/{swimmer_id}/times/"
-                  print(f"  Loading times page: {times_url}")
-                  await page.goto(times_url, wait_until="networkidle", timeout=60000)
-                  await page.wait_for_timeout(5000)
-                  
-                  # Click "SCY" tab if exists to ensure short course yards
-                  try:
-                      scy_tab = page.locator("text=SCY").first
-                      if await scy_tab.is_visible():
-                          await scy_tab.click()
-                          await page.wait_for_timeout(2000)
-                          print(f"  Clicked SCY tab")
-                  except:
-                      pass
-                  
-                  # Get the full HTML
-                  html = await page.content()
-                  
-                  # Define events to search for
-                  events = [
-                      ("50 Free", r'50\s*(?:Y(?:ard)?|SCY)?\s*Free'),
-                      ("100 Free", r'100\s*(?:Y(?:ard)?|SCY)?\s*Free'),
-                      ("200 Free", r'200\s*(?:Y(?:ard)?|SCY)?\s*Free'),
-                      ("500 Free", r'500\s*(?:Y(?:ard)?|SCY)?\s*Free'),
-                      ("50 Fly", r'50\s*(?:Y(?:ard)?|SCY)?\s*(?:Fly|Butterfly)'),
-                      ("100 Fly", r'100\s*(?:Y(?:ard)?|SCY)?\s*(?:Fly|Butterfly)'),
-                      ("50 Back", r'50\s*(?:Y(?:ard)?|SCY)?\s*Back'),
-                      ("100 Back", r'100\s*(?:Y(?:ard)?|SCY)?\s*Back'),
-                      ("200 Back", r'200\s*(?:Y(?:ard)?|SCY)?\s*Back'),
-                      ("50 Breast", r'50\s*(?:Y(?:ard)?|SCY)?\s*Breast'),
-                      ("100 Breast", r'100\s*(?:Y(?:ard)?|SCY)?\s*Breast'),
-                      ("200 Breast", r'200\s*(?:Y(?:ard)?|SCY)?\s*Breast'),
-                      ("200 IM", r'200\s*(?:Y(?:ard)?|SCY)?\s*(?:IM|Individual\s*Medley)'),
-                      ("400 IM", r'400\s*(?:Y(?:ard)?|SCY)?\s*(?:IM|Individual\s*Medley)'),
-                  ]
-                  
-                  # Try to find times table rows
-                  # SwimCloud format: Event name followed by time
-                  for event_name, event_pattern in events:
-                      # Look for the event and capture the time that follows
-                      # Pattern: event name ... time (like 21.86 or 1:48.50)
-                      full_pattern = event_pattern + r'[\s\S]{0,200}?(\d{1,2}:\d{2}\.\d{2}|\d{2}\.\d{2})'
-                      matches = re.findall(full_pattern, html, re.I)
-                      
-                      if matches:
-                          # Get all times found, take the fastest (lowest)
-                          times_found = []
-                          for match in matches:
-                              seconds = parse_time(match)
-                              if seconds and seconds > 15 and seconds < 600:  # Reasonable range
-                                  times_found.append((match, seconds))
-                          
-                          if times_found:
-                              # Sort by seconds (fastest first)
-                              times_found.sort(key=lambda x: x[1])
-                              best_time, best_seconds = times_found[0]
-                              
-                              data["personal_bests"][event_name] = {
-                                  "time": best_time,
-                                  "seconds": best_seconds
-                              }
-                              data["all_times"][event_name] = [{"time": t, "seconds": s} for t, s in times_found[:5]]
-                  
-                  # Also try clicking on each event to get detailed times
-                  # Look for event links
-                  event_links = await page.locator("a[href*='/times/']").all()
-                  print(f"  Found {len(event_links)} event links")
-                  
-                  for link in event_links[:10]:  # Limit to 10 events
-                      try:
-                          link_text = await link.text_content()
-                          link_href = await link.get_attribute("href")
-                          
-                          if not link_href or '/times/' not in link_href:
-                              continue
-                          
-                          # Check if it's an event we care about
-                          event_match = None
-                          for event_name, event_pattern in events:
-                              if re.search(event_pattern, link_text, re.I):
-                                  event_match = event_name
-                                  break
-                          
-                          if event_match and event_match not in data["personal_bests"]:
-                              # Click to get times
-                              await link.click()
-                              await page.wait_for_timeout(2000)
-                              
-                              event_html = await page.content()
-                              time_matches = re.findall(r'(\d{1,2}:\d{2}\.\d{2}|\d{2}\.\d{2})', event_html)
-                              
-                              valid_times = []
-                              for t in time_matches:
-                                  s = parse_time(t)
-                                  if s and s > 15 and s < 600:
-                                      valid_times.append((t, s))
-                              
-                              if valid_times:
-                                  valid_times.sort(key=lambda x: x[1])
-                                  best_time, best_seconds = valid_times[0]
-                                  data["personal_bests"][event_match] = {
-                                      "time": best_time,
-                                      "seconds": best_seconds
-                                  }
-                              
-                              # Go back
-                              await page.go_back()
-                              await page.wait_for_timeout(1000)
-                      except Exception as e:
-                          continue
-                  
-                  # Print results
-                  print(f"\n  PERSONAL BESTS FOUND ({len(data['personal_bests'])} events):")
-                  for event in ['50 Free', '100 Free', '200 Free', '50 Fly', '100 Fly', '100 Back', '100 Breast', '200 IM']:
-                      if event in data["personal_bests"]:
-                          print(f"    {event}: {data['personal_bests'][event]['time']}")
-                  
-                  return data
-                  
-              except Exception as e:
-                  print(f"  ERROR: {e}")
-                  return {
-                      "swimmer_id": swimmer_id,
-                      "name": swimmer_info["name"],
-                      "error": str(e)
-                  }
+                  # Merge times - keep fastest
+                  for event, time_data in item.get("times", {}).items():
+                      if event not in combined["personal_bests"]:
+                          combined["personal_bests"][event] = time_data
+                      elif time_data["seconds"] < combined["personal_bests"][event]["seconds"]:
+                          combined["personal_bests"][event] = time_data
+              
+              print(f"\n   Profile: PI={combined['profile'].get('power_index', 'N/A')}, FL Rank={combined['profile'].get('florida_rank', 'N/A')}")
+              print(f"   Events: {len(combined['personal_bests'])}")
+              for event, data in sorted(combined["personal_bests"].items()):
+                  print(f"     {event}: {data['time']}")
+              
+              return combined
 
-          async def main():
-              print("🏊 SATELLITE BEACH DEEP SCRAPER V3")
-              print("="*70)
-              print(f"Scraping {len(SWIMMERS)} swimmers with FULL time history")
-              print("="*70)
+          def main():
+              print("="*60)
+              print("🏊 SATELLITE BEACH APIFY PRO SCRAPER")
+              print("   Using Apify Web Scraper with RESIDENTIAL proxies")
+              print("="*60)
+              
+              if not APIFY_TOKEN:
+                  print("❌ APIFY_API_TOKEN not set!")
+                  return
               
               results = {}
               
-              async with async_playwright() as p:
-                  browser = await p.chromium.launch(
-                      headless=True,
-                      args=['--no-sandbox', '--disable-setuid-sandbox']
-                  )
-                  context = await browser.new_context(
-                      user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-                      viewport={"width": 1920, "height": 1080}
-                  )
-                  page = await context.new_page()
-                  
-                  for swimmer_id, swimmer_info in SWIMMERS.items():
-                      data = await scrape_swimmer_deep(page, swimmer_id, swimmer_info)
+              for swimmer_id, swimmer_info in SWIMMERS.items():
+                  data = run_apify_scraper_for_swimmer(swimmer_id, swimmer_info)
+                  if data:
                       results[swimmer_info["name"]] = data
-                      await asyncio.sleep(2)
-                  
-                  await browser.close()
+                  time.sleep(5)  # Rate limit protection
               
+              # Save results
               output = {
-                  "scraped_at": datetime.now().isoformat(),
-                  "version": "V3_DEEP",
+                  "scraped_at": datetime.now(timezone.utc).isoformat(),
+                  "version": "APIFY_PRO_V1",
                   "school": "Satellite Beach High School",
                   "team": "Swim Melbourne (MELB-FL)",
-                  "swimmer_count": len(SWIMMERS),
+                  "method": "Apify Web Scraper with RESIDENTIAL proxies",
+                  "swimmer_count": len(results),
                   "swimmers": results
               }
               
               with open("satellite_beach_swimmers.json", "w") as f:
                   json.dump(output, f, indent=2)
               
-              # Final Summary
-              print("\n" + "="*70)
-              print("FINAL RESULTS - SATELLITE BEACH HIGH SCHOOL")
-              print("="*70)
+              # Summary
+              print("\n" + "="*60)
+              print("FINAL SUMMARY")
+              print("="*60)
               
+              success_count = 0
               for name, data in results.items():
                   pbs = data.get("personal_bests", {})
-                  pi = data.get('profile', {}).get('power_index', 'N/A')
-                  fl = data.get('profile', {}).get('florida_rank', 'N/A')
-                  note = data.get('note', '')
+                  if pbs:
+                      success_count += 1
+                      print(f"\n✅ {name}: {len(pbs)} events")
+                      for e in ['50 Free', '100 Free', '200 Free', '100 Fly', '100 Back', '100 Breast']:
+                          if e in pbs:
+                              print(f"   {e}: {pbs[e]['time']}")
+                  else:
+                      print(f"\n❌ {name}: NO DATA")
+              
+              print(f"\nSuccess Rate: {success_count}/{len(SWIMMERS)} ({100*success_count/len(SWIMMERS):.0f}%)")
+              
+              # Save to Supabase
+              if SUPABASE_KEY:
+                  payload = {
+                      "category": "michael_swim",
+                      "subcategory": "satellite_beach_team",
+                      "title": f"Satellite Beach Team Scrape {datetime.now().strftime('%Y-%m-%d')}",
+                      "insight": json.dumps(output),
+                      "importance": "high"
+                  }
                   
-                  print(f"\n{name} (Class {data.get('class_of', '?')})")
-                  if note:
-                      print(f"  ⭐ {note}")
-                  print(f"  Power Index: {pi} | FL Rank: {fl}")
-                  for event in ['50 Free', '100 Free', '200 Free', '50 Fly', '100 Fly', '100 Back', '100 Breast']:
-                      if event in pbs:
-                          print(f"  {event}: {pbs[event]['time']}")
-              
-              # Comparison table
-              print("\n" + "="*70)
-              print("100 FREE COMPARISON")
-              print("="*70)
-              free_100 = []
-              for name, data in results.items():
-                  if "100 Free" in data.get("personal_bests", {}):
-                      free_100.append((name, data["personal_bests"]["100 Free"]["time"], data["personal_bests"]["100 Free"]["seconds"]))
-              
-              free_100.sort(key=lambda x: x[2])
-              for i, (name, time, secs) in enumerate(free_100, 1):
-                  print(f"  {i}. {name}: {time}")
-              
-              print(f"\n💾 Saved to satellite_beach_swimmers.json")
-              return output
+                  resp = requests.post(
+                      f"{SUPABASE_URL}/rest/v1/insights",
+                      headers={
+                          "apikey": SUPABASE_KEY,
+                          "Authorization": f"Bearer {SUPABASE_KEY}",
+                          "Content-Type": "application/json"
+                      },
+                      json=payload
+                  )
+                  print(f"\n{'✅' if resp.status_code in [200,201] else '❌'} Supabase: {resp.status_code}")
 
           if __name__ == "__main__":
-              asyncio.run(main())
+              main()
           PYTHON_EOF
       
       - name: Upload Results
         uses: actions/upload-artifact@v4
         with:
-          name: satellite-beach-deep-${{ github.run_number }}
+          name: satellite-beach-apify-${{ github.run_number }}
           path: satellite_beach_swimmers.json
       
       - name: Commit to Repo
@@ -307,7 +386,7 @@ jobs:
           mkdir -p michael_d1_agents_v3/data
           cp satellite_beach_swimmers.json michael_d1_agents_v3/data/
           git add michael_d1_agents_v3/data/satellite_beach_swimmers.json
-          git diff --staged --quiet || git commit -m "data: Satellite Beach DEEP scrape V3 $(date +'%Y-%m-%d %H:%M')"
+          git diff --staged --quiet || git commit -m "data: Satellite Beach APIFY PRO scrape $(date +'%Y-%m-%d %H:%M')"
           git push || echo "Nothing to push"
       
       - name: Display Results
