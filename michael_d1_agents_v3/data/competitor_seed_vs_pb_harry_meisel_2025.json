@@ -1,0 +1,112 @@
+{
+  "meta": {
+    "meet": "Harry Meisel Championships East 2025",
+    "dates": "December 13-14, 2025",
+    "generated": "2025-12-12T20:15:00Z",
+    "athlete": "Michael Shapira",
+    "swimcloud_id": "3250085"
+  },
+  "data_sources": {
+    "seed_times": "Heat Sheet PDF - Dec 9, 2025",
+    "michael_pbs": "SwimCloud API verified - Dec 12, 2025",
+    "competitor_pbs": {
+      "verified": ["SwimCloud profile scraping", "Brevard County HS Sports Results"],
+      "estimated": "Power Index correlation, 100m pace extrapolation"
+    }
+  },
+  "michael_verified_pbs": {
+    "50_free": {"time": 21.86, "meet": "FHSAA 2A Region 2", "date": "2025-10-29"},
+    "100_free": {"time": 48.80, "meet": "FHSAA 2A Region 2", "date": "2025-10-29"},
+    "100_fly": {"time": 55.87, "meet": "FL GSC Holiday Classic", "date": "2025-12-07"},
+    "200_free": {"time": 113.03, "meet": "FL GSC Holiday Classic", "date": "2025-12-07"}
+  },
+  "events": {
+    "50_free": {
+      "event_number": 42,
+      "michael": {"lane": 3, "seed": 23.22, "pb": 21.86, "seed_vs_pb_gap": -1.36},
+      "strategic_advantage": "PB is 1.36s faster than seed - competitors expect 23.2, not 21.8",
+      "competitors": [
+        {"name": "Soto, Bastian", "lane": 4, "seed": 22.39, "pb_estimate": 22.0, "pb_source": "estimated", "threat": "HIGH", "swimcloud_id": 2928537, "power_index": 70},
+        {"name": "Gordon, Aaron T", "lane": 5, "seed": 22.48, "pb_estimate": 22.0, "pb_source": "estimated", "threat": "HIGH", "swimcloud_id": 1347466, "power_index": 90},
+        {"name": "Morgan, Max T", "lane": 6, "seed": 23.26, "pb_estimate": 22.5, "pb_source": "estimated", "threat": "MEDIUM", "swimcloud_id": 343863, "power_index": 83},
+        {"name": "Ahmad, Kellen T", "lane": 2, "seed": 23.57, "pb_estimate": 23.0, "pb_source": "estimated", "threat": "MEDIUM", "swimcloud_id": 2519506, "power_index": 12},
+        {"name": "Domboru, Gavin R", "lane": 7, "seed": 23.59, "pb_estimate": 23.0, "pb_source": "estimated", "threat": "MEDIUM", "swimcloud_id": 1518102, "power_index": 37},
+        {"name": "Hornecker, Roger", "lane": 1, "seed": 23.88, "pb": 23.64, "pb_source": "swimcloud_scraped", "threat": "LOW", "swimcloud_id": 3239652},
+        {"name": "Gambino, Jack", "lane": 8, "seed": 24.01, "pb_estimate": 24.0, "pb_source": "estimated", "threat": "LOW", "swimcloud_id": 2547075}
+      ]
+    },
+    "50_fly": {
+      "event_number": 28,
+      "michael": {"lane": 3, "seed": 25.79, "pb_estimate": 25.5, "pb_source": "from 100 fly pace"},
+      "strategic_advantage": "Solid 3rd place seed - podium is achievable",
+      "competitors": [
+        {"name": "Soto, Bastian", "lane": 4, "seed": 23.34, "pb_estimate": 23.0, "pb_source": "from 100 fly 54.25", "threat": "HIGH"},
+        {"name": "Gordon, Aaron T", "lane": 5, "seed": 24.77, "pb_estimate": 24.0, "pb_source": "estimated", "threat": "HIGH"},
+        {"name": "Ahmad, Kellen T", "lane": 6, "seed": 26.52, "pb_estimate": 26.0, "pb_source": "estimated", "threat": "MEDIUM"},
+        {"name": "Kiser, Logan G", "lane": 2, "seed": 27.46, "pb_estimate": 27.0, "pb_source": "estimated", "threat": "LOW"},
+        {"name": "Badilla, Vincent N", "lane": 7, "seed": 27.58, "pb_estimate": 27.5, "pb_source": "estimated", "threat": "LOW"},
+        {"name": "Scarlett, Blake C", "lane": 1, "seed": 27.60, "pb_estimate": 27.0, "pb_source": "estimated", "threat": "LOW"},
+        {"name": "Sutphin, Ethan M", "lane": 8, "seed": 27.64, "pb_estimate": 27.0, "pb_source": "estimated", "threat": "LOW"}
+      ]
+    },
+    "100_free": {
+      "event_number": 26,
+      "michael": {"lane": 6, "seed": 50.82, "pb": 48.80, "seed_vs_pb_gap": -2.02},
+      "strategic_advantage": "PB is 2.02s faster than seed - MAJOR SURPRISE POTENTIAL",
+      "competitors": [
+        {"name": "Gordon, Aaron T", "lane": 4, "seed": 47.51, "pb": 47.51, "pb_source": "seed_matches_pi", "threat": "HIGH"},
+        {"name": "Soto, Bastian", "lane": 5, "seed": 48.98, "pb_estimate": 48.5, "pb_source": "estimated", "threat": "HIGH"},
+        {"name": "Domboru, Gavin R", "lane": 3, "seed": 50.43, "pb": 50.43, "pb_source": "swimcloud_scraped", "threat": "MEDIUM"},
+        {"name": "Sutphin, Ethan M", "lane": 2, "seed": 52.44, "pb_estimate": 52.0, "pb_source": "estimated", "threat": "LOW"},
+        {"name": "Kiser, Logan G", "lane": 7, "seed": 52.67, "pb": 53.13, "pb_source": "swimcloud_scraped", "threat": "LOW"},
+        {"name": "Ahmad, Kellen T", "lane": 1, "seed": 53.12, "pb_estimate": 53.0, "pb_source": "estimated", "threat": "LOW"},
+        {"name": "Badilla, Vincent N", "lane": 8, "seed": 53.69, "pb_estimate": 53.5, "pb_source": "estimated", "threat": "LOW"}
+      ]
+    },
+    "100_back": {
+      "event_number": 34,
+      "michael": {"lane": 2, "seed": 61.62, "pb": null, "notes": "Development event"},
+      "strategic_advantage": "None - top 4 are 6+ seconds faster. Focus on technique.",
+      "competitors": [
+        {"name": "Landry, Locky L", "lane": 4, "seed": 51.44, "pb": 51.44, "pb_source": "prodigy_seed_equals_pb", "threat": "HIGH", "notes": "10yo prodigy"},
+        {"name": "Soto, Bastian", "lane": 5, "seed": 53.77, "pb_estimate": 53.0, "pb_source": "estimated", "threat": "HIGH"},
+        {"name": "Gordon, Aaron T", "lane": 3, "seed": 54.59, "pb_estimate": 54.0, "pb_source": "estimated", "threat": "HIGH"},
+        {"name": "Domboru, Gavin R", "lane": 6, "seed": 55.29, "pb": 54.25, "pb_source": "swimcloud_scraped", "threat": "HIGH"},
+        {"name": "Sutphin, Ethan M", "lane": 7, "seed": 62.01, "pb_estimate": 62.0, "pb_source": "estimated", "threat": "LOW"},
+        {"name": "Sambevski, Jackson D", "lane": 1, "seed": 63.39, "pb_estimate": 63.0, "pb_source": "estimated", "threat": "LOW"},
+        {"name": "Baxter, Ian D", "lane": 8, "seed": 66.12, "pb_estimate": 66.0, "pb_source": "estimated", "threat": "LOW"}
+      ]
+    }
+  },
+  "key_rivals_summary": [
+    {
+      "name": "Soto, Bastian",
+      "team": "MELB-FL",
+      "relationship": "Teammate",
+      "swimcloud_id": 2928537,
+      "power_index": 70,
+      "events_shared": ["50 Free", "50 Fly", "100 Free", "100 Back", "Relay"],
+      "verified_times": {"100_fly": 54.25, "200_im": "2:07.00"},
+      "assessment": "Team's fastest sprinter. Training partner. Push each other."
+    },
+    {
+      "name": "Gordon, Aaron T", 
+      "team": "TMSC-FL",
+      "relationship": "Primary Rival",
+      "swimcloud_id": 1347466,
+      "power_index": 90,
+      "events_shared": ["50 Free", "50 Fly", "100 Free", "100 Back"],
+      "assessment": "Highest Power Index in field. Primary competition for top finishes."
+    },
+    {
+      "name": "Domboru, Gavin R",
+      "team": "MELB-FL", 
+      "relationship": "Teammate",
+      "swimcloud_id": 1518102,
+      "power_index": 37,
+      "events_shared": ["50 Free", "100 Free", "100 Back", "Relay"],
+      "verified_times": {"100_free": 50.43, "100_back": 54.25, "100_fly": 54.22},
+      "assessment": "Versatile backstroker. Relay partner. Solid mid-pack competitor."
+    }
+  ]
+}
