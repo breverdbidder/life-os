@@ -1,0 +1,58 @@
+{
+  "task": "harry_meisel_meet_prep",
+  "generated_at": "2025-12-12T21:45:00Z",
+  "meet": {
+    "name": "Harry Meisel Championships East",
+    "dates": ["2025-12-13", "2025-12-14"],
+    "location": "North County Aquatic Center, Sebastian, FL",
+    "departure_time": "06:30",
+    "arrival_target": "07:30"
+  },
+  "athlete": {
+    "name": "Michael Shapira",
+    "swimcloud_id": "3250085",
+    "power_index": 49.62,
+    "florida_rank": 116,
+    "verified_pbs": {
+      "50_free": "21.86",
+      "100_free": "48.80",
+      "100_fly": "55.87",
+      "200_free": "1:53.03"
+    }
+  },
+  "events": [
+    {"number": 42, "name": "50 Free", "heat": 1, "lane": 3, "seed": "23.22", "target": "21.50", "podium_probability": 0.65},
+    {"number": 28, "name": "50 Fly", "heat": 1, "lane": 3, "seed": "25.79", "target": "25.00", "podium_probability": 0.75},
+    {"number": 26, "name": "100 Free", "heat": 1, "lane": 6, "seed": "50.82", "target": "48.50", "podium_probability": 0.55},
+    {"number": 34, "name": "100 Back", "heat": 1, "lane": 2, "seed": "1:01.62", "target": "1:00.00", "podium_probability": 0.15},
+    {"number": 43, "name": "200 Medley Relay", "heat": 1, "lane": 5, "seed": "1:52.38", "role": "anchor"}
+  ],
+  "key_competitors": [
+    {"name": "Aaron Gordon", "team": "TMSC-FL", "swimcloud_id": "1733035", "power_index": 90, "threat": "HIGH"},
+    {"name": "Bastian Soto", "team": "MELB-FL", "swimcloud_id": "2928537", "power_index": 47, "threat": "HIGH", "relationship": "teammate"},
+    {"name": "Gavin Domboru", "team": "MELB-FL", "swimcloud_id": "1518102", "power_index": 37, "threat": "MEDIUM", "relationship": "teammate"}
+  ],
+  "strategic_advantage": {
+    "note": "PBs are FASTER than seed times",
+    "50_free_delta": "-1.36s",
+    "100_free_delta": "-2.02s"
+  },
+  "agent_status": {
+    "built": ["kosher_meal_diet", "swim_training_periodization"],
+    "partial": ["uf_recruiting"],
+    "pending_high": ["education_achievement", "school_comparison", "uf_recruiting"],
+    "pending_medium": ["school_visit_travel", "mental_performance"],
+    "pending_low": ["chabad_contacts", "engineering_opportunities", "nil", "family_coordination"]
+  },
+  "blockers": [
+    "GitHub Actions billing required ($4/mo Pro + $10 spending limit)",
+    "SwimCloud JavaScript rendering blocks automated scraping"
+  ],
+  "next_actions": [
+    "Race at Harry Meisel (Dec 13-14)",
+    "Log results to Supabase",
+    "Enable GitHub billing",
+    "Build Education Achievement agent",
+    "Build School Comparison agent"
+  ]
+}
