@@ -1,0 +1,87 @@
+name: Automated PB Scraping
+
+on:
+  # 72 hours before meets
+  schedule:
+    - cron: '0 11 * * *'  # 6 AM EST daily
+  
+  workflow_dispatch:
+    inputs:
+      swimmers:
+        description: 'Comma-separated swimmer names'
+        required: true
+        default: 'Bastian Soto,Aaron Gordon'
+      events:
+        description: 'Comma-separated events'
+        required: true
+        default: '100 Free,50 Free,100 Fly'
+
+jobs:
+  scrape-pbs:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      
+      - name: Install dependencies
+        run: pip install supabase httpx
+      
+      - name: Run PB Scraping
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          python3 << 'EOF'
+          import os
+          import sys
+          sys.path.insert(0, 'michael_d1_agents_v2')
+          
+          from orchestrator_v2 import MichaelD1OrchestratorV2
+          
+          swimmers = os.environ.get('INPUT_SWIMMERS', 'Bastian Soto,Aaron Gordon').split(',')
+          events = os.environ.get('INPUT_EVENTS', '100 Free,50 Free,100 Fly').split(',')
+          
+          print(f"🏊 Scraping PBs for: {swimmers}")
+          print(f"📊 Events: {events}")
+          
+          orchestrator = MichaelD1OrchestratorV2()
+          result = orchestrator.scrape_competitor_pbs(
+              [s.strip() for s in swimmers],
+              [e.strip() for e in events]
+          )
+          
+          print("\n✅ Results:")
+          for swimmer, pbs in result["pbs_found"].items():
+              print(f"  {swimmer}:")
+              for event, pb in pbs.items():
+                  print(f"    {event}: {pb.time} ({pb.meet_name}, {pb.date_achieved})")
+          
+          # Log to Supabase
+          try:
+              from supabase import create_client
+              url = os.environ.get('SUPABASE_URL')
+              key = os.environ.get('SUPABASE_KEY')
+              if url and key:
+                  client = create_client(url, key)
+                  from datetime import datetime
+                  for swimmer, pbs in result["pbs_found"].items():
+                      for event, pb in pbs.items():
+                          client.table('personal_best_times').upsert({
+                              'swimmer_name': swimmer,
+                              'event': event,
+                              'time': pb.time,
+                              'date_achieved': pb.date_achieved.isoformat(),
+                              'meet_name': pb.meet_name,
+                              'meet_location': pb.meet_location,
+                              'swim_club': pb.swim_club,
+                              'high_school': pb.high_school,
+                              'scraped_at': datetime.now().isoformat()
+                          }, on_conflict='swimmer_name,event').execute()
+                  print("\n📊 Logged to Supabase")
+          except Exception as e:
+              print(f"⚠️ Supabase: {e}")
+          EOF
