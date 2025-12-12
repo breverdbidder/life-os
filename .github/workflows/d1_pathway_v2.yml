@@ -1,0 +1,397 @@
+name: D1 Pathway Agent V2 - UF Priority
+
+on:
+  schedule:
+    # Run daily at 6:00 AM EST (11:00 UTC)
+    - cron: '0 11 * * *'
+  workflow_dispatch:
+    inputs:
+      agent:
+        description: 'Agent to run (all, improvements, competitors, meet_prep, recruiting)'
+        required: false
+        default: 'all'
+
+env:
+  SUPABASE_URL: https://mocerqjnksmhcjzxrewo.supabase.co
+  SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+  PRIMARY_TARGET: "University of Florida"
+  TARGET_CLASS: "2027"
+
+jobs:
+  uf-readiness-check:
+    runs-on: ubuntu-latest
+    name: UF Readiness Assessment
+    outputs:
+      uf_score: ${{ steps.assess.outputs.uf_score }}
+      days_to_signing: ${{ steps.assess.outputs.days_to_signing }}
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      
+      - name: Install dependencies
+        run: pip install supabase
+      
+      - name: Assess UF Readiness
+        id: assess
+        run: |
+          python << 'EOF'
+          import json
+          import os
+          from datetime import datetime
+
+          # Michael's current times
+          times = {
+              "fifty_free": "23.22",
+              "hundred_free": "50.82",
+              "hundred_fly": "57.21",
+              "hundred_back": "1:01.62"
+          }
+
+          # UF recruiting standards
+          uf_targets = {
+              "fifty_free": {"walk_on": 21.5, "scholarship": 20.5},
+              "hundred_free": {"walk_on": 46.5, "scholarship": 44.5},
+              "hundred_fly": {"walk_on": 51.0, "scholarship": 49.0},
+              "hundred_back": {"walk_on": 51.0, "scholarship": 49.0}
+          }
+
+          def time_to_sec(t):
+              if ":" in str(t):
+                  parts = str(t).split(":")
+                  return float(parts[0]) * 60 + float(parts[1])
+              return float(t)
+
+          # Calculate UF readiness score
+          total_score = 0
+          events = 0
+          
+          print("📊 UF READINESS ASSESSMENT")
+          print("=" * 50)
+          print(f"Primary Target: University of Florida - Class of 2027")
+          print("=" * 50)
+          
+          for event, time in times.items():
+              if event in uf_targets:
+                  events += 1
+                  current = time_to_sec(time)
+                  walk_on = uf_targets[event]["walk_on"]
+                  scholarship = uf_targets[event]["scholarship"]
+                  
+                  if current <= scholarship:
+                      score = 100
+                      status = "✅ SCHOLARSHIP"
+                  elif current <= walk_on:
+                      score = 70 + 30 * (walk_on - current) / (walk_on - scholarship)
+                      status = "🟡 WALK-ON"
+                  else:
+                      gap = current - walk_on
+                      score = max(0, 70 - gap * 10)
+                      status = "🔴 DEVELOPING"
+                  
+                  total_score += score
+                  gap = round(current - walk_on, 2)
+                  print(f"  {event:15} | {time:>8} | Target: {walk_on} | Gap: {gap:+.2f}s | {status}")
+
+          uf_score = round(total_score / events, 1) if events > 0 else 0
+          
+          # Days to signing
+          signing_date = datetime(2026, 11, 1)
+          days = (signing_date - datetime.now()).days
+          
+          print("")
+          print(f"📈 Overall UF Readiness Score: {uf_score}/100")
+          print(f"📅 Days to Early Signing Period: {days}")
+          
+          status = "ON TRACK" if uf_score >= 50 else "ACCELERATE TRAINING"
+          print(f"🎯 Status: {status}")
+
+          # Output for GitHub Actions
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
+              f.write(f"uf_score={uf_score}\n")
+              f.write(f"days_to_signing={days}\n")
+
+          # Save JSON
+          output = {
+              "assessment_date": datetime.now().isoformat(),
+              "primary_target": "University of Florida",
+              "target_class": 2027,
+              "uf_readiness_score": uf_score,
+              "days_to_signing": days,
+              "events": times,
+              "status": status
+          }
+          
+          with open("uf_readiness.json", "w") as f:
+              json.dump(output, f, indent=2)
+          EOF
+      
+      - name: Upload UF readiness
+        uses: actions/upload-artifact@v4
+        with:
+          name: uf-readiness
+          path: uf_readiness.json
+
+  competitor-analysis:
+    runs-on: ubuntu-latest
+    name: Competitor Analysis
+    needs: uf-readiness-check
+    
+    steps:
+      - name: Analyze UF 2027 Recruiting Class
+        run: |
+          python << 'EOF'
+          import json
+          from datetime import datetime
+
+          # UF 2027 recruiting class competitors
+          competitors = [
+              {"name": "Recruit A", "state": "TX", "fifty_free": "20.1", "hundred_free": "44.2", "status": "Uncommitted"},
+              {"name": "Recruit B", "state": "CA", "fifty_free": "20.5", "hundred_free": "44.8", "status": "Verbal UF"},
+              {"name": "Recruit C", "state": "FL", "fifty_free": "21.0", "hundred_free": "45.5", "status": "Uncommitted"},
+              {"name": "Recruit D", "state": "GA", "fifty_free": "21.2", "hundred_free": "46.0", "status": "Verbal UGA"},
+          ]
+
+          michael = {"name": "Michael Shapira", "fifty_free": "23.22", "hundred_free": "50.82"}
+
+          # Add Michael and sort
+          all_swimmers = competitors + [michael]
+          sorted_by_100 = sorted(all_swimmers, key=lambda x: float(x["hundred_free"]))
+
+          print("🏊 UF 2027 RECRUITING CLASS ANALYSIS")
+          print("=" * 50)
+          
+          for i, swimmer in enumerate(sorted_by_100):
+              marker = "👤" if swimmer["name"] == "Michael Shapira" else "  "
+              print(f"{marker} {i+1}. {swimmer['name']:20} | 100 Free: {swimmer['hundred_free']}")
+
+          michael_rank = next(i+1 for i, s in enumerate(sorted_by_100) if s["name"] == "Michael Shapira")
+          gap = float(michael["hundred_free"]) - float(sorted_by_100[0]["hundred_free"])
+
+          print("")
+          print(f"📊 Michael's Ranking: {michael_rank}/{len(sorted_by_100)}")
+          print(f"📉 Gap to Top Recruit: {gap:.2f} seconds")
+          print(f"🎯 Target: Top 3 by signing period")
+
+          output = {
+              "analysis_date": datetime.now().isoformat(),
+              "target_class": "UF 2027",
+              "michael_ranking": michael_rank,
+              "gap_to_top": gap,
+              "competitors": competitors
+          }
+          
+          with open("competitor_analysis.json", "w") as f:
+              json.dump(output, f, indent=2)
+          EOF
+      
+      - name: Upload competitor analysis
+        uses: actions/upload-artifact@v4
+        with:
+          name: competitor-analysis
+          path: competitor_analysis.json
+
+  engineering-opportunities:
+    runs-on: ubuntu-latest
+    name: Engineering + Real Estate Minor Analysis
+    
+    steps:
+      - name: Analyze Programs
+        run: |
+          python << 'EOF'
+          import json
+
+          # Schools ranked by Real Estate Minor availability (Priority 1)
+          schools = [
+              {
+                  "rank": 1,
+                  "school": "Florida",
+                  "engineering_rank": 27,
+                  "real_estate_minor": True,
+                  "re_program": "Bergstrom Center for Real Estate Studies",
+                  "re_courses": ["REE 3043 Principles", "REE 4103 Finance", "REE 4204 Appraisal"],
+                  "notes": "Top 5 RE program nationally, perfect for Everest Capital"
+              },
+              {
+                  "rank": 2,
+                  "school": "Texas",
+                  "engineering_rank": 10,
+                  "real_estate_minor": True,
+                  "re_program": "McCombs Real Estate Center",
+                  "notes": "Strong RE program, Bob Bowman coaching"
+              },
+              {
+                  "rank": 3,
+                  "school": "Michigan",
+                  "engineering_rank": 4,
+                  "real_estate_minor": True,
+                  "re_program": "Ross School of Business",
+                  "notes": "Top engineering + RE minor available"
+              },
+              {
+                  "rank": 4,
+                  "school": "NC State",
+                  "engineering_rank": 30,
+                  "real_estate_minor": True,
+                  "re_program": "Poole College Real Estate",
+                  "notes": "Good RE program, sprint-focused swim team"
+              },
+              {
+                  "rank": 5,
+                  "school": "Texas A&M",
+                  "engineering_rank": 12,
+                  "real_estate_minor": True,
+                  "re_program": "Mays Business School",
+                  "notes": "Strong engineering, RE minor available"
+              },
+              {
+                  "rank": 6,
+                  "school": "Georgia Tech",
+                  "engineering_rank": 4,
+                  "real_estate_minor": False,
+                  "re_alternative": "Building Construction",
+                  "notes": "Top 5 engineering but no RE minor"
+              }
+          ]
+
+          print("🎓 ENGINEERING + REAL ESTATE MINOR RANKINGS")
+          print("=" * 60)
+          print("Priority: Real Estate Minor Availability First")
+          print("=" * 60)
+          
+          for s in schools:
+              re_status = "✅ RE Minor" if s["real_estate_minor"] else "❌ No RE Minor"
+              print(f"{s['rank']}. {s['school']:15} | Eng #{s['engineering_rank']:2} | {re_status}")
+
+          print("")
+          print("🎯 RECOMMENDATION: UF offers ideal combination:")
+          print("   • Top-5 Real Estate program nationally")
+          print("   • Competitive engineering (#27)")
+          print("   • Elite SEC swimming program")
+          print("   • Florida resident tuition advantage")
+
+          with open("engineering_analysis.json", "w") as f:
+              json.dump({"schools": schools, "recommendation": "Florida"}, f, indent=2)
+          EOF
+      
+      - name: Upload engineering analysis
+        uses: actions/upload-artifact@v4
+        with:
+          name: engineering-analysis
+          path: engineering_analysis.json
+
+  meet-preparation:
+    runs-on: ubuntu-latest
+    name: Meet Preparation Agent
+    
+    steps:
+      - name: Prepare for Harry Meisel
+        run: |
+          python << 'EOF'
+          import json
+          from datetime import datetime
+
+          meet = {
+              "name": "Harry Meisel Championships East",
+              "dates": "December 13-14, 2025",
+              "importance": "CRITICAL - Last meet before recruiting push",
+              "entries": [
+                  {"event": "100 Free", "seed": "50.82", "target": "49.5", "heat": 1, "lane": 6},
+                  {"event": "50 Fly", "seed": "25.79", "target": "25.0", "heat": 1, "lane": 3},
+                  {"event": "100 Back", "seed": "1:01.62", "target": "59.9", "heat": 1, "lane": 2},
+                  {"event": "50 Free", "seed": "23.22", "target": "22.5", "heat": 1, "lane": 3}
+              ],
+              "strategy": {
+                  "50_free": "Aggressive start, high tempo through 25",
+                  "100_free": "Controlled 24.5 first 50, negative split to 25.0",
+                  "50_fly": "Minimize breathing, strong underwater",
+                  "100_back": "Strong underwaters each wall, even tempo"
+              },
+              "warmup": {
+                  "arrive": "60 min before first event",
+                  "routine": ["800 easy", "4x50 build", "4x25 race pace", "50 easy + 25 sprint pre-race"]
+              },
+              "uf_implications": "Strong times here = UF recruiting email update immediately after"
+          }
+
+          print("🏊 HARRY MEISEL CHAMPIONSHIPS PREPARATION")
+          print("=" * 50)
+          print(f"Date: {meet['dates']}")
+          print(f"Importance: {meet['importance']}")
+          print("")
+          print("📋 ENTRIES & TARGETS:")
+          for e in meet["entries"]:
+              print(f"  {e['event']:12} | Seed: {e['seed']:>8} | Target: {e['target']:>8}")
+          
+          print("")
+          print("🎯 UF IMPLICATION: Strong performance = immediate coach outreach")
+
+          with open("meet_prep.json", "w") as f:
+              json.dump(meet, f, indent=2)
+          EOF
+      
+      - name: Upload meet prep
+        uses: actions/upload-artifact@v4
+        with:
+          name: meet-preparation
+          path: meet_prep.json
+
+  log-to-supabase:
+    runs-on: ubuntu-latest
+    name: Log to Supabase
+    needs: [uf-readiness-check, competitor-analysis, engineering-opportunities, meet-preparation]
+    
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+      
+      - name: Log D1 Pathway Update
+        run: |
+          pip install supabase
+          python << 'EOF'
+          import json
+          import os
+          from datetime import datetime
+          from supabase import create_client
+
+          supabase = create_client(
+              os.environ.get("SUPABASE_URL", ""),
+              os.environ.get("SUPABASE_KEY", "")
+          )
+
+          # Load artifacts
+          try:
+              with open("uf-readiness/uf_readiness.json") as f:
+                  uf_data = json.load(f)
+          except:
+              uf_data = {"uf_readiness_score": 0}
+
+          # Log to insights
+          insight = {
+              "insight_type": "D1_PATHWAY_V2_UPDATE",
+              "title": f"D1 Pathway V2 - UF Score: {uf_data.get('uf_readiness_score', 0)}/100",
+              "description": f"Daily UF readiness assessment. Target: UF 2027. Days to signing: {uf_data.get('days_to_signing', 0)}",
+              "metadata": uf_data,
+              "confidence": 0.95
+          }
+
+          try:
+              response = supabase.table("insights").insert(insight).execute()
+              print(f"✅ Logged to Supabase: {response.data[0]['id'] if response.data else 'success'}")
+          except Exception as e:
+              print(f"⚠️ Supabase error: {e}")
+
+          print("")
+          print("📊 D1 PATHWAY V2 DAILY UPDATE COMPLETE")
+          print(f"🎯 Primary Target: University of Florida - Class of 2027")
+          print(f"📈 UF Readiness: {uf_data.get('uf_readiness_score', 0)}/100")
+          print(f"📅 Days to Signing: {uf_data.get('days_to_signing', 0)}")
+          EOF
+        env:
+          SUPABASE_URL: ${{ env.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ env.SUPABASE_KEY }}
