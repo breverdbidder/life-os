@@ -1,0 +1,219 @@
+name: SwimCloud Satellite Beach Scraper
+
+on:
+  workflow_dispatch:
+    inputs:
+      swimmer_ids:
+        description: 'Comma-separated SwimCloud IDs'
+        required: false
+        default: '3250085,2928537,1518102,1754554'
+
+jobs:
+  scrape:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      
+      - name: Install dependencies
+        run: |
+          pip install playwright beautifulsoup4
+          playwright install chromium
+      
+      - name: Create scraper script
+        run: |
+          cat > scrape_swimcloud.py << 'PYTHON'
+          import asyncio
+          import json
+          import re
+          import sys
+          from datetime import datetime
+          from playwright.async_api import async_playwright
+
+          SWIMMERS = {
+              "3250085": "Michael Shapira",
+              "2928537": "Bastian Soto", 
+              "1518102": "Gavin Domboru",
+              "1754554": "Max Morgan"
+          }
+
+          async def scrape_swimmer(page, swimmer_id):
+              """Scrape a single swimmer's profile."""
+              url = f"https://www.swimcloud.com/swimmer/{swimmer_id}/"
+              print(f"\n{'='*60}")
+              print(f"Scraping: {SWIMMERS.get(swimmer_id, swimmer_id)}")
+              print(f"URL: {url}")
+              
+              try:
+                  await page.goto(url, wait_until="networkidle", timeout=60000)
+                  await page.wait_for_timeout(3000)
+                  
+                  data = {
+                      "swimmer_id": swimmer_id,
+                      "name": SWIMMERS.get(swimmer_id, "Unknown"),
+                      "scraped_at": datetime.now().isoformat(),
+                      "profile": {},
+                      "times": [],
+                      "highlights": []
+                  }
+                  
+                  # Get swimmer name from h1
+                  try:
+                      h1 = await page.locator("h1").first.text_content()
+                      data["name"] = h1.strip() if h1 else data["name"]
+                  except:
+                      pass
+                  
+                  # Get power index and ranks
+                  try:
+                      text = await page.locator("body").text_content()
+                      
+                      pi_match = re.search(r'Power index\s*(\d+\.?\d*)', text, re.I)
+                      if pi_match:
+                          data["profile"]["power_index"] = float(pi_match.group(1))
+                      
+                      fl_rank = re.search(r'Florida rank\s*(\d+)', text, re.I)
+                      if fl_rank:
+                          data["profile"]["florida_rank"] = int(fl_rank.group(1))
+                      
+                      class_match = re.search(r'Class\s*·?\s*(\d{4})', text, re.I)
+                      if class_match:
+                          data["profile"]["graduation_year"] = int(class_match.group(1))
+                  except Exception as e:
+                      print(f"Profile extraction error: {e}")
+                  
+                  # Get times from tables
+                  try:
+                      rows = await page.locator("table tr").all()
+                      for row in rows:
+                          text = await row.text_content()
+                          
+                          # Match patterns like "50 Y Free" or "100 Y Fly"
+                          event_match = re.search(r'(\d+)\s*Y\s*(Free|Fly|Back|Breast|IM)', text, re.I)
+                          time_match = re.search(r'(\d{1,2}:\d{2}\.\d{2}|\d{2}\.\d{2})', text)
+                          
+                          if event_match and time_match:
+                              event = f"{event_match.group(1)} Y {event_match.group(2).title()}"
+                              time_str = time_match.group(1)
+                              
+                              # Check for PB marker
+                              is_pb = "PB" in text
+                              
+                              # Get place if present
+                              place_match = re.search(r'(\d+)(st|nd|rd|th)', text, re.I)
+                              place = place_match.group(0) if place_match else None
+                              
+                              data["times"].append({
+                                  "event": event,
+                                  "time": time_str,
+                                  "is_pb": is_pb,
+                                  "place": place
+                              })
+                  except Exception as e:
+                      print(f"Times extraction error: {e}")
+                  
+                  # Get highlights section
+                  try:
+                      highlights_text = await page.locator("body").text_content()
+                      
+                      # Find state championship results
+                      state_matches = re.findall(
+                          r'(\d+)(st|nd|rd|th)\s+place\s+(\d+\s*Y\s*\w+)\s*[–-]\s*(\d{1,2}:\d{2}\.\d{2}|\d{2}\.\d{2})',
+                          highlights_text, re.I
+                      )
+                      for match in state_matches:
+                          data["highlights"].append({
+                              "place": f"{match[0]}{match[1]}",
+                              "event": match[2],
+                              "time": match[3]
+                          })
+                  except Exception as e:
+                      print(f"Highlights extraction error: {e}")
+                  
+                  # Print results
+                  print(f"\nName: {data['name']}")
+                  print(f"Power Index: {data['profile'].get('power_index', 'N/A')}")
+                  print(f"Florida Rank: {data['profile'].get('florida_rank', 'N/A')}")
+                  print(f"Class: {data['profile'].get('graduation_year', 'N/A')}")
+                  print(f"Times found: {len(data['times'])}")
+                  print(f"Highlights: {len(data['highlights'])}")
+                  
+                  if data['times']:
+                      print("\nBest Times:")
+                      for t in data['times'][:10]:
+                          pb = " (PB)" if t.get('is_pb') else ""
+                          place = f" [{t['place']}]" if t.get('place') else ""
+                          print(f"  {t['event']}: {t['time']}{pb}{place}")
+                  
+                  if data['highlights']:
+                      print("\nHighlights:")
+                      for h in data['highlights'][:5]:
+                          print(f"  {h['place']} {h['event']}: {h['time']}")
+                  
+                  return data
+                  
+              except Exception as e:
+                  print(f"Error scraping {swimmer_id}: {e}")
+                  return {"swimmer_id": swimmer_id, "error": str(e)}
+
+          async def main():
+              swimmer_ids = sys.argv[1].split(',') if len(sys.argv) > 1 else list(SWIMMERS.keys())
+              
+              async with async_playwright() as p:
+                  browser = await p.chromium.launch(headless=True)
+                  context = await browser.new_context(
+                      user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+                  )
+                  page = await context.new_page()
+                  
+                  results = {}
+                  for sid in swimmer_ids:
+                      sid = sid.strip()
+                      results[sid] = await scrape_swimmer(page, sid)
+                      await asyncio.sleep(2)  # Be polite
+                  
+                  await browser.close()
+              
+              # Save results
+              output = {
+                  "scraped_at": datetime.now().isoformat(),
+                  "source": "SwimCloud via Playwright",
+                  "swimmers": results
+              }
+              
+              with open("satellite_beach_swimmers.json", "w") as f:
+                  json.dump(output, f, indent=2)
+              
+              print(f"\n{'='*60}")
+              print(f"Results saved to satellite_beach_swimmers.json")
+              print(f"{'='*60}")
+              
+              return output
+
+          if __name__ == "__main__":
+              asyncio.run(main())
+          PYTHON
+      
+      - name: Run scraper
+        run: python scrape_swimcloud.py "${{ github.event.inputs.swimmer_ids || '3250085,2928537,1518102,1754554' }}"
+      
+      - name: Upload results
+        uses: actions/upload-artifact@v4
+        with:
+          name: swimcloud-results-${{ github.run_number }}
+          path: satellite_beach_swimmers.json
+      
+      - name: Commit results to repo
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          mkdir -p michael_d1_agents_v3/data
+          mv satellite_beach_swimmers.json michael_d1_agents_v3/data/
+          git add michael_d1_agents_v3/data/satellite_beach_swimmers.json
+          git commit -m "data: SwimCloud scrape $(date +'%Y-%m-%d %H:%M')" || echo "No changes"
+          git push
