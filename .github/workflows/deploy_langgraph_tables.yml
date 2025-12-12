@@ -1,0 +1,40 @@
+name: Deploy LangGraph Tables
+
+on:
+  workflow_dispatch:
+
+env:
+  SUPABASE_URL: https://mocerqjnksmhcjzxrewo.supabase.co
+  
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        
+      - name: Install psql
+        run: sudo apt-get install -y postgresql-client
+        
+      - name: Deploy LangGraph Tables
+        env:
+          PGPASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+        run: |
+          echo "=== Deploying LangGraph Tables ==="
+          
+          # Try pooler connection first
+          psql "postgresql://postgres.mocerqjnksmhcjzxrewo:${PGPASSWORD}@aws-0-us-east-1.pooler.supabase.com:6543/postgres?sslmode=require" \
+            -f migrations/002_langgraph_tables.sql || \
+          psql "postgresql://postgres:${PGPASSWORD}@db.mocerqjnksmhcjzxrewo.supabase.co:5432/postgres?sslmode=require" \
+            -f migrations/002_langgraph_tables.sql
+          
+          echo "✅ LangGraph tables deployed!"
+      
+      - name: Verify Tables
+        env:
+          PGPASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+        run: |
+          echo "=== Verifying tables ==="
+          psql "postgresql://postgres.mocerqjnksmhcjzxrewo:${PGPASSWORD}@aws-0-us-east-1.pooler.supabase.com:6543/postgres?sslmode=require" \
+            -c "SELECT table_name FROM information_schema.tables WHERE table_schema='public' AND table_name LIKE '%langgraph%' OR table_name='orchestrated_tasks'" || true
