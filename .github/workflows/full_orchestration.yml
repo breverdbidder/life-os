@@ -1,0 +1,144 @@
+name: Michael D1 Full Orchestration
+
+on:
+  schedule:
+    # Daily at 6 AM EST
+    - cron: '0 11 * * *'
+    
+  workflow_dispatch:
+    inputs:
+      action:
+        description: 'Action to perform'
+        required: true
+        type: choice
+        options:
+          - scrape_all_competitors
+          - generate_meet_prep
+          - update_uf_progress
+          - full_analysis
+      meet_name:
+        description: 'Meet name (for meet_prep action)'
+        required: false
+        default: 'Harry Meisel Championships'
+
+env:
+  SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+  SUPABASE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+  APIFY_API_TOKEN: ${{ secrets.APIFY_API_TOKEN }}
+
+jobs:
+  orchestrate:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      
+      - name: Install dependencies
+        run: pip install supabase httpx
+      
+      - name: Run Full Orchestration
+        run: |
+          python3 << 'EOF'
+          import os
+          import sys
+          import json
+          from datetime import datetime, date, timedelta
+          
+          sys.path.insert(0, 'michael_d1_agents_v2')
+          
+          from orchestrator_v2_integrated import MichaelD1OrchestratorV2Integrated
+          from supabase_client import SupabaseClient
+          
+          print("🏊 Michael D1 V2.2 - Full Orchestration")
+          print("=" * 60)
+          
+          # Initialize
+          orchestrator = MichaelD1OrchestratorV2Integrated()
+          db = SupabaseClient()
+          
+          action = os.environ.get('INPUT_ACTION', 'full_analysis')
+          print(f"Action: {action}")
+          
+          # 1. Get upcoming meets
+          print("\n📅 Checking upcoming meets...")
+          meets = db.get_upcoming_meets(14)  # Next 14 days
+          print(f"   Found {len(meets)} upcoming meets")
+          
+          for meet in meets:
+              print(f"   • {meet['meet_name']} - {meet['meet_date']}")
+          
+          # 2. Scrape competitor PBs for meets in next 72 hours
+          print("\n🔍 Scraping competitor PBs...")
+          today = date.today()
+          
+          for meet in meets:
+              meet_date = date.fromisoformat(meet['meet_date'])
+              days_until = (meet_date - today).days
+              
+              if days_until <= 3:
+                  print(f"   ⚡ {meet['meet_name']} in {days_until} days - triggering scrape")
+                  
+                  competitors = meet.get('competitors', ['Bastian Soto', 'Aaron Gordon'])
+                  events = meet.get('events', ['100 Free', '50 Free', '100 Fly'])
+                  
+                  result = orchestrator.scrape_all_competitors()
+                  print(f"   ✅ Scraped {result['swimmers_scraped']} swimmers")
+                  
+                  # Log to Supabase
+                  for swimmer, data in result.get('data', {}).items():
+                      for event, pb in data.get('pbs', {}).items():
+                          from supabase_client import PersonalBestRecord
+                          record = PersonalBestRecord(
+                              swimmer_name=swimmer,
+                              event=event,
+                              time=pb['time'],
+                              date_achieved=pb.get('date'),
+                              meet_name=pb.get('meet'),
+                              swim_club=data.get('club'),
+                              high_school=data.get('high_school'),
+                              source='swimcloud'
+                          )
+                          db.upsert_pb(record)
+                  
+                  # Generate meet prep document
+                  print(f"   📄 Generating meet prep document...")
+                  doc = orchestrator.generate_meet_prep_document(
+                      meet['meet_name'],
+                      meet_date,
+                      events,
+                      competitors
+                  )
+                  
+                  # Save to file
+                  filename = f"{meet['meet_name'].replace(' ', '_')}_MeetPrep_{today.isoformat()}.md"
+                  with open(filename, 'w') as f:
+                      f.write(doc)
+                  print(f"   ✅ Saved: {filename}")
+          
+          # 3. Update UF progress
+          print("\n🎯 Updating UF progress...")
+          progress = db.get_uf_progress()
+          for p in progress:
+              print(f"   • {p['event']}: {p['current_pb']} → {p['uf_target']} (gap: {p['gap']})")
+          
+          # 4. Log execution
+          print("\n📊 System Status:")
+          status = orchestrator.get_system_status()
+          print(f"   Agents: {status['agents']}")
+          print(f"   MCP Servers: {status['mcp_servers']}")
+          print(f"   MCP Tools: {status['mcp_tools']}")
+          
+          print("\n" + "=" * 60)
+          print("✅ Orchestration complete")
+          EOF
+      
+      - name: Upload meet prep documents
+        uses: actions/upload-artifact@v4
+        with:
+          name: meet-prep-documents
+          path: "*.md"
+          if-no-files-found: ignore
