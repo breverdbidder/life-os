@@ -1,4 +1,4 @@
-name: SwimCloud PB Scraper
+name: SwimCloud Scraper - Michael Shapira
 
 on:
   workflow_dispatch:
@@ -13,240 +13,253 @@ on:
         default: 'Michael Shapira'
 
 jobs:
-  scrape:
+  scrape-swimcloud:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     
     steps:
-      - uses: actions/checkout@v4
-      
-      - uses: actions/setup-python@v5
+      - name: Checkout
+        uses: actions/checkout@v4
+        
+      - name: Setup Python
+        uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-      
+          
       - name: Install dependencies
+        run: pip install requests
+          
+      - name: Scrape SwimCloud with Apify
+        env:
+          APIFY_API_TOKEN: ${{ secrets.APIFY_API_TOKEN }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+          SWIMMER_ID: ${{ github.event.inputs.swimmer_id || '3250085' }}
+          SWIMMER_NAME: ${{ github.event.inputs.swimmer_name || 'Michael Shapira' }}
         run: |
-          pip install playwright beautifulsoup4 requests
-          playwright install chromium
-      
-      - name: Scrape SwimCloud
-        id: scrape
-        run: |
-          python3 << 'SCRAPE_EOF'
-          import asyncio
-          import json
-          import re
+          python3 << 'SCRAPER_EOF'
           import os
-          from datetime import datetime
-          from bs4 import BeautifulSoup
-          from playwright.async_api import async_playwright
-
-          SWIMMER_ID = "${{ github.event.inputs.swimmer_id }}"
-          SWIMMER_NAME = "${{ github.event.inputs.swimmer_name }}"
-
-          async def scrape_swimcloud():
-              print(f"🏊 Scraping SwimCloud for {SWIMMER_NAME} (ID: {SWIMMER_ID})")
+          import json
+          import time
+          import requests
+          from datetime import datetime, timezone
+          
+          APIFY_TOKEN = os.environ.get('APIFY_API_TOKEN')
+          SUPABASE_URL = os.environ.get('SUPABASE_URL', 'https://mocerqjnksmhcjzxrewo.supabase.co')
+          SUPABASE_KEY = os.environ.get('SUPABASE_KEY')
+          SWIMMER_ID = os.environ.get('SWIMMER_ID', '3250085')
+          SWIMMER_NAME = os.environ.get('SWIMMER_NAME', 'Michael Shapira')
+          
+          print(f"🏊 SwimCloud Scraper")
+          print(f"   Swimmer: {SWIMMER_NAME} (ID: {SWIMMER_ID})")
+          print(f"   Token: {'SET' if APIFY_TOKEN else 'NOT SET'}")
+          
+          if not APIFY_TOKEN:
+              print("❌ APIFY_API_TOKEN not set!")
+              exit(1)
+          
+          # URLs to scrape
+          urls = [
+              f"https://www.swimcloud.com/swimmer/{SWIMMER_ID}/",
+              f"https://www.swimcloud.com/swimmer/{SWIMMER_ID}/times/"
+          ]
+          
+          # Apify Web Scraper config
+          scraper_input = {
+              "startUrls": [{"url": url} for url in urls],
+              "pageFunction": """
+          async function pageFunction(context) {
+              const { request, page, log } = context;
+              log.info('Processing: ' + request.url);
               
-              async with async_playwright() as p:
-                  browser = await p.chromium.launch(headless=True)
-                  context = await browser.new_context(
-                      user_agent='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-                  )
-                  page = await context.new_page()
+              await page.waitForTimeout(5000);
+              
+              const data = await page.evaluate(() => {
+                  const result = {
+                      url: window.location.href,
+                      name: '',
+                      team: '',
+                      times: {},
+                      raw_times: [],
+                      text_sample: ''
+                  };
                   
-                  # Navigate to times page
-                  url = f"https://www.swimcloud.com/swimmer/{SWIMMER_ID}/times/"
-                  print(f"Navigating to: {url}")
+                  // Get swimmer name
+                  const h1 = document.querySelector('h1');
+                  if (h1) result.name = h1.textContent.trim();
                   
-                  await page.goto(url, wait_until='networkidle', timeout=60000)
-                  await asyncio.sleep(5)  # Wait for full render
+                  // Get team
+                  const teamEl = document.querySelector('a[href*="/team/"]');
+                  if (teamEl) result.team = teamEl.textContent.trim();
                   
-                  # Get page content
-                  content = await page.content()
-                  print(f"Page loaded: {len(content)} bytes")
+                  // Get page text
+                  const bodyText = document.body.innerText;
+                  result.text_sample = bodyText.substring(0, 3000);
                   
-                  # Parse with BeautifulSoup
-                  soup = BeautifulSoup(content, 'html.parser')
+                  // Find all table rows with times
+                  document.querySelectorAll('tr').forEach(row => {
+                      const text = row.textContent;
+                      const timeMatch = text.match(/(\\d{1,2}:\\d{2}\\.\\d{2}|\\d{2}\\.\\d{2})/);
+                      if (timeMatch) {
+                          result.raw_times.push({
+                              row: text.trim().substring(0, 200),
+                              time: timeMatch[1]
+                          });
+                      }
+                  });
                   
-                  # Extract swimmer name
-                  name_elem = soup.select_one('h1, .swimmer-name, [class*="name"]')
-                  print(f"Name element: {name_elem.text if name_elem else 'Not found'}")
+                  // Parse specific events
+                  const eventPatterns = {
+                      '50 Free': /50\\s*(?:Y(?:ard)?)?\\s*Free[^\\d]*(\\d{2}\\.\\d{2})/gi,
+                      '100 Free': /100\\s*(?:Y(?:ard)?)?\\s*Free[^\\d]*(\\d{2}\\.\\d{2}|\\d:\\d{2}\\.\\d{2})/gi,
+                      '200 Free': /200\\s*(?:Y(?:ard)?)?\\s*Free[^\\d]*(\\d:\\d{2}\\.\\d{2})/gi,
+                      '100 Fly': /100\\s*(?:Y(?:ard)?)?\\s*(?:Fly|Butterfly)[^\\d]*(\\d{2}\\.\\d{2}|\\d:\\d{2}\\.\\d{2})/gi,
+                      '100 Back': /100\\s*(?:Y(?:ard)?)?\\s*Back[^\\d]*(\\d{2}\\.\\d{2}|\\d:\\d{2}\\.\\d{2})/gi
+                  };
                   
-                  # Find all time tables
-                  tables = soup.find_all('table')
-                  print(f"Found {len(tables)} tables")
-                  
-                  personal_bests = []
-                  
-                  # Look for PB times in various formats
-                  # SwimCloud typically shows times in tables with event, time, meet, date
-                  for table in tables:
-                      rows = table.find_all('tr')
-                      for row in rows:
-                          cells = row.find_all(['td', 'th'])
-                          if len(cells) >= 2:
-                              text = ' | '.join([c.get_text(strip=True) for c in cells])
-                              # Look for time patterns
-                              if re.search(r'\d{1,2}:\d{2}\.\d{2}|\d{2}\.\d{2}', text):
-                                  personal_bests.append(text)
-                  
-                  # Also try to find times in divs/spans
-                  time_elements = soup.find_all(string=re.compile(r'^\d{1,2}:\d{2}\.\d{2}$|^\d{2}\.\d{2}$'))
-                  for elem in time_elements:
-                      parent = elem.parent
-                      if parent:
-                          # Get context around the time
-                          context_text = parent.get_text(strip=True)
-                          if context_text not in personal_bests:
-                              personal_bests.append(context_text)
-                  
-                  # Get full page text for parsing
-                  page_text = soup.get_text(separator='\n', strip=True)
-                  
-                  # Save results
-                  results = {
-                      "swimmer_id": SWIMMER_ID,
-                      "swimmer_name": SWIMMER_NAME,
-                      "scraped_at": datetime.now().isoformat(),
-                      "url": url,
-                      "personal_bests_raw": personal_bests[:50],  # First 50
-                      "page_text_sample": page_text[:5000]
+                  for (const [event, pattern] of Object.entries(eventPatterns)) {
+                      const match = pattern.exec(bodyText);
+                      if (match) {
+                          result.times[event] = match[1];
+                      }
                   }
                   
-                  with open('swimcloud_results.json', 'w') as f:
-                      json.dump(results, f, indent=2)
-                  
-                  # Also save full HTML for debugging
-                  with open('swimcloud_full.html', 'w') as f:
-                      f.write(content)
-                  
-                  print(f"\n✅ Found {len(personal_bests)} potential time entries")
-                  print(f"Sample entries: {personal_bests[:5]}")
-                  
-                  await browser.close()
-                  return results
-
-          results = asyncio.run(scrape_swimcloud())
-          print(json.dumps(results, indent=2))
-          SCRAPE_EOF
-      
-      - name: Parse and Structure Data
-        run: |
-          python3 << 'PARSE_EOF'
-          import json
-          import re
-          from datetime import datetime
-
-          # Load raw results
-          with open('swimcloud_results.json', 'r') as f:
-              raw = json.load(f)
-
-          print("🔍 Parsing SwimCloud data...")
-          print(f"Raw entries: {len(raw.get('personal_bests_raw', []))}")
-
-          # Parse the page text to extract structured PB data
-          page_text = raw.get('page_text_sample', '')
+                  return result;
+              });
+              
+              return data;
+          }
+              """,
+              "proxyConfiguration": {"useApifyProxy": True},
+              "maxConcurrency": 1,
+              "maxRequestsPerCrawl": 5
+          }
           
-          # Common event names
-          events = ['50 Free', '100 Free', '200 Free', '500 Free', '1000 Free', '1650 Free',
-                    '50 Back', '100 Back', '200 Back',
-                    '50 Breast', '100 Breast', '200 Breast', 
-                    '50 Fly', '100 Fly', '200 Fly',
-                    '100 IM', '200 IM', '400 IM']
-
-          # Time pattern
-          time_pattern = r'(\d{1,2}:\d{2}\.\d{2}|\d{2}\.\d{2})'
+          print("\n📡 Starting Apify Web Scraper...")
           
-          # Date patterns
-          date_patterns = [
-              r'(\w{3,9}\s+\d{1,2},?\s+\d{4})',  # Month DD, YYYY
-              r'(\d{1,2}/\d{1,2}/\d{2,4})',       # MM/DD/YYYY
-          ]
-
-          structured_pbs = []
+          response = requests.post(
+              "https://api.apify.com/v2/acts/apify~web-scraper/runs",
+              headers={
+                  "Authorization": f"Bearer {APIFY_TOKEN}",
+                  "Content-Type": "application/json"
+              },
+              json=scraper_input,
+              timeout=60
+          )
           
-          # Try to match events with times
-          for event in events:
-              # Find event mentions in text
-              event_pattern = re.compile(rf'{event}[^\n]*?({time_pattern})', re.IGNORECASE)
-              matches = event_pattern.findall(page_text)
-              if matches:
-                  for match in matches:
-                      time = match[0] if isinstance(match, tuple) else match
-                      structured_pbs.append({
-                          "event": event,
-                          "time": time,
-                          "course": "SCY",  # Default
-                          "source": "swimcloud"
-                      })
-
-          # Save structured data
+          if response.status_code != 201:
+              print(f"❌ Failed to start: {response.status_code}")
+              print(response.text[:500])
+              exit(1)
+          
+          run_data = response.json()
+          run_id = run_data["data"]["id"]
+          print(f"✅ Run started: {run_id}")
+          
+          # Wait for completion
+          for i in range(24):
+              time.sleep(10)
+              
+              status_resp = requests.get(
+                  f"https://api.apify.com/v2/actor-runs/{run_id}",
+                  headers={"Authorization": f"Bearer {APIFY_TOKEN}"},
+                  timeout=30
+              )
+              
+              status = status_resp.json()["data"]["status"]
+              print(f"   [{i*10}s] Status: {status}")
+              
+              if status in ["SUCCEEDED", "FAILED", "ABORTED", "TIMED-OUT"]:
+                  break
+          
+          if status != "SUCCEEDED":
+              print(f"❌ Run failed: {status}")
+              exit(1)
+          
+          # Get results
+          dataset_id = status_resp.json()["data"]["defaultDatasetId"]
+          results = requests.get(
+              f"https://api.apify.com/v2/datasets/{dataset_id}/items",
+              headers={"Authorization": f"Bearer {APIFY_TOKEN}"},
+              timeout=30
+          ).json()
+          
+          print(f"\n{'='*50}")
+          print(f"📊 RESULTS FOR {SWIMMER_NAME}")
+          print(f"{'='*50}")
+          
+          # Process results
+          all_times = {}
+          raw_data = []
+          
+          for item in results:
+              if 'times' in item:
+                  all_times.update(item.get('times', {}))
+              if 'raw_times' in item:
+                  raw_data.extend(item.get('raw_times', []))
+              if 'text_sample' in item:
+                  print(f"\n--- Page Text Sample ---")
+                  print(item['text_sample'][:1000])
+          
+          if all_times:
+              print(f"\n🏊 PERSONAL BEST TIMES:")
+              for event, t in sorted(all_times.items()):
+                  print(f"   {event}: {t}")
+          else:
+              print("\n⚠️ No times extracted via patterns")
+              print(f"Raw time data found: {len(raw_data)} rows")
+              for row in raw_data[:10]:
+                  print(f"   {row}")
+          
+          # Save results
           output = {
-              "swimmer_id": raw['swimmer_id'],
-              "swimmer_name": raw['swimmer_name'],
-              "scraped_at": raw['scraped_at'],
-              "personal_bests": structured_pbs
+              "swimmer_name": SWIMMER_NAME,
+              "swimmer_id": SWIMMER_ID,
+              "times": all_times,
+              "raw_times": raw_data[:20],
+              "source": "swimcloud.com",
+              "scraped_at": datetime.now(timezone.utc).isoformat()
           }
-
-          with open('michael_pbs_structured.json', 'w') as f:
+          
+          with open(f"swimcloud_{SWIMMER_ID}.json", 'w') as f:
               json.dump(output, f, indent=2)
-
-          print(f"\n✅ Structured {len(structured_pbs)} personal bests")
-          print(json.dumps(output, indent=2))
-          PARSE_EOF
-      
-      - name: Upload to Supabase
-        env:
-          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-          SUPABASE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
-        run: |
-          python3 << 'SUPABASE_EOF'
-          import os
-          import json
-          import requests
-
-          SUPABASE_URL = os.environ.get('SUPABASE_URL')
-          SUPABASE_KEY = os.environ.get('SUPABASE_KEY')
-
-          if not SUPABASE_URL or not SUPABASE_KEY:
-              print("⚠️ Supabase credentials not available")
-              exit(0)
-
-          # Load structured data
-          with open('michael_pbs_structured.json', 'r') as f:
-              data = json.load(f)
-
-          headers = {
-              "apikey": SUPABASE_KEY,
-              "Authorization": f"Bearer {SUPABASE_KEY}",
-              "Content-Type": "application/json"
-          }
-
-          # Insert into personal_best_times table
-          for pb in data.get('personal_bests', []):
-              record = {
-                  "swimmer_name": data['swimmer_name'],
-                  "event": pb['event'],
-                  "time_seconds": float(pb['time'].replace(':', '')) if ':' not in pb['time'] else 
-                                  float(pb['time'].split(':')[0]) * 60 + float(pb['time'].split(':')[1]),
-                  "source": "swimcloud",
-                  "verified": True
+          
+          print(f"\n💾 Saved to swimcloud_{SWIMMER_ID}.json")
+          
+          # Save to Supabase
+          if SUPABASE_KEY:
+              payload = {
+                  "category": "michael_swim",
+                  "subcategory": "swimcloud_pbs",
+                  "title": f"SwimCloud Times - {SWIMMER_NAME}",
+                  "insight": json.dumps(output),
+                  "importance": "high",
+                  "created_at": datetime.now(timezone.utc).isoformat()
               }
               
               resp = requests.post(
-                  f"{SUPABASE_URL}/rest/v1/personal_best_times",
-                  headers=headers,
-                  json=record
+                  f"{SUPABASE_URL}/rest/v1/insights",
+                  headers={
+                      "apikey": SUPABASE_KEY,
+                      "Authorization": f"Bearer {SUPABASE_KEY}",
+                      "Content-Type": "application/json"
+                  },
+                  json=payload,
+                  timeout=30
               )
-              print(f"{pb['event']}: {resp.status_code}")
-
-          print("✅ Uploaded to Supabase")
-          SUPABASE_EOF
-      
-      - name: Upload artifacts
+              
+              if resp.status_code in [200, 201]:
+                  print("✅ Saved to Supabase")
+              else:
+                  print(f"⚠️ Supabase: {resp.status_code}")
+          
+          print("\n✅ SCRAPING COMPLETE")
+          SCRAPER_EOF
+        
+      - name: Upload Results
         uses: actions/upload-artifact@v4
+        if: always()
         with:
-          name: swimcloud-data
-          path: |
-            swimcloud_results.json
-            michael_pbs_structured.json
-            swimcloud_full.html
+          name: swimcloud-results-${{ github.run_id }}
+          path: swimcloud_*.json
+          retention-days: 7
