@@ -1,12 +1,15 @@
-name: Satellite Beach SwimCloud Scraper
+name: Satellite Beach + Rivals Scraper V5
 
 on:
   workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/satellite_beach_scraper.yml'
 
 jobs:
   scrape:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 15
     
     steps:
       - uses: actions/checkout@v4
@@ -16,291 +19,155 @@ jobs:
         with:
           python-version: '3.11'
       
-      - name: Install Playwright
+      - name: Install dependencies
         run: |
           pip install playwright beautifulsoup4
           playwright install chromium
-          playwright install-deps chromium
       
-      - name: Scrape All Satellite Beach Swimmers (CORRECTED IDs)
+      - name: Scrape All Swimmers
         run: |
           python3 << 'PYTHON_EOF'
-          import asyncio
-          import json
-          import re
-          from datetime import datetime
-          from playwright.async_api import async_playwright
+import asyncio
+import json
+import re
+from datetime import datetime
+from playwright.async_api import async_playwright
+from bs4 import BeautifulSoup
 
-          # CORRECTED SWIMMER IDS - Max Morgan fixed!
-          SWIMMERS = {
-              "3250085": {"name": "Michael Shapira", "class": 2027},
-              "2928537": {"name": "Bastian Soto", "class": 2027},
-              "1518102": {"name": "Gavin Domboru", "class": 2027},
-              "2652914": {"name": "Max Morgan", "class": 2026},  # CORRECTED ID
-              "2662363": {"name": "Sawyer Davis", "class": 2026, "note": "Ohio State Commit, 2A State Champion"}
-          }
+SWIMMERS = [
+    {"name": "Michael Shapira", "id": "3250085", "school": "Satellite Beach HS"},
+    {"name": "Bastian Soto", "id": "2928537", "school": "Satellite Beach HS"},
+    {"name": "Gavin Domboru", "id": "1518102", "school": "Satellite Beach HS"},
+    {"name": "Max Morgan", "id": "2652914", "school": "Satellite Beach HS"},
+    {"name": "Sawyer Davis", "id": "2662363", "school": "Satellite Beach HS"},
+    {"name": "Aaron Gordon", "id": "1733035", "school": "Merritt Island HS"},
+]
 
-          def parse_time_to_seconds(time_str):
-              """Convert time string to seconds."""
-              try:
-                  time_str = time_str.strip()
-                  if ':' in time_str:
-                      parts = time_str.split(':')
-                      return round(float(parts[0]) * 60 + float(parts[1]), 2)
-                  return round(float(time_str), 2)
-              except:
-                  return None
+async def scrape_swimmer(page, swimmer_id, name):
+    url = f"https://www.swimcloud.com/swimmer/{swimmer_id}/"
+    print(f"\nScraping: {name} ({swimmer_id})")
+    
+    try:
+        await page.goto(url, wait_until='networkidle', timeout=30000)
+        await asyncio.sleep(2)
+        
+        content = await page.content()
+        
+        result = {"name": name, "swimcloud_id": swimmer_id, "events": {}}
+        
+        # Power Index
+        pi_match = re.search(r'Power index\s*([\d.]+)', content)
+        if pi_match:
+            result["power_index"] = float(pi_match.group(1))
+        
+        # Florida Rank
+        rank_match = re.search(r'Florida rank\s*(\d+)', content)
+        if rank_match:
+            result["fl_rank"] = int(rank_match.group(1))
+        
+        # Class
+        class_match = re.search(r'Class\s*[·:]\s*(\d{4})', content)
+        if class_match:
+            result["class"] = int(class_match.group(1))
+        
+        # Extract times - multiple patterns
+        patterns = [
+            (r'50 Y Free[^0-9]*(\d{2}\.\d{2})', '50 Free'),
+            (r'100 Y Free[^0-9]*(\d{2}\.\d{2})', '100 Free'),
+            (r'200 Y Free[^0-9]*(1:\d{2}\.\d{2})', '200 Free'),
+            (r'500 Y Free[^0-9]*([45]:\d{2}\.\d{2})', '500 Free'),
+            (r'50 Y Back[^0-9]*(\d{2}\.\d{2})', '50 Back'),
+            (r'100 Y Back[^0-9]*(\d{2}\.\d{2})', '100 Back'),
+            (r'200 Y Back[^0-9]*(1:\d{2}\.\d{2})', '200 Back'),
+            (r'50 Y Fly[^0-9]*(\d{2}\.\d{2})', '50 Fly'),
+            (r'100 Y Fly[^0-9]*(\d{2}\.\d{2})', '100 Fly'),
+            (r'50 Y Breast[^0-9]*(\d{2}\.\d{2})', '50 Breast'),
+            (r'100 Y Breast[^0-9]*(1?:?\d{2}\.\d{2})', '100 Breast'),
+            (r'200 Y IM[^0-9]*(1:\d{2}\.\d{2})', '200 IM'),
+            (r'100 Free[^0-9–-]*[–-]\s*(\d{2}\.\d{2})', '100 Free'),
+            (r'100 Back[^0-9–-]*[–-]\s*(\d{2}\.\d{2})', '100 Back'),
+        ]
+        
+        for pattern, event in patterns:
+            if event not in result["events"]:
+                matches = re.findall(pattern, content, re.IGNORECASE)
+                if matches:
+                    # Get best time
+                    times = []
+                    for m in matches:
+                        try:
+                            if ':' in m:
+                                parts = m.split(':')
+                                secs = float(parts[0]) * 60 + float(parts[1])
+                            else:
+                                secs = float(m)
+                            if 15 < secs < 600:
+                                times.append((secs, m))
+                        except:
+                            pass
+                    if times:
+                        best = min(times, key=lambda x: x[0])
+                        result["events"][event] = best[1]
+        
+        print(f"  PI: {result.get('power_index', 'N/A')} | Rank: {result.get('fl_rank', 'N/A')} | Events: {len(result['events'])}")
+        for e, t in sorted(result["events"].items()):
+            print(f"    {e}: {t}")
+        
+        return result
+        
+    except Exception as e:
+        print(f"  ERROR: {e}")
+        return {"name": name, "swimcloud_id": swimmer_id, "error": str(e)}
 
-          async def scrape_swimmer_comprehensive(page, swimmer_id, swimmer_info):
-              """Comprehensive scraping of swimmer profile and times."""
-              print(f"\n{'='*70}")
-              print(f"SCRAPING: {swimmer_info['name']} (ID: {swimmer_id})")
-              print(f"{'='*70}")
-              
-              data = {
-                  "swimmer_id": swimmer_id,
-                  "name": swimmer_info["name"],
-                  "class_of": swimmer_info.get("class"),
-                  "school": "Satellite Sr High School",
-                  "team": "Swim Melbourne (MELB-FL)",
-                  "note": swimmer_info.get("note", ""),
-                  "scraped_at": datetime.now().isoformat(),
-                  "profile": {},
-                  "personal_bests": {}
-              }
-              
-              try:
-                  # First get profile info from main page
-                  url = f"https://www.swimcloud.com/swimmer/{swimmer_id}/"
-                  print(f"  Loading profile: {url}")
-                  await page.goto(url, wait_until="networkidle", timeout=60000)
-                  await page.wait_for_timeout(4000)
-                  
-                  body_text = await page.locator("body").text_content()
-                  
-                  # Power Index
-                  pi_match = re.search(r'Power\s*index\s*(\d+\.?\d*)', body_text, re.I)
-                  if pi_match:
-                      data["profile"]["power_index"] = float(pi_match.group(1))
-                  
-                  # Florida Rank
-                  fl_rank = re.search(r'Florida\s*rank\s*(\d+)', body_text, re.I)
-                  if fl_rank:
-                      data["profile"]["florida_rank"] = int(fl_rank.group(1))
-                  
-                  print(f"  Profile: PI={data['profile'].get('power_index', 'N/A')}, FL Rank={data['profile'].get('florida_rank', 'N/A')}")
-                  
-                  # Now go to TIMES page with SCY filter
-                  times_url = f"https://www.swimcloud.com/swimmer/{swimmer_id}/times/?page=1&course=Y"
-                  print(f"  Loading times page: {times_url}")
-                  await page.goto(times_url, wait_until="networkidle", timeout=60000)
-                  await page.wait_for_timeout(5000)
-                  
-                  # Get full page HTML for parsing
-                  html = await page.content()
-                  body_text = await page.locator("body").text_content()
-                  
-                  # Comprehensive event patterns
-                  events = [
-                      ("50 Free", r'50\s*(?:Yard|Y)?\s*Free(?:style)?'),
-                      ("100 Free", r'100\s*(?:Yard|Y)?\s*Free(?:style)?'),
-                      ("200 Free", r'200\s*(?:Yard|Y)?\s*Free(?:style)?'),
-                      ("500 Free", r'500\s*(?:Yard|Y)?\s*Free(?:style)?'),
-                      ("1000 Free", r'1000\s*(?:Yard|Y)?\s*Free(?:style)?'),
-                      ("1650 Free", r'1650\s*(?:Yard|Y)?\s*Free(?:style)?'),
-                      ("50 Fly", r'50\s*(?:Yard|Y)?\s*(?:Fly|Butterfly)'),
-                      ("100 Fly", r'100\s*(?:Yard|Y)?\s*(?:Fly|Butterfly)'),
-                      ("200 Fly", r'200\s*(?:Yard|Y)?\s*(?:Fly|Butterfly)'),
-                      ("50 Back", r'50\s*(?:Yard|Y)?\s*Back(?:stroke)?'),
-                      ("100 Back", r'100\s*(?:Yard|Y)?\s*Back(?:stroke)?'),
-                      ("200 Back", r'200\s*(?:Yard|Y)?\s*Back(?:stroke)?'),
-                      ("50 Breast", r'50\s*(?:Yard|Y)?\s*Breast(?:stroke)?'),
-                      ("100 Breast", r'100\s*(?:Yard|Y)?\s*Breast(?:stroke)?'),
-                      ("200 Breast", r'200\s*(?:Yard|Y)?\s*Breast(?:stroke)?'),
-                      ("100 IM", r'100\s*(?:Yard|Y)?\s*(?:IM|Individual\s*Medley)'),
-                      ("200 IM", r'200\s*(?:Yard|Y)?\s*(?:IM|Individual\s*Medley)'),
-                      ("400 IM", r'400\s*(?:Yard|Y)?\s*(?:IM|Individual\s*Medley)'),
-                  ]
-                  
-                  # Time pattern (catches both XX.XX and M:SS.XX formats)
-                  time_pattern = r'(\d{1,2}:\d{2}\.\d{2}|\d{2}\.\d{2})'
-                  
-                  # Method 1: Search for event name followed by time within 200 chars
-                  for event_name, event_pattern in events:
-                      full_pattern = event_pattern + r'[\s\S]{0,200}?' + time_pattern
-                      matches = re.findall(full_pattern, body_text, re.I)
-                      
-                      if matches:
-                          times_found = []
-                          for match in matches:
-                              time_str = match if isinstance(match, str) else match
-                              seconds = parse_time_to_seconds(time_str)
-                              if seconds and seconds > 15 and seconds < 1200:  # Reasonable range
-                                  times_found.append((time_str, seconds))
-                          
-                          if times_found:
-                              times_found.sort(key=lambda x: x[1])
-                              best_time, best_seconds = times_found[0]
-                              data["personal_bests"][event_name] = {
-                                  "time": best_time,
-                                  "seconds": best_seconds
-                              }
-                  
-                  # Method 2: Parse table rows specifically
-                  from bs4 import BeautifulSoup
-                  soup = BeautifulSoup(html, 'html.parser')
-                  
-                  # Look for time entries in tables
-                  for row in soup.select('tr'):
-                      row_text = row.get_text()
-                      for event_name, event_pattern in events:
-                          if event_name not in data["personal_bests"]:
-                              if re.search(event_pattern, row_text, re.I):
-                                  time_match = re.search(time_pattern, row_text)
-                                  if time_match:
-                                      time_str = time_match.group(1)
-                                      seconds = parse_time_to_seconds(time_str)
-                                      if seconds and seconds > 15 and seconds < 1200:
-                                          data["personal_bests"][event_name] = {
-                                              "time": time_str,
-                                              "seconds": seconds
-                                          }
-                  
-                  # Method 3: Look for links with times
-                  for link in soup.select('a[href*="/times/"]'):
-                      link_text = link.get_text()
-                      parent_text = link.parent.get_text() if link.parent else ""
-                      combined = f"{link_text} {parent_text}"
-                      
-                      for event_name, event_pattern in events:
-                          if event_name not in data["personal_bests"]:
-                              if re.search(event_pattern, combined, re.I):
-                                  time_match = re.search(time_pattern, combined)
-                                  if time_match:
-                                      time_str = time_match.group(1)
-                                      seconds = parse_time_to_seconds(time_str)
-                                      if seconds and seconds > 15 and seconds < 1200:
-                                          data["personal_bests"][event_name] = {
-                                              "time": time_str,
-                                              "seconds": seconds
-                                          }
-                  
-                  # Print results
-                  print(f"\n  PERSONAL BESTS FOUND ({len(data['personal_bests'])} events):")
-                  for event in ['50 Free', '100 Free', '200 Free', '50 Fly', '100 Fly', '50 Back', '100 Back', '50 Breast', '100 Breast', '200 IM']:
-                      if event in data["personal_bests"]:
-                          print(f"    {event}: {data['personal_bests'][event]['time']}")
-                  
-                  return data
-                  
-              except Exception as e:
-                  print(f"  ERROR: {e}")
-                  import traceback
-                  traceback.print_exc()
-                  return {
-                      "swimmer_id": swimmer_id,
-                      "name": swimmer_info["name"],
-                      "error": str(e)
-                  }
+async def main():
+    print("="*60)
+    print("SATELLITE BEACH + RIVALS SCRAPER V5")
+    print("="*60)
+    
+    async with async_playwright() as p:
+        browser = await p.chromium.launch(headless=True)
+        context = await browser.new_context(
+            user_agent='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+        )
+        page = await context.new_page()
+        
+        results = []
+        for swimmer in SWIMMERS:
+            result = await scrape_swimmer(page, swimmer["id"], swimmer["name"])
+            result["school"] = swimmer["school"]
+            results.append(result)
+            await asyncio.sleep(1)
+        
+        await browser.close()
+    
+    output = {
+        "version": "V5_WITH_AARON_GORDON",
+        "scraped_at": datetime.now().isoformat(),
+        "swimmers": results
+    }
+    
+    with open("swimmers_with_gordon.json", "w") as f:
+        json.dump(output, f, indent=2)
+    
+    print(f"\n{'='*60}")
+    print(f"COMPLETE: {len(results)} swimmers scraped")
+    print(f"{'='*60}")
 
-          async def main():
-              print("🏊 SATELLITE BEACH COMPREHENSIVE SCRAPER V4")
-              print("   CORRECTED Max Morgan ID: 2652914")
-              print("="*70)
-              
-              results = {}
-              
-              async with async_playwright() as p:
-                  browser = await p.chromium.launch(
-                      headless=True,
-                      args=['--no-sandbox', '--disable-setuid-sandbox']
-                  )
-                  context = await browser.new_context(
-                      user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-                      viewport={"width": 1920, "height": 1080}
-                  )
-                  page = await context.new_page()
-                  
-                  for swimmer_id, swimmer_info in SWIMMERS.items():
-                      data = await scrape_swimmer_comprehensive(page, swimmer_id, swimmer_info)
-                      results[swimmer_info["name"]] = data
-                      await asyncio.sleep(3)
-                  
-                  await browser.close()
-              
-              output = {
-                  "scraped_at": datetime.now().isoformat(),
-                  "version": "V4_CORRECTED",
-                  "school": "Satellite Beach High School",
-                  "team": "Swim Melbourne (MELB-FL)",
-                  "swimmer_count": len(SWIMMERS),
-                  "swimmers": results
-              }
-              
-              with open("satellite_beach_swimmers.json", "w") as f:
-                  json.dump(output, f, indent=2)
-              
-              # Final Summary
-              print("\n" + "="*70)
-              print("FINAL RESULTS - SATELLITE BEACH HIGH SCHOOL")
-              print("="*70)
-              
-              success_count = 0
-              for name, data in results.items():
-                  pbs = data.get("personal_bests", {})
-                  pi = data.get('profile', {}).get('power_index', 'N/A')
-                  fl = data.get('profile', {}).get('florida_rank', 'N/A')
-                  note = data.get('note', '')
-                  
-                  status = "✅" if pbs else "❌"
-                  if pbs:
-                      success_count += 1
-                  
-                  print(f"\n{status} {name} (Class {data.get('class_of', '?')}) - {len(pbs)} events")
-                  if note:
-                      print(f"  ⭐ {note}")
-                  print(f"  Power Index: {pi} | FL Rank: {fl}")
-                  for event in ['50 Free', '100 Free', '200 Free', '50 Fly', '100 Fly', '100 Back', '100 Breast']:
-                      if event in pbs:
-                          print(f"  {event}: {pbs[event]['time']}")
-              
-              print(f"\n{'='*70}")
-              print(f"SUCCESS RATE: {success_count}/{len(SWIMMERS)} ({100*success_count/len(SWIMMERS):.0f}%)")
-              print(f"{'='*70}")
-              
-              # 100 Free Team Ranking
-              print("\n100 FREE TEAM RANKING:")
-              free_100 = []
-              for name, data in results.items():
-                  if "100 Free" in data.get("personal_bests", {}):
-                      free_100.append((name, data["personal_bests"]["100 Free"]["time"], data["personal_bests"]["100 Free"]["seconds"]))
-              
-              free_100.sort(key=lambda x: x[2])
-              for i, (name, time, secs) in enumerate(free_100, 1):
-                  print(f"  {i}. {name}: {time}")
-              
-              print(f"\n💾 Saved to satellite_beach_swimmers.json")
-              return output
-
-          if __name__ == "__main__":
-              asyncio.run(main())
-          PYTHON_EOF
+asyncio.run(main())
+PYTHON_EOF
       
       - name: Upload Results
         uses: actions/upload-artifact@v4
         with:
-          name: satellite-beach-v4-${{ github.run_number }}
-          path: satellite_beach_swimmers.json
+          name: swimmers-v5-${{ github.run_number }}
+          path: swimmers_with_gordon.json
       
       - name: Commit to Repo
         run: |
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
           mkdir -p michael_d1_agents_v3/data
-          cp satellite_beach_swimmers.json michael_d1_agents_v3/data/
-          git add michael_d1_agents_v3/data/satellite_beach_swimmers.json
-          git diff --staged --quiet || git commit -m "data: Satellite Beach V4 CORRECTED - Max Morgan ID fixed $(date +'%Y-%m-%d %H:%M')"
+          cp swimmers_with_gordon.json michael_d1_agents_v3/data/
+          git add michael_d1_agents_v3/data/swimmers_with_gordon.json
+          git diff --staged --quiet || git commit -m "data: swimmers V5 with Aaron Gordon $(date +'%Y-%m-%d %H:%M')"
           git push || echo "Nothing to push"
-      
-      - name: Display Results
-        run: cat satellite_beach_swimmers.json
