@@ -1,115 +1,196 @@
-# Michael Shapira D1 Pathway V2.2 - Enhanced Multi-Agent System
+# Michael Shapira D1 Pathway V2.2 - INTEGRATED AGENTIC AI SYSTEM
 
 ## 🏊 Overview
 
-Advanced LangGraph-based multi-agent AI orchestration for Michael's D1 pathway.
+**Full LangGraph Agentic AI Orchestration** for Michael's D1 pathway.
 
-**Primary Target: University of Florida Class of 2027**
+**Primary Target:** University of Florida Class of 2027
 
-## V2.2 New Features
+---
 
-- **Agent #13: Personal Best Time Scraping Agent** - Automated PB data collection
-- **Enhanced Agent #12** - Comprehensive competitor PB display in meet prep docs
-- **SwimCloud API Integration** - Automated competitor data scraping
-- **72-Hour Pre-Meet Trigger** - Auto-scrape competitor PBs before each meet
-- **Full Metadata Storage** - Date, meet name, location, club/HS for all PBs
+## 🤖 V2.2 INTEGRATED ARCHITECTURE
 
-## 🤖 13 Specialized Agents
-
-| # | Agent | XGBoost Model | Primary Function |
-|---|-------|---------------|------------------|
-| 1 | Kosher Diet | NUTRITION_OPTIMIZER | Keto Mon-Thu, Shabbat Fri-Sun |
-| 2 | Education | ACADEMIC_PREDICTOR | GPA, NCAA eligibility |
-| 3 | Travel | TRAVEL_OPTIMIZER | School visit planning |
-| 4 | Chabad Contacts | COMMUNITY_ANALYZER | Jewish life resources |
-| 5 | Competitor Analysis | COMPETITOR_PREDICTOR | Track UF 2027 recruits |
-| 6 | Engineering | CAREER_FORECASTER | Real estate minor priority |
-| 7 | Meet Prep | RACE_STRATEGY | Pre-meet analysis |
-| 8 | Meet Results | PERFORMANCE_TRAJECTORY | Performance tracking |
-| 9 | Goals | GOAL_ACHIEVEMENT | UF target tracking |
-| 10 | Events Schedule | MEET_QUALIFIER | Meet calendar |
-| 11 | School Comparison | PROGRAM_MATCHER | Program matching |
-| 12 | **Meet Prep & Motivation** | MOTIVATION_OPTIMIZER | **48-72hr docs with competitor PBs** |
-| **13** | **PB Scraping** | **PB_IMPROVEMENT_PREDICTOR** | **SwimCloud/USA Swimming scraping** |
-
-## 🆕 Agent #13: Personal Best Time Scraping
-
-### Features
-- Scrapes SwimCloud, USA Swimming, HS databases
-- Maintains PB database in Supabase
-- Auto-triggers 72 hours before meets
-- Tracks Michael + all competitors (Bastian Soto, Aaron Gordon, etc.)
-
-### Data Stored
-```python
-PersonalBestTime:
-  - swimmer_name
-  - event
-  - time
-  - date_achieved
-  - meet_name
-  - meet_location
-  - swim_club
-  - high_school
-  - competition_level (club/hs/usa_swimming)
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    CLAUDE CHAT INTERFACE                     │
+└────────────────────────────┬────────────────────────────────┘
+                             │
+                             ▼
+┌─────────────────────────────────────────────────────────────┐
+│                    BRIDGE INTEGRATION                        │
+│  • Request Interpreter                                       │
+│  • Intent Detection                                          │
+│  • Context Persistence (Supabase)                           │
+└────────────────────────────┬────────────────────────────────┘
+                             │
+          ┌──────────────────┼──────────────────┐
+          │                  │                  │
+          ▼                  ▼                  ▼
+┌─────────────────┐ ┌─────────────────┐ ┌─────────────────┐
+│  13 AGENTS      │ │  MCP BRIDGE     │ │  XGBOOST ML     │
+│                 │ │                 │ │                 │
+│ • Kosher Diet   │ │ • SwimCloud     │ │ • Per Agent     │
+│ • Education     │ │ • USA Swimming  │ │ • Predictions   │
+│ • Travel        │ │ • Firecrawl     │ │ • Confidence    │
+│ • Chabad        │ │ • Apify         │ │                 │
+│ • Competitor    │ │ • AI Travel     │ │                 │
+│ • Engineering   │ │ • AI Nutrition  │ │                 │
+│ • Meet Prep     │ │ • Census API    │ │                 │
+│ • Results       │ │                 │ │                 │
+│ • Goals         │ │ 7 Servers       │ │                 │
+│ • Schedule      │ │ 14 Tools        │ │                 │
+│ • School Comp   │ │                 │ │                 │
+│ • Motivation    │ │                 │ │                 │
+│ • PB Scraping   │ │                 │ │                 │
+└─────────────────┘ └─────────────────┘ └─────────────────┘
+          │                  │                  │
+          └──────────────────┼──────────────────┘
+                             │
+                             ▼
+┌─────────────────────────────────────────────────────────────┐
+│                    SHARED STATE REPOSITORY                   │
+│  • Michael's PBs            • Competitor PBs                 │
+│  • UF 2027 Targets          • MCP-Sourced Data              │
+│  • Meet Schedule            • Supabase Sync                  │
+└─────────────────────────────────────────────────────────────┘
 ```
 
-## 📊 Enhanced Meet Prep Documents
+---
 
-V2.2 meet prep documents now include:
+## 📊 System Components
 
-### Michael's Section
-| Event | Seed | **Personal Best** | PB Date | PB Meet |
-|-------|------|-------------------|---------|---------|
-| 100 Free | 50.82 | **50.82** | 2025-11-15 | Senior Champs |
+### 13 Specialized Agents
 
-### Competitor Analysis Section
-| Name | Club | High School | Seed | PB | PB Date | PB Meet |
-|------|------|-------------|------|-----|---------|---------|
-| Bastian Soto | Brevard Aquatic | Eau Gallie HS | - | 49.82 | 2025-11-10 | Fall Classic |
-| Aaron Gordon | Melbourne ST | Melbourne HS | - | 51.15 | 2025-11-05 | Regional Champs |
+| # | Agent | MCP Integration | Primary Function |
+|---|-------|-----------------|------------------|
+| 1 | Kosher Diet | AI Nutrition MCP | Keto Mon-Thu, Shabbat Fri-Sun |
+| 2 | Education | - | GPA, NCAA eligibility |
+| 3 | Travel | AI Travel Agent MCP | College visit planning |
+| 4 | Chabad Contacts | - | Jewish life resources |
+| 5 | Competitor Analysis | SwimCloud MCP | Track competitors |
+| 6 | Engineering | - | Real estate minor |
+| 7 | Meet Prep | AI Nutrition MCP | Pre-meet analysis |
+| 8 | Meet Results | SwimCloud MCP | Performance tracking |
+| 9 | Goals | USA Swimming MCP | UF target tracking |
+| 10 | Events Schedule | - | Meet calendar |
+| 11 | School Comparison | - | Program matching |
+| 12 | **Meet Prep & Motivation** | All MCPs | 48-72hr prep docs |
+| **13** | **PB Scraping** | SwimCloud MCP | Automated PB collection |
+
+### 7 MCP Servers (14 Tools)
+
+| Server | Tools | Purpose |
+|--------|-------|---------|
+| **SwimCloud** | scrape_swimmer_pbs, scrape_meet_results, search_swimmer | Competitor PB data |
+| **USA Swimming** | get_times_standards, get_d1_recruiting_times | Time standards |
+| **Firecrawl** | scrape_url, crawl_site | Web scraping |
+| **Apify** | run_actor, get_dataset | Multi-source scraping |
+| **AI Travel Agent** | plan_college_visit | Visit itineraries |
+| **AI Nutrition** | generate_meal_plan, get_pre_race_nutrition | Kosher keto meals |
+| **Census API** | get_demographics | Location data |
+
+---
+
+## 🗂️ Files
+
+```
+breverdbidder/life-os/
+├── michael_d1_agents_v2/
+│   ├── orchestrator_v2.py           # V2.2 - 13 agents
+│   ├── mcp_bridge.py                # MCP Bridge - 7 servers
+│   ├── orchestrator_v2_integrated.py # Full integration
+│   └── README.md
+│
+└── .github/workflows/
+    ├── meet_prep_automation.yml      # Auto-generate docs
+    └── pb_scraping_automation.yml    # 72-hour pre-meet scraping
+```
+
+---
 
 ## 🚀 Usage
 
+### Initialize Orchestrator
+
 ```python
-from orchestrator_v2 import MichaelD1OrchestratorV2
-from datetime import date
+from orchestrator_v2_integrated import MichaelD1OrchestratorV2Integrated
 
-orchestrator = MichaelD1OrchestratorV2()
+orchestrator = MichaelD1OrchestratorV2Integrated()
 
-# Scrape competitor PBs
-result = orchestrator.scrape_competitor_pbs(
-    ["Bastian Soto", "Aaron Gordon"],
-    ["100 Free", "50 Free", "100 Fly"]
-)
+# Get system status
+status = orchestrator.get_system_status()
+# {'agents': 13, 'mcp_servers': 7, 'mcp_tools': 14, ...}
+```
 
-# Generate meet prep document
+### Process Natural Language Query
+
+```python
+result = orchestrator.process_query("Get competitor PBs for Bastian Soto")
+# Automatically routes to pb_scraping and competitor_analysis agents
+# Uses SwimCloud MCP to scrape data
+```
+
+### Generate Meet Prep Document
+
+```python
 doc = orchestrator.generate_meet_prep_document(
     "Harry Meisel Championships",
     date(2025, 12, 13),
     ["100 Free", "50 Free", "100 Fly"],
     ["Bastian Soto", "Aaron Gordon"]
 )
+# Generates markdown with MCP-sourced competitor data
 ```
 
-## 📁 GitHub Structure
+### Plan College Visit
 
+```python
+visit = orchestrator.plan_college_visit("UF", ["2026-01-15"])
+# Returns itinerary with Chabad contact, swim facility, coach info
 ```
-breverdbidder/life-os/
-├── michael_d1_agents_v2/
-│   ├── orchestrator_v2.py      # V2.2 - 13 agents
-│   └── README.md
-└── .github/workflows/
-    └── meet_prep_automation.yml  # Auto-generate docs
-```
-
-## 🔧 GitHub Actions Automation
-
-- **Daily 6 AM EST**: Check for meets in 48-72 hour window
-- **Auto-scrape**: Competitor PBs before each meet
-- **Auto-generate**: Meet prep documents
-- **Supabase logging**: All scrape results persisted
 
 ---
 
-**Version**: 2.2 | **Agents**: 13 | **Target**: UF 2027
+## 📈 API Mega Library Integration
+
+**Source:** `github.com/cporter202/API-mega-list`
+
+| Category | Count | Integrated |
+|----------|-------|------------|
+| Total APIs | 10,498 | ✅ |
+| MCP Servers | 131 | 7 deployed |
+| Real Estate | 851 | BidDeed.AI |
+| AI Agents | 697 | Life OS |
+| Travel | 397 | College visits |
+
+---
+
+## 🎯 UF 2027 Progress Tracking
+
+| Event | Current PB | UF Target | Gap |
+|-------|------------|-----------|-----|
+| 50 Free | 23.22 | 20.50 | 2.72 |
+| 100 Free | 50.82 | 45.00 | 5.82 |
+| 100 Fly | 57.21 | 50.00 | 7.21 |
+| 100 Back | 61.62 | 52.00 | 9.62 |
+
+---
+
+## 🔧 Environment Variables
+
+```bash
+# Required for production
+APIFY_API_TOKEN=apify_api_xxx
+FIRECRAWL_API_KEY=fc-xxx
+SUPABASE_URL=https://xxx.supabase.co
+SUPABASE_KEY=eyJxxx
+```
+
+---
+
+**Version:** 2.2 INTEGRATED  
+**Agents:** 13  
+**MCP Servers:** 7  
+**MCP Tools:** 14  
+**API Library:** 10,498 APIs + 131 MCP  
+**Target:** UF 2027
