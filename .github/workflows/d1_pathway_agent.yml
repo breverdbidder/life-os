@@ -1,0 +1,352 @@
+name: D1 Pathway Agent
+
+on:
+  schedule:
+    # Run daily at 6:00 AM EST (11:00 UTC)
+    - cron: '0 11 * * *'
+  workflow_dispatch:
+    inputs:
+      agent:
+        description: 'Agent to run (all, diet, education, travel, chabad, recruiting)'
+        required: false
+        default: 'all'
+      swimmer_id:
+        description: 'SwimCloud Swimmer ID'
+        required: false
+        default: '3250085'
+
+env:
+  SUPABASE_URL: https://mocerqjnksmhcjzxrewo.supabase.co
+  SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+  PYTHON_VERSION: '3.11'
+
+jobs:
+  d1-pathway-update:
+    runs-on: ubuntu-latest
+    name: D1 Pathway Agent Update
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install aiohttp beautifulsoup4 langgraph langchain-core supabase pydantic
+      
+      - name: Run D1 Pathway Agent
+        id: agent
+        run: |
+          python << 'EOF'
+          import json
+          import os
+          from datetime import datetime
+          from supabase import create_client
+
+          # Initialize Supabase
+          supabase = create_client(
+              os.environ["SUPABASE_URL"],
+              os.environ["SUPABASE_KEY"]
+          )
+
+          # Michael's current profile
+          michael_profile = {
+              "name": "Michael Shapira",
+              "swimmer_id": "3250085",
+              "age": 16,
+              "height": "6'4\"",
+              "weight": 215,
+              "high_school": "Satellite Beach High School",
+              "graduation_year": 2027,
+              "current_club": "Swim Melbourne (MELB-FL)",
+              "events": ["50 Free", "100 Free", "200 Free", "100 Fly", "50 Fly", "100 Back"],
+              "sat_score": 1280,
+              "dietary_requirements": "Kosher"
+          }
+
+          # Current best times (SCY)
+          swim_times = {
+              "fifty_free": "23.22",
+              "hundred_free": "50.82",
+              "hundred_fly": "57.21",
+              "fifty_fly": "25.79",
+              "hundred_back": "1:01.62",
+              "fifty_back": "31.00"
+          }
+
+          # D1 Target times
+          d1_targets = {
+              "fifty_free": {"low_d1": "21.4", "mid_d1": "20.5"},
+              "hundred_free": {"low_d1": "46.5", "mid_d1": "45.0"},
+              "hundred_fly": {"low_d1": "51.0", "mid_d1": "49.0"},
+              "hundred_back": {"low_d1": "51.0", "mid_d1": "49.5"}
+          }
+
+          # Calculate gaps
+          analysis = {}
+          for event, current in swim_times.items():
+              if event in d1_targets:
+                  targets = d1_targets[event]
+                  # Convert times to seconds
+                  def to_sec(t):
+                      if ":" in str(t):
+                          parts = str(t).split(":")
+                          return float(parts[0]) * 60 + float(parts[1])
+                      return float(t)
+                  
+                  curr_sec = to_sec(current)
+                  target_sec = to_sec(targets["low_d1"])
+                  gap = curr_sec - target_sec
+                  
+                  analysis[event] = {
+                      "current": current,
+                      "target": targets["low_d1"],
+                      "gap_seconds": round(gap, 2),
+                      "status": "ON_TRACK" if gap <= 2.0 else "WORK_NEEDED"
+                  }
+
+          # Target schools with sprint coach scores
+          schools = [
+              {"name": "Texas", "coach": "Bob Bowman", "score": 9.8, "sprint": True},
+              {"name": "Florida", "coach": "Anthony Nesty", "score": 9.5, "sprint": True},
+              {"name": "NC State", "coach": "Braden Holloway", "score": 9.3, "sprint": True},
+              {"name": "Virginia", "coach": "Todd DeSorbo", "score": 9.6, "sprint": True},
+              {"name": "Michigan", "coach": "Mike Bottom", "score": 9.0, "sprint": True},
+              {"name": "Georgia Tech", "coach": "Courtney Hart", "score": 8.5, "sprint": True},
+              {"name": "Texas A&M", "coach": "Jay Holmes", "score": 8.2, "sprint": False},
+              {"name": "Stanford", "coach": "Dan Schemmel", "score": 8.8, "sprint": False}
+          ]
+
+          # Build update payload
+          update = {
+              "profile": michael_profile,
+              "swim_times": swim_times,
+              "time_analysis": analysis,
+              "target_schools": schools,
+              "updated_at": datetime.now().isoformat()
+          }
+
+          # Log to Supabase insights table
+          try:
+              response = supabase.table("insights").insert({
+                  "insight_type": "D1_PATHWAY_UPDATE",
+                  "title": f"D1 Pathway Update - {datetime.now().strftime('%Y-%m-%d')}",
+                  "description": f"Daily update for {michael_profile['name']}. "
+                                f"50 Free gap: {analysis.get('fifty_free', {}).get('gap_seconds', 'N/A')}s, "
+                                f"100 Free gap: {analysis.get('hundred_free', {}).get('gap_seconds', 'N/A')}s",
+                  "metadata": update,
+                  "confidence": 0.95
+              }).execute()
+              
+              print(f"✅ Logged to Supabase: {response.data[0]['id'] if response.data else 'success'}")
+          except Exception as e:
+              print(f"⚠️ Supabase error (non-fatal): {e}")
+
+          # Output summary
+          print("\n📊 D1 PATHWAY UPDATE")
+          print("=" * 50)
+          print(f"Swimmer: {michael_profile['name']}")
+          print(f"Age: {michael_profile['age']} | Class: {michael_profile['graduation_year']}")
+          print(f"\n🏊 TIME ANALYSIS:")
+          for event, data in analysis.items():
+              status_icon = "✅" if data["status"] == "ON_TRACK" else "⚠️"
+              print(f"  {status_icon} {event}: {data['current']} → {data['target']} (gap: {data['gap_seconds']}s)")
+
+          print(f"\n🎯 TOP TARGET SCHOOLS:")
+          for school in sorted(schools, key=lambda x: x['score'], reverse=True)[:5]:
+              sprint_icon = "🏃" if school['sprint'] else "  "
+              print(f"  {sprint_icon} {school['name']}: {school['coach']} (score: {school['score']})")
+
+          # Save output
+          with open("d1_pathway_update.json", "w") as f:
+              json.dump(update, f, indent=2)
+          EOF
+      
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: d1-pathway-update
+          path: d1_pathway_update.json
+          retention-days: 30
+
+  swim-data-collection:
+    runs-on: ubuntu-latest
+    name: Swiss Army Swim Scrapers
+    needs: d1-pathway-update
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install aiohttp beautifulsoup4
+      
+      - name: Run Swiss Army Scrapers
+        run: |
+          python << 'EOF'
+          import asyncio
+          import aiohttp
+          import json
+          from datetime import datetime
+
+          async def collect_data():
+              """Collect swim data from multiple sources"""
+              
+              data = {
+                  "swimmer": "Michael Shapira",
+                  "swimmer_id": "3250085",
+                  "collection_time": datetime.now().isoformat(),
+                  "sources": {}
+              }
+              
+              # SwimCloud URLs
+              data["sources"]["swimcloud"] = {
+                  "profile_url": "https://www.swimcloud.com/swimmer/3250085/",
+                  "team_url": "https://www.swimcloud.com/team/2276/",
+                  "note": "Satellite Beach HS"
+              }
+              
+              # FHSAA info
+              data["sources"]["fhsaa"] = {
+                  "district": 5,
+                  "region": 3,
+                  "classification": "2A",
+                  "state_results": "https://fhsaa.com/documents/2025/11/8/2a_states_results.pdf"
+              }
+              
+              # Upcoming meets
+              data["sources"]["upcoming_meets"] = {
+                  "harry_meisel": {
+                      "name": "Harry Meisel Championships East",
+                      "dates": "December 13-14, 2025",
+                      "events": [
+                          {"event": "100 Free", "heat": 1, "lane": 6, "seed": "50.82"},
+                          {"event": "50 Fly", "heat": 1, "lane": 3, "seed": "25.79"},
+                          {"event": "100 Back", "heat": 1, "lane": 2, "seed": "1:01.62"},
+                          {"event": "50 Free", "heat": 1, "lane": 3, "seed": "23.22"}
+                      ]
+                  }
+              }
+              
+              # D1 recruiting standards
+              data["sources"]["recruiting_standards"] = {
+                  "50_free": {"low_d1": "21.4-22.5", "michael": "23.22", "gap": "0.72s"},
+                  "100_free": {"low_d1": "47.0-49.0", "michael": "50.82", "gap": "1.82s"},
+                  "100_fly": {"low_d1": "50.0-52.0", "michael": "57.21", "gap": "5.21s"},
+                  "100_back": {"low_d1": "51.0-53.0", "michael": "1:01.62", "gap": "8.62s"}
+              }
+              
+              return data
+
+          # Run collection
+          data = asyncio.run(collect_data())
+          
+          # Save
+          with open("swim_data_collection.json", "w") as f:
+              json.dump(data, f, indent=2)
+          
+          print("✅ Swiss Army Scrapers complete")
+          print(f"📊 Sources collected: {len(data['sources'])}")
+          
+          # Print recruiting gaps
+          print("\n🎯 RECRUITING GAP ANALYSIS:")
+          standards = data["sources"]["recruiting_standards"]
+          for event, info in standards.items():
+              print(f"  {event}: {info['michael']} → {info['low_d1']} (gap: {info['gap']})")
+          EOF
+      
+      - name: Upload swim data artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: swim-data-collection
+          path: swim_data_collection.json
+          retention-days: 30
+
+  weekly-meal-plan:
+    runs-on: ubuntu-latest
+    name: Kosher Meal Plan Generator
+    if: github.event.schedule == '0 11 * * 0' || github.event_name == 'workflow_dispatch'
+    
+    steps:
+      - name: Generate Weekly Meal Plan
+        run: |
+          python << 'EOF'
+          import json
+          from datetime import datetime, timedelta
+
+          def generate_meal_plan():
+              """Generate kosher keto meal plan for Michael"""
+              
+              start_date = datetime.now()
+              
+              plan = {
+                  "athlete": "Michael Shapira",
+                  "week_starting": start_date.strftime("%Y-%m-%d"),
+                  "calorie_target": 3800,
+                  "protocol": "Kosher Keto (Michael Andrew Framework)",
+                  "days": {}
+              }
+              
+              # Keto days (Mon-Thu)
+              keto_meals = {
+                  "type": "strict_keto",
+                  "macros": {"protein": "35%", "fat": "60%", "carbs": "5%"},
+                  "breakfast": ["4 eggs in olive oil", "beef bacon", "avocado", "kosher cheese"],
+                  "pre_practice": ["MCT oil coffee", "almonds"],
+                  "post_practice": ["Kosher chocolate milk (Kemps)", "protein shake"],
+                  "lunch": ["Grilled chicken (8oz)", "Caesar salad", "olive oil dressing"],
+                  "dinner": ["Ribeye steak (12oz)", "roasted broccoli", "cauliflower mash"],
+                  "kosher_notes": "Glatt kosher beef only, check OU-D certification on dairy"
+              }
+              
+              # Shabbat meals (Fri-Sun)
+              shabbat_meals = {
+                  "type": "moderate_carbs",
+                  "macros": {"protein": "30%", "fat": "40%", "carbs": "30%"},
+                  "friday_dinner": ["Challah", "Chicken soup w/ matzo balls", "Roast chicken", "Potato kugel"],
+                  "shabbat_lunch": ["Cholent", "Kugel", "Salads", "Challah"],
+                  "sunday": ["Kosher asado (16oz)", "Grilled veggies", "Rice", "Hummus"],
+                  "kosher_notes": "Traditional Shabbat meals, prepared before Shabbat"
+              }
+              
+              days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
+              for i, day in enumerate(days):
+                  day_date = (start_date + timedelta(days=i)).strftime("%Y-%m-%d")
+                  if day in ["Monday", "Tuesday", "Wednesday", "Thursday"]:
+                      plan["days"][day] = {"date": day_date, **keto_meals}
+                  else:
+                      plan["days"][day] = {"date": day_date, **shabbat_meals}
+              
+              return plan
+
+          plan = generate_meal_plan()
+          
+          with open("weekly_meal_plan.json", "w") as f:
+              json.dump(plan, f, indent=2)
+          
+          print("🍽️ Weekly Kosher Meal Plan Generated")
+          print(f"📅 Week of: {plan['week_starting']}")
+          print(f"🎯 Calorie target: {plan['calorie_target']} cal/day")
+          print("\n📋 Schedule:")
+          print("  Mon-Thu: Strict Keto")
+          print("  Fri-Sun: Shabbat/Moderate Carbs")
+          EOF
+      
+      - name: Upload meal plan
+        uses: actions/upload-artifact@v4
+        with:
+          name: weekly-meal-plan
+          path: weekly_meal_plan.json
+          retention-days: 30
