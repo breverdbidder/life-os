@@ -308,7 +308,7 @@ class SwimCloudAPI:
             "swimmer_id": sid,
             "times": {
                 "50 Free": {"time": 23.22, "date": "2024-12-07"},
-                "100 Free": {"time": 50.82, "date": "2024-12-07"},
+                "100 Free": {"time": 48.80, "date": "2024-12-07"},
                 "100 Fly": {"time": 57.21, "date": "2024-11-15"},
                 "100 Back": {"time": 61.62, "date": "2024-11-15"}
             },
@@ -431,10 +431,10 @@ class SharedStateRepository:
             "high_school": "Satellite Beach High School",
             "events": ["50 Free", "100 Free", "100 Fly", "100 Back", "200 Free"],
             "personal_bests": {
-                "50 Free": 23.22,
-                "100 Free": 50.82,
-                "100 Fly": 57.21,
-                "100 Back": 61.62
+                "50 Free": 21.86,
+                "100 Free": 48.80,
+                "100 Fly": 55.87,
+                "200 Free": 113.03
             },
             "uf_2027_targets": Config.UF_2027_TARGETS,
             "gpa": 3.5,
@@ -795,7 +795,7 @@ class CompetitorAnalysisAgentV3(BaseAgentV3):
     
     def process(self, query: str, context: Dict) -> Dict:
         event = context.get("event", "100 Free")
-        michael_time = self.state.get("personal_bests", {}).get(event, 50.82)
+        michael_time = self.state.get("personal_bests", {}).get(event, 48.80)
         
         competitors = self.swimcloud.get_competitor_data(2027)
         
