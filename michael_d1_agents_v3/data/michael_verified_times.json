@@ -1,0 +1,69 @@
+{
+  "swimmer": {
+    "name": "Michael Shapira",
+    "swimcloud_id": "3250085",
+    "location": "Satellite Beach, FL",
+    "class_of": 2027,
+    "florida_rank": 116,
+    "power_index": 49.62
+  },
+  "teams": [
+    {"name": "Swim Melbourne", "id": "10023007"},
+    {"name": "Satellite Sr High School", "id": "2276"},
+    {"name": "West Shore High School", "id": "2144"}
+  ],
+  "verified_personal_bests_scy": {
+    "50 Free": {
+      "time": "21.86",
+      "time_seconds": 21.86,
+      "meet": "FHSAA 2A Region 2 Championship",
+      "date": "2025-10-29",
+      "place": "3rd"
+    },
+    "100 Free": {
+      "time": "48.80",
+      "time_seconds": 48.80,
+      "meet": "FHSAA 2A Region 2 Championship",
+      "date": "2025-10-29",
+      "place": "3rd"
+    },
+    "100 Fly": {
+      "time": "55.87",
+      "time_seconds": 55.87,
+      "meet": "FL GSC Holiday Classic",
+      "date": "2025-12-07",
+      "place": "35th",
+      "is_pb": true
+    },
+    "200 Free": {
+      "time": "1:53.03",
+      "time_seconds": 113.03,
+      "meet": "FL GSC Holiday Classic",
+      "date": "2025-12-07",
+      "place": "66th",
+      "is_pb": true
+    }
+  },
+  "recent_meets_2025": [
+    "FL GSC Holiday Classic (Dec 5-7, 2025)",
+    "FHSAA Class 2A State Championship (Nov 7, 2025)",
+    "FHSAA 2A Region 2 Championship (Oct 29, 2025)",
+    "FHSAA 2A District 5 Championships (Oct 23, 2025)",
+    "Cape Coast Conference Championships (Oct 3, 2025)"
+  ],
+  "uf_2027_targets": {
+    "50 Free": 20.5,
+    "100 Free": 44.5,
+    "100 Fly": 49.0,
+    "200 Free": 103.0
+  },
+  "gap_analysis": {
+    "50 Free": {"current": 21.86, "target": 20.5, "gap": 1.36, "improvement_needed": "6.2%"},
+    "100 Free": {"current": 48.80, "target": 44.5, "gap": 4.30, "improvement_needed": "8.8%"},
+    "100 Fly": {"current": 55.87, "target": 49.0, "gap": 6.87, "improvement_needed": "12.3%"},
+    "200 Free": {"current": 113.03, "target": 103.0, "gap": 10.03, "improvement_needed": "8.9%"}
+  },
+  "data_source": "SwimCloud",
+  "scraped_at": "2025-12-12T19:38:00Z",
+  "scraper_method": "curl_cffi with safari17_0 impersonation"
+}
