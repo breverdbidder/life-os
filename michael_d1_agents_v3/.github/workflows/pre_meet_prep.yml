@@ -1,0 +1,62 @@
+name: Pre-Meet Preparation Document Generator
+on:
+  schedule:
+    - cron: '0 12 * * *'  # Check daily at noon UTC (8 AM EST)
+  workflow_dispatch:  # Manual trigger
+
+env:
+  SUPABASE_URL: https://mocerqjnksmhcjzxrewo.supabase.co
+  MEET_PREP_HOURS_BEFORE: 72  # Generate docs 72 hours before meet
+  
+jobs:
+  check-upcoming-meets:
+    runs-on: ubuntu-latest
+    outputs:
+      has_meets: ${{ steps.check.outputs.has_meets }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          
+      - name: Install dependencies
+        run: pip install httpx supabase
+        
+      - name: Check for meets within 72 hours
+        id: check
+        env:
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+        run: |
+          cd michael_d1_agents_v3
+          result=$(python orchestrator_v3.py meet_prep_check)
+          echo "has_meets=$(echo $result | grep -c 'meet_id' || echo 0)" >> $GITHUB_OUTPUT
+          
+  generate-prep-docs:
+    needs: check-upcoming-meets
+    if: needs.check-upcoming-meets.outputs.has_meets != '0'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          
+      - name: Install dependencies
+        run: |
+          pip install httpx supabase xgboost pandas numpy python-docx
+          
+      - name: Generate preparation documents
+        env:
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+        run: |
+          cd michael_d1_agents_v3
+          python orchestrator_v3.py generate_meet_prep
+          
+      - name: Log completion
+        run: echo "✅ Meet prep documents generated at $(date)"
