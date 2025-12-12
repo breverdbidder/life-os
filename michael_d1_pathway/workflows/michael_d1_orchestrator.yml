@@ -1,0 +1,65 @@
+name: Michael D1 Pathway Orchestrator
+
+on:
+  workflow_dispatch:
+    inputs:
+      query:
+        description: 'Query to run through the multi-agent system'
+        required: false
+        default: 'What are my UF recruiting prospects?'
+  schedule:
+    # Daily check at 7 AM EST
+    - cron: '0 12 * * *'
+
+env:
+  SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+  SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+  ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+
+jobs:
+  run-orchestrator:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+          
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip
+          pip install -r michael_d1_pathway/requirements.txt
+          
+      - name: Run Orchestrator
+        working-directory: michael_d1_pathway
+        run: |
+          echo "🏊 Michael D1 Pathway Orchestrator"
+          echo "=================================="
+          echo "Target: UF 2027 | Coach: Anthony Nesty"
+          echo ""
+          python main.py --demo
+          
+      - name: Log to Supabase
+        if: always()
+        run: |
+          curl -X POST "$SUPABASE_URL/rest/v1/insights" \
+            -H "apikey: $SUPABASE_KEY" \
+            -H "Authorization: Bearer $SUPABASE_KEY" \
+            -H "Content-Type: application/json" \
+            -H "Prefer: return=minimal" \
+            -d '{
+              "category": "michael_d1",
+              "subcategory": "orchestrator_run",
+              "content": "Daily orchestrator check completed",
+              "metadata": {
+                "workflow": "michael_d1_pathway",
+                "status": "completed",
+                "timestamp": "'$(date -u +%Y-%m-%dT%H:%M:%SZ)'"
+              }
+            }'
+          echo "✅ Logged to Supabase"
