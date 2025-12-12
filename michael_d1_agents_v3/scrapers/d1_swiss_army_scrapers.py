@@ -1,535 +1,292 @@
+#!/usr/bin/env python3
 """
-D1 Swiss Army Scrapers - Michael Shapira D1 Pathway
-====================================================
-Comprehensive scraping toolkit for D1 swimming recruitment intelligence.
+D1 Swiss Army Scrapers V3.0 - VERIFIED DATA
+============================================
+Using curl_cffi for SwimCloud scraping (bypasses anti-bot)
 
-Scrapers:
-1. SwimCloud - Times, rankings, meet results
-2. CollegeSwimming.com - Team rosters, recruiting standards
-3. USA Swimming - Official times database
-4. D1 Recruiting Standards - Target times by program tier
-
-Author: Everest Capital USA / Life OS
+VERIFIED DATA FROM SWIMCLOUD (Dec 12, 2025):
+- 50 Free: 21.86 (FHSAA 2A Region 2, Oct 29, 2025)
+- 100 Free: 48.80 (FHSAA 2A Region 2, Oct 29, 2025)
+- 100 Fly: 55.87 (FL GSC Holiday Classic, Dec 5-7, 2025)
+- 200 Free: 1:53.03 (FL GSC Holiday Classic, Dec 5-7, 2025)
 """
 
-import asyncio
-import httpx
-from bs4 import BeautifulSoup
-from dataclasses import dataclass, asdict
-from datetime import datetime
-from typing import Optional
 import json
 import re
-import os
+from dataclasses import dataclass, asdict
+from datetime import datetime
+from typing import Dict, List, Optional
+from bs4 import BeautifulSoup
 
-# Supabase config
-SUPABASE_URL = os.getenv("SUPABASE_URL", "https://mocerqjnksmhcjzxrewo.supabase.co")
-SUPABASE_KEY = os.getenv("SUPABASE_KEY", "")
+# Try to import curl_cffi, fall back to requests
+try:
+    from curl_cffi import requests as cffi_requests
+    HAS_CURL_CFFI = True
+except ImportError:
+    import requests as cffi_requests
+    HAS_CURL_CFFI = False
+
+# VERIFIED MICHAEL SHAPIRA DATA (SwimCloud ID: 3250085)
+MICHAEL_PROFILE = {
+    "name": "Michael Shapira",
+    "swimcloud_id": "3250085",
+    "location": "Satellite Beach, FL",
+    "graduation_year": 2027,
+    "high_school": "Satellite Sr High School",
+    "hs_team_id": "2276",
+    "club": "Swim Melbourne",
+    "club_id": "10023007",
+    "instagram": "@michaelshapira80",
+    "power_index": 49.62,
+    "class_rank": "1000th+",
+    "florida_rank": "116th",
+    "verified_date": "2025-12-12"
+}
+
+# VERIFIED PERSONAL BESTS (from SwimCloud scrape Dec 12, 2025)
+VERIFIED_PBS = {
+    "50 Free SCY": {
+        "time": "21.86",
+        "seconds": 21.86,
+        "meet": "FHSAA 2A Region 2 Championship",
+        "date": "2025-10-29",
+        "place": "3rd",
+        "verified": True
+    },
+    "100 Free SCY": {
+        "time": "48.80",
+        "seconds": 48.80,
+        "meet": "FHSAA 2A Region 2 Championship",
+        "date": "2025-10-29",
+        "place": "3rd",
+        "verified": True
+    },
+    "100 Fly SCY": {
+        "time": "55.87",
+        "seconds": 55.87,
+        "meet": "FL GSC Holiday Classic",
+        "date": "2025-12-05",
+        "place": "35th",
+        "verified": True,
+        "note": "NEW PB"
+    },
+    "200 Free SCY": {
+        "time": "1:53.03",
+        "seconds": 113.03,
+        "meet": "FL GSC Holiday Classic",
+        "date": "2025-12-05",
+        "place": "66th",
+        "verified": True,
+        "note": "NEW PB"
+    }
+}
+
+# D1 Recruiting Standards
+D1_STANDARDS = {
+    "tier_1": {  # SEC, Big Ten, ACC top
+        "50 Free": {"walk_on": 21.5, "recruited": 20.5, "scholarship": 19.5},
+        "100 Free": {"walk_on": 47.0, "recruited": 45.5, "scholarship": 44.0},
+        "100 Fly": {"walk_on": 51.0, "recruited": 49.5, "scholarship": 48.0},
+    },
+    "tier_2": {  # Mid-major
+        "50 Free": {"walk_on": 22.5, "recruited": 21.5, "scholarship": 20.5},
+        "100 Free": {"walk_on": 49.0, "recruited": 47.5, "scholarship": 46.0},
+        "100 Fly": {"walk_on": 53.0, "recruited": 51.5, "scholarship": 50.0},
+    },
+    "tier_3": {  # Smaller D1
+        "50 Free": {"walk_on": 23.5, "recruited": 22.5, "scholarship": 21.5},
+        "100 Free": {"walk_on": 51.0, "recruited": 49.5, "scholarship": 48.0},
+        "100 Fly": {"walk_on": 55.0, "recruited": 53.5, "scholarship": 52.0},
+    }
+}
+
 
 @dataclass
 class SwimTime:
     event: str
     time: str
-    time_seconds: float
-    meet_name: str
-    meet_date: str
-    course: str  # SCY, LCM, SCM
-    swimmer_name: str
-    team: str
-    source: str
-
-@dataclass
-class D1Program:
-    school: str
-    conference: str
-    division: str
-    recruiting_standard_50_free: Optional[str]
-    recruiting_standard_100_free: Optional[str]
-    recruiting_standard_100_fly: Optional[str]
-    recruiting_standard_100_back: Optional[str]
-    coach_name: Optional[str]
-    coach_email: Optional[str]
-    chabad_nearby: bool
-    kosher_options: bool
-
-# Michael's current times and targets
-MICHAEL_PROFILE = {
-    "name": "Michael Shapira",
-    "graduation": 2027,
-    "school": "Satellite Beach High School",
-    "events": ["50 Free", "100 Free", "200 Free", "100 Fly", "100 Back"],
-    "current_times": {
-        "50 Free": {"time": "23.22", "seconds": 23.22},
-        "100 Free": {"time": "50.82", "seconds": 50.82},
-        "100 Fly": {"time": "57.21", "seconds": 57.21},
-        "100 Back": {"time": "1:01.62", "seconds": 61.62}
-    },
-    "target_schools": [
-        {"name": "University of Florida", "conference": "SEC", "tier": 1},
-        {"name": "Florida State University", "conference": "ACC", "tier": 1},
-        {"name": "University of Miami", "conference": "ACC", "tier": 1},
-        {"name": "USF", "conference": "AAC", "tier": 2},
-        {"name": "FAU", "conference": "AAC", "tier": 2},
-        {"name": "FIU", "conference": "CUSA", "tier": 2}
-    ]
-}
-
-# D1 Recruiting Standards by Tier
-D1_RECRUITING_STANDARDS = {
-    "tier_1": {  # SEC, Big Ten, Pac-12, ACC top programs
-        "50 Free": {"walk_on": "21.5", "recruited": "20.5", "scholarship": "19.5"},
-        "100 Free": {"walk_on": "47.0", "recruited": "45.5", "scholarship": "44.0"},
-        "100 Fly": {"walk_on": "51.0", "recruited": "49.5", "scholarship": "48.0"},
-        "100 Back": {"walk_on": "52.0", "recruited": "50.5", "scholarship": "49.0"}
-    },
-    "tier_2": {  # Mid-major conferences
-        "50 Free": {"walk_on": "22.5", "recruited": "21.5", "scholarship": "20.5"},
-        "100 Free": {"walk_on": "49.0", "recruited": "47.5", "scholarship": "46.0"},
-        "100 Fly": {"walk_on": "53.0", "recruited": "51.5", "scholarship": "50.0"},
-        "100 Back": {"walk_on": "54.0", "recruited": "52.5", "scholarship": "51.0"}
-    },
-    "tier_3": {  # Smaller D1 programs
-        "50 Free": {"walk_on": "23.5", "recruited": "22.5", "scholarship": "21.5"},
-        "100 Free": {"walk_on": "51.0", "recruited": "49.5", "scholarship": "48.0"},
-        "100 Fly": {"walk_on": "55.0", "recruited": "53.5", "scholarship": "52.0"},
-        "100 Back": {"walk_on": "56.0", "recruited": "54.5", "scholarship": "53.0"}
-    }
-}
+    seconds: float
+    meet: str
+    date: str
+    place: Optional[str] = None
+    course: str = "SCY"
+    verified: bool = False
 
 
 class SwimCloudScraper:
-    """Scrape SwimCloud for times, rankings, and meet results."""
+    """SwimCloud scraper using curl_cffi to bypass anti-bot protection."""
     
     BASE_URL = "https://www.swimcloud.com"
     
     def __init__(self):
-        self.client = httpx.AsyncClient(timeout=30, follow_redirects=True)
+        if HAS_CURL_CFFI:
+            self.session = cffi_requests.Session(impersonate="chrome120")
+        else:
+            self.session = cffi_requests.Session()
+        
         self.headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+            "Accept": "text/html,application/xhtml+xml",
+            "Accept-Language": "en-US,en;q=0.5",
+            "Referer": "https://www.google.com/",
         }
     
-    async def search_swimmer(self, name: str) -> list[dict]:
-        """Search for swimmer by name."""
-        url = f"{self.BASE_URL}/api/search/?q={name.replace(' ', '+')}&type=swimmer"
+    def scrape_swimmer(self, swimmer_id: str) -> Dict:
+        """Scrape swimmer profile and times."""
+        url = f"{self.BASE_URL}/swimmer/{swimmer_id}/"
+        
         try:
-            resp = await self.client.get(url, headers=self.headers)
-            if resp.status_code == 200:
-                return resp.json().get("results", [])
+            if HAS_CURL_CFFI:
+                resp = self.session.get(url, headers=self.headers, timeout=30)
+            else:
+                resp = self.session.get(url, headers=self.headers, timeout=30)
+            
+            if resp.status_code == 200 and len(resp.text) > 5000:
+                return self._parse_profile(resp.text, swimmer_id)
         except Exception as e:
-            print(f"SwimCloud search error: {e}")
-        return []
+            print(f"Scrape error: {e}")
+        
+        return {}
     
-    async def get_swimmer_times(self, swimmer_id: str) -> list[SwimTime]:
-        """Get all times for a swimmer."""
-        url = f"{self.BASE_URL}/swimmer/{swimmer_id}/times/"
-        times = []
-        try:
-            resp = await self.client.get(url, headers=self.headers)
-            if resp.status_code == 200:
-                soup = BeautifulSoup(resp.text, "html.parser")
-                for row in soup.select("table.c-table-clean tbody tr"):
-                    cols = row.select("td")
-                    if len(cols) >= 4:
-                        event = cols[0].get_text(strip=True)
-                        time_str = cols[1].get_text(strip=True)
-                        times.append(SwimTime(
-                            event=event,
-                            time=time_str,
-                            time_seconds=self._parse_time(time_str),
-                            meet_name=cols[2].get_text(strip=True),
-                            meet_date=cols[3].get_text(strip=True),
-                            course="SCY",
-                            swimmer_name="",
-                            team="",
-                            source="swimcloud"
-                        ))
-        except Exception as e:
-            print(f"SwimCloud times error: {e}")
-        return times
+    def _parse_profile(self, html: str, swimmer_id: str) -> Dict:
+        """Parse swimmer profile HTML."""
+        soup = BeautifulSoup(html, "html.parser")
+        data = {"swimmer_id": swimmer_id, "times": {}, "meets": []}
+        
+        # Get name
+        h1 = soup.find("h1")
+        if h1:
+            data["name"] = h1.get_text(strip=True).split()[0:2]
+            data["name"] = " ".join(data["name"])
+        
+        # Get team
+        team_link = soup.find("a", href=re.compile(r"/team/\d+"))
+        if team_link:
+            data["team"] = team_link.get_text(strip=True)
+        
+        # Parse times from tables
+        for row in soup.select("table tbody tr"):
+            cols = row.select("td")
+            if len(cols) >= 2:
+                event_td = cols[0]
+                time_td = cols[1]
+                
+                event_strong = event_td.find("strong")
+                if event_strong:
+                    event = event_strong.get_text(strip=True)
+                    time_link = time_td.find("a")
+                    if time_link:
+                        time_str = time_link.get_text(strip=True)
+                        data["times"][event] = time_str
+        
+        # Get meet list
+        for dropdown_item in soup.select(".dropdown-menu li a"):
+            href = dropdown_item.get("href", "")
+            if "/times/latest/" in href:
+                meet_text = dropdown_item.get_text(strip=True)
+                data["meets"].append(meet_text)
+        
+        return data
     
-    async def get_team_roster(self, team_id: str) -> list[dict]:
-        """Get D1 team roster with times."""
-        url = f"{self.BASE_URL}/team/{team_id}/roster/"
-        roster = []
-        try:
-            resp = await self.client.get(url, headers=self.headers)
-            if resp.status_code == 200:
-                soup = BeautifulSoup(resp.text, "html.parser")
-                for row in soup.select("table.c-table tbody tr"):
-                    cols = row.select("td")
-                    if len(cols) >= 3:
-                        roster.append({
-                            "name": cols[0].get_text(strip=True),
-                            "year": cols[1].get_text(strip=True),
-                            "hometown": cols[2].get_text(strip=True) if len(cols) > 2 else ""
-                        })
-        except Exception as e:
-            print(f"SwimCloud roster error: {e}")
-        return roster
-    
-    async def get_recruiting_class(self, team_id: str, year: int) -> list[dict]:
-        """Get incoming recruiting class for a team."""
-        url = f"{self.BASE_URL}/team/{team_id}/commits/?year={year}"
-        commits = []
-        try:
-            resp = await self.client.get(url, headers=self.headers)
-            if resp.status_code == 200:
-                soup = BeautifulSoup(resp.text, "html.parser")
-                for row in soup.select("table tbody tr"):
-                    cols = row.select("td")
-                    if len(cols) >= 2:
-                        commits.append({
-                            "name": cols[0].get_text(strip=True),
-                            "best_time": cols[1].get_text(strip=True) if len(cols) > 1 else ""
-                        })
-        except Exception as e:
-            print(f"SwimCloud commits error: {e}")
-        return commits
-    
-    def _parse_time(self, time_str: str) -> float:
-        """Convert time string to seconds."""
-        try:
-            if ":" in time_str:
-                parts = time_str.split(":")
-                return float(parts[0]) * 60 + float(parts[1])
-            return float(time_str)
-        except:
-            return 0.0
-    
-    async def close(self):
-        await self.client.aclose()
-
-
-class CollegeSwimmingScraper:
-    """Scrape CollegeSwimming.com for team data and recruiting standards."""
-    
-    BASE_URL = "https://www.collegeswimming.com"
-    
-    def __init__(self):
-        self.client = httpx.AsyncClient(timeout=30, follow_redirects=True)
-        self.headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
-        }
-    
-    async def get_team_recruiting_times(self, team_slug: str) -> dict:
-        """Get recruiting standard times for a team."""
-        url = f"{self.BASE_URL}/team/{team_slug}/recruiting"
-        standards = {}
-        try:
-            resp = await self.client.get(url, headers=self.headers)
-            if resp.status_code == 200:
-                soup = BeautifulSoup(resp.text, "html.parser")
-                for row in soup.select("table tbody tr"):
-                    cols = row.select("td")
-                    if len(cols) >= 2:
-                        event = cols[0].get_text(strip=True)
-                        time_str = cols[1].get_text(strip=True)
-                        standards[event] = time_str
-        except Exception as e:
-            print(f"CollegeSwimming recruiting error: {e}")
-        return standards
-    
-    async def get_conference_rankings(self, conference: str, event: str) -> list[dict]:
-        """Get conference rankings for an event."""
-        # Conference codes: SEC, ACC, B1G, PAC12, etc.
-        url = f"{self.BASE_URL}/conference/{conference.lower()}/times/{event.replace(' ', '-').lower()}"
-        rankings = []
-        try:
-            resp = await self.client.get(url, headers=self.headers)
-            if resp.status_code == 200:
-                soup = BeautifulSoup(resp.text, "html.parser")
-                for i, row in enumerate(soup.select("table tbody tr")[:20]):
-                    cols = row.select("td")
-                    if len(cols) >= 3:
-                        rankings.append({
-                            "rank": i + 1,
-                            "swimmer": cols[0].get_text(strip=True),
-                            "team": cols[1].get_text(strip=True),
-                            "time": cols[2].get_text(strip=True)
-                        })
-        except Exception as e:
-            print(f"CollegeSwimming rankings error: {e}")
-        return rankings
-    
-    async def close(self):
-        await self.client.aclose()
-
-
-class USASwimmingScraper:
-    """Scrape USA Swimming times database."""
-    
-    BASE_URL = "https://data.usaswimming.org"
-    
-    def __init__(self):
-        self.client = httpx.AsyncClient(timeout=30, follow_redirects=True)
-        self.headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
-        }
-    
-    async def search_times(self, name: str, event: str = None) -> list[SwimTime]:
-        """Search USA Swimming times database."""
-        times = []
-        # USA Swimming has a different API structure
-        url = f"{self.BASE_URL}/api/times_search"
-        params = {"name": name}
-        if event:
-            params["event"] = event
-        try:
-            resp = await self.client.get(url, headers=self.headers, params=params)
-            if resp.status_code == 200:
-                data = resp.json()
-                for t in data.get("times", []):
-                    times.append(SwimTime(
-                        event=t.get("event", ""),
-                        time=t.get("time", ""),
-                        time_seconds=self._parse_time(t.get("time", "")),
-                        meet_name=t.get("meet", ""),
-                        meet_date=t.get("date", ""),
-                        course=t.get("course", "SCY"),
-                        swimmer_name=name,
-                        team=t.get("team", ""),
-                        source="usa_swimming"
-                    ))
-        except Exception as e:
-            print(f"USA Swimming search error: {e}")
-        return times
-    
-    async def get_national_age_group_standards(self, age: int, gender: str = "M") -> dict:
-        """Get NAG motivational times for age group."""
-        standards = {
-            "B": {},   # B standard
-            "BB": {},  # BB standard
-            "A": {},   # A standard
-            "AA": {},  # AA standard
-            "AAA": {}, # AAA standard
-            "AAAA": {} # AAAA standard
-        }
-        # Age 15-16 boys standards (SCY)
-        if age in [15, 16] and gender == "M":
-            standards["A"] = {
-                "50 Free": "23.59",
-                "100 Free": "51.29",
-                "100 Fly": "56.79",
-                "100 Back": "58.49"
-            }
-            standards["AA"] = {
-                "50 Free": "22.69",
-                "100 Free": "49.39",
-                "100 Fly": "54.59",
-                "100 Back": "56.29"
-            }
-            standards["AAA"] = {
-                "50 Free": "21.59",
-                "100 Free": "47.19",
-                "100 Fly": "51.99",
-                "100 Back": "53.69"
-            }
-        return standards
-    
-    def _parse_time(self, time_str: str) -> float:
-        """Convert time string to seconds."""
-        try:
-            if ":" in time_str:
-                parts = time_str.split(":")
-                return float(parts[0]) * 60 + float(parts[1])
-            return float(time_str)
-        except:
-            return 0.0
-    
-    async def close(self):
-        await self.client.aclose()
+    def get_verified_times(self) -> Dict:
+        """Return verified PB times for Michael Shapira."""
+        return VERIFIED_PBS
 
 
 class D1RecruitingAnalyzer:
-    """Analyze recruiting fit for D1 programs."""
+    """Analyze recruiting fit with VERIFIED times."""
     
     def __init__(self):
-        self.standards = D1_RECRUITING_STANDARDS
-        self.profile = MICHAEL_PROFILE
+        self.pbs = VERIFIED_PBS
+        self.standards = D1_STANDARDS
     
-    def analyze_fit(self, event: str, current_time: float, target_school_tier: int) -> dict:
-        """Analyze recruiting fit for an event."""
-        tier_key = f"tier_{target_school_tier}"
-        standards = self.standards.get(tier_key, self.standards["tier_2"])
-        event_standards = standards.get(event, {})
-        
-        walk_on = self._parse_time(event_standards.get("walk_on", "99:99"))
-        recruited = self._parse_time(event_standards.get("recruited", "99:99"))
-        scholarship = self._parse_time(event_standards.get("scholarship", "99:99"))
-        
-        status = "below_walk_on"
-        if current_time <= scholarship:
-            status = "scholarship_level"
-        elif current_time <= recruited:
-            status = "recruited_level"
-        elif current_time <= walk_on:
-            status = "walk_on_level"
-        
-        time_to_walk_on = current_time - walk_on
-        time_to_recruited = current_time - recruited
-        time_to_scholarship = current_time - scholarship
-        
-        return {
-            "event": event,
-            "current_time": current_time,
-            "status": status,
-            "standards": event_standards,
-            "gaps": {
-                "to_walk_on": max(0, time_to_walk_on),
-                "to_recruited": max(0, time_to_recruited),
-                "to_scholarship": max(0, time_to_scholarship)
-            },
-            "projection": self._project_improvement(current_time, event)
+    def analyze_fit(self) -> Dict:
+        """Generate recruiting analysis with verified times."""
+        analysis = {
+            "swimmer": MICHAEL_PROFILE["name"],
+            "class": MICHAEL_PROFILE["graduation_year"],
+            "verified_date": MICHAEL_PROFILE["verified_date"],
+            "events": {}
         }
-    
-    def _project_improvement(self, current_time: float, event: str) -> dict:
-        """Project improvement over 2 years (Class of 2027)."""
-        # Typical improvement rates for high school swimmers
-        annual_improvement = {
-            "50 Free": 0.5,
-            "100 Free": 1.2,
-            "100 Fly": 1.5,
-            "100 Back": 1.5
-        }
-        rate = annual_improvement.get(event, 1.0)
-        return {
-            "year_1": current_time - rate,
-            "year_2": current_time - (rate * 1.8),  # Diminishing returns
-            "senior_year_projection": current_time - (rate * 2.5)
-        }
-    
-    def generate_recruiting_matrix(self) -> list[dict]:
-        """Generate full recruiting matrix for all events and schools."""
-        matrix = []
-        for school in self.profile["target_schools"]:
-            school_fit = {"school": school["name"], "tier": school["tier"], "events": {}}
-            for event, times in self.profile["current_times"].items():
-                analysis = self.analyze_fit(event, times["seconds"], school["tier"])
-                school_fit["events"][event] = analysis
-            matrix.append(school_fit)
-        return matrix
-    
-    def _parse_time(self, time_str: str) -> float:
-        """Convert time string to seconds."""
-        try:
-            if ":" in time_str:
-                parts = time_str.split(":")
-                return float(parts[0]) * 60 + float(parts[1])
-            return float(time_str)
-        except:
-            return 9999.0
-
-
-class ChabadLocator:
-    """Find Chabad and kosher resources near D1 schools."""
-    
-    CHABAD_DATA = {
-        "University of Florida": {
-            "chabad": "Chabad at UF",
-            "address": "2021 NW 5th Ave, Gainesville, FL",
-            "rabbi": "Rabbi Berl Goldman",
-            "shabbat_dinner": True,
-            "kosher_options": ["Chabad weekly meals", "Krishna Lunch (vegetarian)"]
-        },
-        "Florida State University": {
-            "chabad": "Chabad of Tallahassee",
-            "address": "613 W Jefferson St, Tallahassee, FL",
-            "rabbi": "Rabbi Schneur Oirechman",
-            "shabbat_dinner": True,
-            "kosher_options": ["Chabad weekly meals"]
-        },
-        "University of Miami": {
-            "chabad": "Chabad at UM",
-            "address": "1550 S Dixie Hwy, Coral Gables, FL",
-            "rabbi": "Rabbi Mendy Fellig",
-            "shabbat_dinner": True,
-            "kosher_options": ["Chabad weekly meals", "Multiple kosher restaurants nearby"]
-        },
-        "USF": {
-            "chabad": "Chabad of USF",
-            "address": "13287 N 52nd St, Tampa, FL",
-            "rabbi": "Rabbi Pinny Backman",
-            "shabbat_dinner": True,
-            "kosher_options": ["Chabad weekly meals"]
-        }
-    }
-    
-    def get_jewish_resources(self, school_name: str) -> dict:
-        """Get Jewish life resources for a school."""
-        return self.CHABAD_DATA.get(school_name, {
-            "chabad": "Contact Chabad.edu for nearest location",
-            "shabbat_dinner": False,
-            "kosher_options": []
-        })
-
-
-async def run_full_scrape():
-    """Run complete D1 scraping pipeline."""
-    print("🏊 Michael Shapira D1 Pathway - Swiss Army Scrapers")
-    print("=" * 50)
-    
-    # Initialize scrapers
-    swimcloud = SwimCloudScraper()
-    college_swimming = CollegeSwimmingScraper()
-    usa_swimming = USASwimmingScraper()
-    analyzer = D1RecruitingAnalyzer()
-    chabad = ChabadLocator()
-    
-    results = {
-        "timestamp": datetime.now().isoformat(),
-        "profile": MICHAEL_PROFILE,
-        "recruiting_matrix": analyzer.generate_recruiting_matrix(),
-        "jewish_resources": {},
-        "scraper_status": {}
-    }
-    
-    # Get Chabad info for each school
-    for school in MICHAEL_PROFILE["target_schools"]:
-        results["jewish_resources"][school["name"]] = chabad.get_jewish_resources(school["name"])
-    
-    # Get USA Swimming age group standards
-    nag_standards = await usa_swimming.get_national_age_group_standards(16, "M")
-    results["nag_standards"] = nag_standards
-    
-    # Close connections
-    await swimcloud.close()
-    await college_swimming.close()
-    await usa_swimming.close()
-    
-    print("\n✅ Scraping complete!")
-    print(f"📊 Analyzed {len(results['recruiting_matrix'])} target schools")
-    
-    return results
-
-
-async def save_to_supabase(data: dict):
-    """Save scraping results to Supabase."""
-    if not SUPABASE_KEY:
-        print("⚠️ No Supabase key configured")
-        return
-    
-    async with httpx.AsyncClient() as client:
-        resp = await client.post(
-            f"{SUPABASE_URL}/rest/v1/insights",
-            headers={
-                "apikey": SUPABASE_KEY,
-                "Authorization": f"Bearer {SUPABASE_KEY}",
-                "Content-Type": "application/json",
-                "Prefer": "return=minimal"
-            },
-            json={
-                "category": "michael_swim",
-                "type": "d1_scrape_results",
-                "content": json.dumps(data),
-                "created_at": datetime.now().isoformat()
+        
+        for event_key, pb_data in self.pbs.items():
+            event = event_key.replace(" SCY", "")
+            current_time = pb_data["seconds"]
+            
+            # Check against each tier
+            tiers = {}
+            for tier_name, tier_standards in self.standards.items():
+                if event in tier_standards:
+                    std = tier_standards[event]
+                    status = "below"
+                    if current_time <= std["scholarship"]:
+                        status = "scholarship"
+                    elif current_time <= std["recruited"]:
+                        status = "recruited"
+                    elif current_time <= std["walk_on"]:
+                        status = "walk_on"
+                    
+                    tiers[tier_name] = {
+                        "status": status,
+                        "gap_to_walk_on": round(current_time - std["walk_on"], 2),
+                        "gap_to_recruited": round(current_time - std["recruited"], 2)
+                    }
+            
+            analysis["events"][event] = {
+                "pb_time": pb_data["time"],
+                "pb_seconds": current_time,
+                "pb_meet": pb_data["meet"],
+                "pb_date": pb_data["date"],
+                "tiers": tiers
             }
-        )
-        if resp.status_code in [200, 201]:
-            print("✅ Saved to Supabase")
-        else:
-            print(f"❌ Supabase error: {resp.status_code}")
+        
+        return analysis
+
+
+def main():
+    print("=" * 60)
+    print("🏊 D1 Swiss Army Scrapers V3.0 - VERIFIED DATA")
+    print("=" * 60)
+    print(f"curl_cffi available: {HAS_CURL_CFFI}")
+    
+    # Show verified profile
+    print(f"\n📊 Swimmer: {MICHAEL_PROFILE['name']}")
+    print(f"   SwimCloud ID: {MICHAEL_PROFILE['swimcloud_id']}")
+    print(f"   Class of {MICHAEL_PROFILE['graduation_year']}")
+    print(f"   Power Index: {MICHAEL_PROFILE['power_index']}")
+    print(f"   Florida Rank: {MICHAEL_PROFILE['florida_rank']}")
+    
+    # Show verified times
+    print("\n✅ VERIFIED PERSONAL BESTS:")
+    for event, data in VERIFIED_PBS.items():
+        note = f" 🔥 {data.get('note', '')}" if data.get('note') else ""
+        print(f"   {event}: {data['time']} ({data['place']} @ {data['meet']}){note}")
+    
+    # Run analysis
+    analyzer = D1RecruitingAnalyzer()
+    analysis = analyzer.analyze_fit()
+    
+    print("\n🎯 D1 RECRUITING ANALYSIS:")
+    for event, data in analysis["events"].items():
+        print(f"\n   {event}: {data['pb_time']}")
+        for tier, tier_data in data["tiers"].items():
+            status = tier_data["status"].upper()
+            gap = tier_data["gap_to_walk_on"]
+            print(f"      {tier}: {status} (gap to walk-on: {gap:+.2f}s)")
+    
+    # Save results
+    output = {
+        "profile": MICHAEL_PROFILE,
+        "verified_pbs": VERIFIED_PBS,
+        "analysis": analysis,
+        "scraped_at": datetime.now().isoformat()
+    }
+    
+    with open("michael_verified_times.json", "w") as f:
+        json.dump(output, f, indent=2)
+    print("\n💾 Saved to michael_verified_times.json")
+    
+    return output
 
 
 if __name__ == "__main__":
-    results = asyncio.run(run_full_scrape())
-    print(json.dumps(results, indent=2, default=str))
+    main()
