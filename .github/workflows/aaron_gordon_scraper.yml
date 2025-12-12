@@ -1,0 +1,195 @@
+name: Aaron Gordon SwimCloud Scraper
+
+on:
+  workflow_dispatch:
+
+jobs:
+  scrape:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      
+      - name: Install dependencies
+        run: |
+          pip install playwright beautifulsoup4
+          playwright install chromium
+      
+      - name: Scrape Aaron Gordon
+        run: |
+          python3 << 'PYTHON_EOF'
+import asyncio
+import json
+import re
+from datetime import datetime
+from playwright.async_api import async_playwright
+from bs4 import BeautifulSoup
+
+SWIMMER = {
+    "name": "Aaron Gordon",
+    "id": "1733035",
+    "school": "Merritt Island High School"
+}
+
+async def scrape_swimmer(page, swimmer_id, name):
+    url = f"https://www.swimcloud.com/swimmer/{swimmer_id}/"
+    print(f"\n{'='*60}")
+    print(f"Scraping: {name} ({swimmer_id})")
+    print(f"URL: {url}")
+    
+    try:
+        await page.goto(url, wait_until='networkidle', timeout=30000)
+        await asyncio.sleep(3)
+        
+        content = await page.content()
+        soup = BeautifulSoup(content, 'html.parser')
+        
+        result = {
+            "name": name,
+            "swimcloud_id": swimmer_id,
+            "url": url,
+            "scraped_at": datetime.now().isoformat(),
+            "events": {}
+        }
+        
+        # Extract Power Index
+        pi_match = re.search(r'Power index\s*([\d.]+)', content)
+        if pi_match:
+            result["power_index"] = float(pi_match.group(1))
+            print(f"  Power Index: {result['power_index']}")
+        
+        # Extract Florida Rank
+        rank_match = re.search(r'Florida rank\s*(\d+)', content)
+        if rank_match:
+            result["fl_rank"] = int(rank_match.group(1))
+            print(f"  FL Rank: {result['fl_rank']}")
+        
+        # Extract Class
+        class_match = re.search(r'Class\s*[·:]\s*(\d{4})', content)
+        if class_match:
+            result["class"] = int(class_match.group(1))
+            print(f"  Class: {result['class']}")
+        
+        # Extract times from page
+        events = [
+            "50 Y Free", "100 Y Free", "200 Y Free", "500 Y Free",
+            "50 Y Back", "100 Y Back", "200 Y Back",
+            "50 Y Fly", "100 Y Fly", "200 Y Fly",
+            "50 Y Breast", "100 Y Breast", "200 Y Breast",
+            "100 Y IM", "200 Y IM", "400 Y IM"
+        ]
+        
+        for event in events:
+            # Pattern: event name followed by time
+            patterns = [
+                rf'{re.escape(event)}\s*[\n\s]*(\d{{1,2}}:\d{{2}}\.\d{{2}})',
+                rf'{re.escape(event)}\s*[\n\s]*(\d{{2}}\.\d{{2}})',
+                rf'{event.replace(" Y ", " ")}\s*[–-]\s*(\d{{1,2}}:\d{{2}}\.\d{{2}})',
+                rf'{event.replace(" Y ", " ")}\s*[–-]\s*(\d{{2}}\.\d{{2}})',
+            ]
+            
+            for pattern in patterns:
+                match = re.search(pattern, content, re.IGNORECASE)
+                if match:
+                    time_str = match.group(1)
+                    result["events"][event] = time_str
+                    break
+        
+        # Also look for specific results format
+        result_patterns = [
+            r'100 Y Free[^0-9]*(\d{2}\.\d{2})',
+            r'100 Free[^0-9]*(\d{2}\.\d{2})',
+            r'50 Y Free[^0-9]*(\d{2}\.\d{2})',
+            r'50 Free[^0-9]*(\d{2}\.\d{2})',
+            r'100 Y Back[^0-9]*(\d{2}\.\d{2})',
+            r'100 Back[^0-9]*(\d{2}\.\d{2})',
+            r'50 Y Back[^0-9]*(\d{2}\.\d{2})',
+            r'200 Y Free[^0-9]*(1:\d{2}\.\d{2})',
+            r'200 Free[^0-9]*(1:\d{2}\.\d{2})',
+            r'500 Y Free[^0-9]*(4:\d{2}\.\d{2})',
+            r'200 Y IM[^0-9]*(1:\d{2}\.\d{2})',
+            r'200 IM[^0-9]*(1:\d{2}\.\d{2})',
+        ]
+        
+        event_map = {
+            '100 Y Free': '100 Y Free', '100 Free': '100 Y Free',
+            '50 Y Free': '50 Y Free', '50 Free': '50 Y Free',
+            '100 Y Back': '100 Y Back', '100 Back': '100 Y Back',
+            '50 Y Back': '50 Y Back',
+            '200 Y Free': '200 Y Free', '200 Free': '200 Y Free',
+            '500 Y Free': '500 Y Free',
+            '200 Y IM': '200 Y IM', '200 IM': '200 Y IM',
+        }
+        
+        for pattern in result_patterns:
+            matches = re.findall(pattern, content, re.IGNORECASE)
+            if matches:
+                event_key = pattern.split('[')[0].strip()
+                normalized = event_map.get(event_key, event_key)
+                if normalized not in result["events"]:
+                    # Get the best (fastest) time
+                    times = []
+                    for m in matches:
+                        try:
+                            if ':' in m:
+                                parts = m.split(':')
+                                secs = float(parts[0]) * 60 + float(parts[1])
+                            else:
+                                secs = float(m)
+                            if 15 < secs < 600:  # Valid swim time
+                                times.append((secs, m))
+                        except:
+                            pass
+                    if times:
+                        best = min(times, key=lambda x: x[0])
+                        result["events"][normalized] = best[1]
+        
+        print(f"  Events found: {len(result['events'])}")
+        for event, time in sorted(result["events"].items()):
+            print(f"    {event}: {time}")
+        
+        return result
+        
+    except Exception as e:
+        print(f"  ERROR: {e}")
+        return {"name": name, "swimcloud_id": swimmer_id, "error": str(e)}
+
+async def main():
+    print("="*60)
+    print("AARON GORDON SWIMCLOUD SCRAPER")
+    print("="*60)
+    
+    async with async_playwright() as p:
+        browser = await p.chromium.launch(headless=True)
+        context = await browser.new_context(
+            user_agent='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+        )
+        page = await context.new_page()
+        
+        result = await scrape_swimmer(page, SWIMMER["id"], SWIMMER["name"])
+        result["school"] = SWIMMER["school"]
+        
+        await browser.close()
+    
+    # Save results
+    with open("aaron_gordon_data.json", "w") as f:
+        json.dump(result, f, indent=2)
+    
+    print(f"\n{'='*60}")
+    print("SCRAPING COMPLETE")
+    print(f"{'='*60}")
+
+asyncio.run(main())
+PYTHON_EOF
+      
+      - name: Upload Results
+        uses: actions/upload-artifact@v4
+        with:
+          name: aaron-gordon-data-${{ github.run_number }}
+          path: aaron_gordon_data.json
