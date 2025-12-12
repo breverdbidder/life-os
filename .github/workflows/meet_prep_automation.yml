@@ -1,0 +1,177 @@
+name: Automated Meet Prep Document Generation
+
+on:
+  # Manual trigger
+  workflow_dispatch:
+    inputs:
+      meet_name:
+        description: 'Meet name'
+        required: true
+        default: 'Harry Meisel Championships'
+      meet_date:
+        description: 'Meet date (YYYY-MM-DD)'
+        required: true
+        default: '2025-12-13'
+  
+  # Scheduled runs - check daily at 6 AM EST
+  schedule:
+    - cron: '0 11 * * *'  # 11 UTC = 6 AM EST
+
+env:
+  SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+  SUPABASE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+
+jobs:
+  check-and-generate:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        run: |
+          pip install supabase httpx python-dateutil
+          npm install -g docx
+
+      - name: Check for upcoming meets
+        id: check_meets
+        run: |
+          python3 << 'EOF'
+          import os
+          import json
+          from datetime import datetime, timedelta
+          from supabase import create_client
+
+          # Initialize Supabase
+          url = os.environ.get('SUPABASE_URL', 'https://mocerqjnksmhcjzxrewo.supabase.co')
+          key = os.environ.get('SUPABASE_KEY', '')
+          
+          # Check if we have a manual input
+          meet_name = os.environ.get('INPUT_MEET_NAME', '')
+          meet_date = os.environ.get('INPUT_MEET_DATE', '')
+          
+          if meet_name and meet_date:
+              # Manual trigger
+              print(f"Manual trigger: {meet_name} on {meet_date}")
+              with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
+                  f.write(f"should_generate=true\n")
+                  f.write(f"meet_name={meet_name}\n")
+                  f.write(f"meet_date={meet_date}\n")
+          else:
+              # Check for meets in next 48-72 hours
+              # In production, this would query Supabase for scheduled meets
+              today = datetime.now()
+              
+              # Hardcoded upcoming meets for now
+              upcoming_meets = [
+                  {"name": "Harry Meisel Championships", "date": "2025-12-13"},
+                  {"name": "FL Senior Championships", "date": "2026-01-15"},
+                  {"name": "Sectionals", "date": "2026-03-10"}
+              ]
+              
+              for meet in upcoming_meets:
+                  meet_dt = datetime.strptime(meet["date"], "%Y-%m-%d")
+                  days_until = (meet_dt - today).days
+                  
+                  # Generate prep doc 2-3 days before
+                  if 2 <= days_until <= 3:
+                      print(f"Meet found: {meet['name']} in {days_until} days")
+                      with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
+                          f.write(f"should_generate=true\n")
+                          f.write(f"meet_name={meet['name']}\n")
+                          f.write(f"meet_date={meet['date']}\n")
+                      break
+              else:
+                  print("No meets in 48-72 hour window")
+                  with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
+                      f.write(f"should_generate=false\n")
+          EOF
+        env:
+          INPUT_MEET_NAME: ${{ github.event.inputs.meet_name }}
+          INPUT_MEET_DATE: ${{ github.event.inputs.meet_date }}
+
+      - name: Generate meet prep document
+        if: steps.check_meets.outputs.should_generate == 'true'
+        run: |
+          python3 << 'EOF'
+          import os
+          import sys
+          sys.path.insert(0, 'michael_d1_agents_v2')
+          
+          from orchestrator_v2 import MichaelD1OrchestratorV2
+          from datetime import datetime
+          
+          meet_name = os.environ.get('MEET_NAME', 'Harry Meisel Championships')
+          meet_date_str = os.environ.get('MEET_DATE', '2025-12-13')
+          meet_date = datetime.strptime(meet_date_str, "%Y-%m-%d").date()
+          
+          print(f"🏊 Generating meet prep for: {meet_name}")
+          print(f"📅 Date: {meet_date}")
+          
+          orchestrator = MichaelD1OrchestratorV2()
+          doc = orchestrator.generate_meet_prep_document(meet_name, meet_date)
+          
+          # Save markdown version
+          filename = f"meet_prep_{meet_date_str}_{meet_name.replace(' ', '_')}.md"
+          with open(filename, 'w') as f:
+              f.write(doc)
+          
+          print(f"✅ Document generated: {filename}")
+          
+          # Log to Supabase
+          try:
+              from supabase import create_client
+              url = os.environ.get('SUPABASE_URL', 'https://mocerqjnksmhcjzxrewo.supabase.co')
+              key = os.environ.get('SUPABASE_KEY', '')
+              
+              if key:
+                  supabase = create_client(url, key)
+                  supabase.table('insights').insert({
+                      'category': 'michael_swim',
+                      'type': 'meet_prep_generated',
+                      'data': {
+                          'meet_name': meet_name,
+                          'meet_date': meet_date_str,
+                          'generated_at': datetime.now().isoformat()
+                      }
+                  }).execute()
+                  print("📊 Logged to Supabase")
+          except Exception as e:
+              print(f"⚠️ Supabase logging failed: {e}")
+          EOF
+        env:
+          MEET_NAME: ${{ steps.check_meets.outputs.meet_name }}
+          MEET_DATE: ${{ steps.check_meets.outputs.meet_date }}
+
+      - name: Upload artifact
+        if: steps.check_meets.outputs.should_generate == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: meet-prep-document
+          path: meet_prep_*.md
+          retention-days: 30
+
+      - name: Commit to repo (optional)
+        if: steps.check_meets.outputs.should_generate == 'true'
+        run: |
+          git config user.name "Michael D1 Agents Bot"
+          git config user.email "bot@biddeed.ai"
+          
+          # Create reports directory if it doesn't exist
+          mkdir -p reports/meet_prep
+          mv meet_prep_*.md reports/meet_prep/
+          
+          git add reports/meet_prep/
+          git commit -m "🏊 Auto-generated meet prep: ${{ steps.check_meets.outputs.meet_name }}" || echo "No changes to commit"
+          git push || echo "Push failed or no changes"
