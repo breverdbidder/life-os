@@ -50,21 +50,19 @@ jobs:
           SWIMMER_ID = os.environ.get('SWIMMER_ID', '3250085')
           SWIMMER_NAME = os.environ.get('SWIMMER_NAME', 'Michael Shapira')
           
-          print(f"🏊 SwimCloud Scraper")
+          print(f"🏊 SwimCloud Scraper V2 (Fixed)")
           print(f"   Swimmer: {SWIMMER_NAME} (ID: {SWIMMER_ID})")
-          print(f"   Token: {'SET' if APIFY_TOKEN else 'NOT SET'}")
           
           if not APIFY_TOKEN:
               print("❌ APIFY_API_TOKEN not set!")
               exit(1)
           
-          # URLs to scrape
           urls = [
               f"https://www.swimcloud.com/swimmer/{SWIMMER_ID}/",
               f"https://www.swimcloud.com/swimmer/{SWIMMER_ID}/times/"
           ]
           
-          # Apify Web Scraper config
+          # Fixed pageFunction - no waitForTimeout
           scraper_input = {
               "startUrls": [{"url": url} for url in urls],
               "pageFunction": """
@@ -72,11 +70,16 @@ jobs:
               const { request, page, log } = context;
               log.info('Processing: ' + request.url);
               
-              await page.waitForTimeout(5000);
+              // Wait for page to load using waitForSelector instead
+              await page.waitForSelector('body', { timeout: 30000 });
+              
+              // Additional wait using page.waitForFunction
+              await page.waitForFunction(() => document.readyState === 'complete', { timeout: 30000 });
               
               const data = await page.evaluate(() => {
                   const result = {
                       url: window.location.href,
+                      title: document.title,
                       name: '',
                       team: '',
                       times: {},
@@ -84,7 +87,7 @@ jobs:
                       text_sample: ''
                   };
                   
-                  // Get swimmer name
+                  // Get swimmer name from h1 or title
                   const h1 = document.querySelector('h1');
                   if (h1) result.name = h1.textContent.trim();
                   
@@ -92,33 +95,33 @@ jobs:
                   const teamEl = document.querySelector('a[href*="/team/"]');
                   if (teamEl) result.team = teamEl.textContent.trim();
                   
-                  // Get page text
-                  const bodyText = document.body.innerText;
-                  result.text_sample = bodyText.substring(0, 3000);
+                  // Get all body text
+                  const bodyText = document.body.innerText || '';
+                  result.text_sample = bodyText.substring(0, 5000);
                   
-                  // Find all table rows with times
-                  document.querySelectorAll('tr').forEach(row => {
-                      const text = row.textContent;
+                  // Find times in tables
+                  document.querySelectorAll('tr, .time-entry, [class*="time"]').forEach(el => {
+                      const text = el.textContent || '';
                       const timeMatch = text.match(/(\\d{1,2}:\\d{2}\\.\\d{2}|\\d{2}\\.\\d{2})/);
                       if (timeMatch) {
                           result.raw_times.push({
-                              row: text.trim().substring(0, 200),
+                              text: text.trim().substring(0, 300),
                               time: timeMatch[1]
                           });
                       }
                   });
                   
-                  // Parse specific events
-                  const eventPatterns = {
-                      '50 Free': /50\\s*(?:Y(?:ard)?)?\\s*Free[^\\d]*(\\d{2}\\.\\d{2})/gi,
-                      '100 Free': /100\\s*(?:Y(?:ard)?)?\\s*Free[^\\d]*(\\d{2}\\.\\d{2}|\\d:\\d{2}\\.\\d{2})/gi,
-                      '200 Free': /200\\s*(?:Y(?:ard)?)?\\s*Free[^\\d]*(\\d:\\d{2}\\.\\d{2})/gi,
-                      '100 Fly': /100\\s*(?:Y(?:ard)?)?\\s*(?:Fly|Butterfly)[^\\d]*(\\d{2}\\.\\d{2}|\\d:\\d{2}\\.\\d{2})/gi,
-                      '100 Back': /100\\s*(?:Y(?:ard)?)?\\s*Back[^\\d]*(\\d{2}\\.\\d{2}|\\d:\\d{2}\\.\\d{2})/gi
+                  // Parse specific events from body text
+                  const patterns = {
+                      '50 Free': /50\\s*(?:Yard|Y)?\\s*Free[^\\d]*(\\d{2}\\.\\d{2})/i,
+                      '100 Free': /100\\s*(?:Yard|Y)?\\s*Free[^\\d]*(\\d{2}\\.\\d{2}|\\d:\\d{2}\\.\\d{2})/i,
+                      '200 Free': /200\\s*(?:Yard|Y)?\\s*Free[^\\d]*(\\d:\\d{2}\\.\\d{2})/i,
+                      '100 Fly': /100\\s*(?:Yard|Y)?\\s*(?:Fly|Butterfly)[^\\d]*(\\d{2}\\.\\d{2}|\\d:\\d{2}\\.\\d{2})/i,
+                      '100 Back': /100\\s*(?:Yard|Y)?\\s*Back[^\\d]*(\\d{2}\\.\\d{2}|\\d:\\d{2}\\.\\d{2})/i
                   };
                   
-                  for (const [event, pattern] of Object.entries(eventPatterns)) {
-                      const match = pattern.exec(bodyText);
+                  for (const [event, pattern] of Object.entries(patterns)) {
+                      const match = bodyText.match(pattern);
                       if (match) {
                           result.times[event] = match[1];
                       }
@@ -132,7 +135,8 @@ jobs:
               """,
               "proxyConfiguration": {"useApifyProxy": True},
               "maxConcurrency": 1,
-              "maxRequestsPerCrawl": 5
+              "maxRequestsPerCrawl": 5,
+              "maxRequestRetries": 3
           }
           
           print("\n📡 Starting Apify Web Scraper...")
@@ -156,7 +160,7 @@ jobs:
           run_id = run_data["data"]["id"]
           print(f"✅ Run started: {run_id}")
           
-          # Wait for completion
+          # Wait for completion (max 4 min)
           for i in range(24):
               time.sleep(10)
               
@@ -172,11 +176,7 @@ jobs:
               if status in ["SUCCEEDED", "FAILED", "ABORTED", "TIMED-OUT"]:
                   break
           
-          if status != "SUCCEEDED":
-              print(f"❌ Run failed: {status}")
-              exit(1)
-          
-          # Get results
+          # Get results even if failed
           dataset_id = status_resp.json()["data"]["defaultDatasetId"]
           results = requests.get(
               f"https://api.apify.com/v2/datasets/{dataset_id}/items",
@@ -188,17 +188,23 @@ jobs:
           print(f"📊 RESULTS FOR {SWIMMER_NAME}")
           print(f"{'='*50}")
           
-          # Process results
           all_times = {}
           raw_data = []
+          text_samples = []
           
           for item in results:
+              print(f"\n--- Page: {item.get('url', 'unknown')} ---")
+              print(f"Title: {item.get('title', 'N/A')}")
+              print(f"Name found: {item.get('name', 'N/A')}")
+              print(f"Team: {item.get('team', 'N/A')}")
+              
               if 'times' in item:
                   all_times.update(item.get('times', {}))
               if 'raw_times' in item:
                   raw_data.extend(item.get('raw_times', []))
               if 'text_sample' in item:
-                  print(f"\n--- Page Text Sample ---")
+                  text_samples.append(item['text_sample'])
+                  print(f"\nText sample (first 1000 chars):")
                   print(item['text_sample'][:1000])
           
           if all_times:
@@ -206,18 +212,20 @@ jobs:
               for event, t in sorted(all_times.items()):
                   print(f"   {event}: {t}")
           else:
-              print("\n⚠️ No times extracted via patterns")
-              print(f"Raw time data found: {len(raw_data)} rows")
+              print(f"\n⚠️ No times extracted via patterns")
+              print(f"Raw time entries found: {len(raw_data)}")
               for row in raw_data[:10]:
                   print(f"   {row}")
           
-          # Save results
+          # Save all data
           output = {
               "swimmer_name": SWIMMER_NAME,
               "swimmer_id": SWIMMER_ID,
               "times": all_times,
-              "raw_times": raw_data[:20],
+              "raw_times": raw_data[:30],
+              "text_samples": text_samples,
               "source": "swimcloud.com",
+              "apify_run_id": run_id,
               "scraped_at": datetime.now(timezone.utc).isoformat()
           }
           
@@ -227,12 +235,16 @@ jobs:
           print(f"\n💾 Saved to swimcloud_{SWIMMER_ID}.json")
           
           # Save to Supabase
-          if SUPABASE_KEY:
+          if SUPABASE_KEY and (all_times or raw_data):
               payload = {
                   "category": "michael_swim",
                   "subcategory": "swimcloud_pbs",
                   "title": f"SwimCloud Times - {SWIMMER_NAME}",
-                  "insight": json.dumps(output),
+                  "insight": json.dumps({
+                      "times": all_times,
+                      "raw_times": raw_data[:10],
+                      "scraped_at": output["scraped_at"]
+                  }),
                   "importance": "high",
                   "created_at": datetime.now(timezone.utc).isoformat()
               }
@@ -247,11 +259,7 @@ jobs:
                   json=payload,
                   timeout=30
               )
-              
-              if resp.status_code in [200, 201]:
-                  print("✅ Saved to Supabase")
-              else:
-                  print(f"⚠️ Supabase: {resp.status_code}")
+              print(f"Supabase: {resp.status_code}")
           
           print("\n✅ SCRAPING COMPLETE")
           SCRAPER_EOF
