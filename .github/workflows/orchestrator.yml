@@ -1,7 +1,6 @@
 name: Life OS Orchestrator Agent
 
 on:
-  # Manual trigger with task input
   workflow_dispatch:
     inputs:
       task:
@@ -19,11 +18,9 @@ on:
           - status
           - cloudflare
   
-  # Scheduled health check every 30 minutes
   schedule:
     - cron: '*/30 * * * *'
   
-  # Webhook trigger for real-time tasks
   repository_dispatch:
     types: [life-os-task]
 
@@ -77,16 +74,25 @@ jobs:
           echo "☁️ Cloudflare Pages Status"
           echo "=========================="
           
-          RESPONSE=$(curl -s "https://api.cloudflare.com/client/v4/accounts/${{ env.CF_ACCOUNT }}/pages/projects" \
-            -H "Authorization: Bearer ${{ env.CF_TOKEN }}" \
-            -H "Content-Type: application/json")
-          
-          python3 << 'EOF'
+          # Fetch directly and process
+          python3 << 'PYEOF'
           import json
           import os
-          import sys
+          import urllib.request
           
-          data = json.loads('''$RESPONSE'''.replace("'", '"'))
+          cf_token = os.environ.get('CF_TOKEN', '')
+          cf_account = os.environ.get('CF_ACCOUNT', '')
+          
+          req = urllib.request.Request(
+              f"https://api.cloudflare.com/client/v4/accounts/{cf_account}/pages/projects",
+              headers={
+                  "Authorization": f"Bearer {cf_token}",
+                  "Content-Type": "application/json"
+              }
+          )
+          
+          with urllib.request.urlopen(req) as response:
+              data = json.loads(response.read().decode())
           
           alerts = []
           for project in data.get("result", []):
@@ -104,17 +110,18 @@ jobs:
               if status == "failure":
                   alerts.append(name)
           
-          if alerts:
-              print(f"⚠️ ALERTS: {', '.join(alerts)} have failed deployments")
-              with open(os.environ.get('GITHUB_OUTPUT', '/dev/null'), 'a') as f:
-                  f.write(f"has_alerts=true\n")
-                  f.write(f"alert_projects={','.join(alerts)}\n")
-          else:
-              with open(os.environ.get('GITHUB_OUTPUT', '/dev/null'), 'a') as f:
-                  f.write("has_alerts=false\n")
-          EOF
-        env:
-          RESPONSE: ${{ env.RESPONSE }}
+          # Write outputs
+          github_output = os.environ.get('GITHUB_OUTPUT', '')
+          if github_output:
+              with open(github_output, 'a') as f:
+                  if alerts:
+                      f.write("has_alerts=true\n")
+                      f.write(f"alert_projects={','.join(alerts)}\n")
+                      print(f"⚠️ ALERTS: {', '.join(alerts)} have failed deployments")
+                  else:
+                      f.write("has_alerts=false\n")
+                      print("✅ All deployments healthy")
+          PYEOF
       
       - name: Auto-remediate failed deployments
         if: steps.cloudflare.outputs.has_alerts == 'true'
@@ -142,20 +149,23 @@ jobs:
           import asyncio
           import sys
           sys.path.insert(0, 'agents/orchestrator')
-          from orchestrator import Orchestrator
-          
-          async def resume():
-              orch = Orchestrator()
-              if await orch.resume_session():
-                  result = await orch.execute_task(
-                      orch.state.task,
-                      [orch.state.current_step] + orch.state.next_steps
-                  )
-                  print(f"Result: {result}")
-              else:
-                  print("No session to resume")
-          
-          asyncio.run(resume())
+          try:
+              from orchestrator import Orchestrator
+              
+              async def resume():
+                  orch = Orchestrator()
+                  if await orch.resume_session():
+                      result = await orch.execute_task(
+                          orch.state.task,
+                          [orch.state.current_step] + orch.state.next_steps
+                      )
+                      print(f"Result: {result}")
+                  else:
+                      print("No session to resume")
+              
+              asyncio.run(resume())
+          except ImportError as e:
+              print(f"Orchestrator not available: {e}")
           EOF
       
       - name: Run Orchestrator (New Task)
@@ -166,23 +176,25 @@ jobs:
           import os
           import sys
           sys.path.insert(0, 'agents/orchestrator')
-          from orchestrator import Orchestrator
-          
-          async def new_task():
-              task = "${{ github.event.inputs.task }}"
-              orch = Orchestrator()
+          try:
+              from orchestrator import Orchestrator
               
-              # Simple task decomposition
-              steps = [
-                  f"Analyze requirements for: {task}",
-                  f"Execute primary action for: {task}",
-                  f"Verify and document results for: {task}"
-              ]
+              async def new_task():
+                  task = "${{ github.event.inputs.task }}"
+                  orch = Orchestrator()
+                  
+                  steps = [
+                      f"Analyze requirements for: {task}",
+                      f"Execute primary action for: {task}",
+                      f"Verify and document results for: {task}"
+                  ]
+                  
+                  result = await orch.execute_task(task, steps)
+                  print(f"Result: {result}")
               
-              result = await orch.execute_task(task, steps)
-              print(f"Result: {result}")
-          
-          asyncio.run(new_task())
+              asyncio.run(new_task())
+          except ImportError as e:
+              print(f"Orchestrator not available: {e}")
           EOF
       
       - name: Status Check
@@ -191,29 +203,7 @@ jobs:
           echo "📊 Life OS Orchestrator Status"
           echo "=============================="
           echo "Checkpoint found: ${{ steps.checkpoint.outputs.has_checkpoint }}"
-          
-          if [ "${{ steps.checkpoint.outputs.has_checkpoint }}" == "true" ]; then
-            echo ""
-            echo "Active checkpoint data:"
-            echo '${{ steps.checkpoint.outputs.checkpoint_data }}' | python3 -c "
-          import sys, json
-          data = json.load(sys.stdin)
-          if data:
-              cp = data[0]
-              desc_raw = cp.get('description', '')
-              # Try parsing as JSON, fallback to plain text
-              try:
-                  desc = json.loads(desc_raw) if desc_raw.startswith('{') else {}
-                  print(f\"  Session: {desc.get('session_id', 'N/A')}\")
-                  print(f\"  Task: {desc.get('task', 'N/A')}\")
-                  print(f\"  Completed: {len(desc.get('steps_completed', []))} steps\")
-                  print(f\"  Token usage: {desc.get('token_ratio', 'N/A')}\")
-              except:
-                  print(f\"  Description: {desc_raw[:200]}\")
-              print(f\"  Title: {cp.get('title', 'N/A')}\")
-              print(f\"  Created: {cp.get('created_at', 'N/A')}\")
-          "
-          fi
+          echo "Cloudflare alerts: ${{ steps.cloudflare.outputs.has_alerts }}"
       
       - name: Log completion
         if: always()
