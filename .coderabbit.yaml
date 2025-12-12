@@ -1,11 +1,10 @@
 # CodeRabbit Configuration for BidDeed.AI
-# Agentic AI Foreclosure Auction Platform
 # https://docs.coderabbit.ai/configuration
 
 language: en-US
 
 reviews:
-  # Enable automatic reviews on all PRs
+  # Enable automatic PR reviews
   auto_review:
     enabled: true
     drafts: false
@@ -13,57 +12,55 @@ reviews:
       - main
       - develop
   
-  # Review profile optimized for agentic AI patterns
+  # Review depth settings
   profile: assertive
   
-  # High-value review areas for BidDeed.AI
-  path_filters:
-    # Core pipeline - highest scrutiny
-    - "src/pipeline/**"
-    - "src/agents/**"
-    - "src/scrapers/**"
-    # ML models - security critical
-    - "src/ml/**"
-    - "models/**"
-    # API and data handling
-    - "src/api/**"
-    - "src/db/**"
-  
-  # Ignore generated/vendor files
+  # Focus areas for agentic AI codebase
   path_instructions:
-    - path: "**/*.min.js"
-      instructions: "Skip minified files"
-    - path: "**/node_modules/**"
-      instructions: "Skip dependencies"
-    - path: "**/__pycache__/**"
-      instructions: "Skip cache"
+    - path: "src/agents/**"
+      instructions: |
+        Focus on agent communication patterns, state management, and error handling.
+        Check for race conditions in multi-agent workflows.
+        Validate proper cleanup of agent resources.
+    
+    - path: "src/scrapers/**"
+      instructions: |
+        Verify anti-detection measures are in place.
+        Check for proper error handling and retry logic.
+        Ensure rate limiting compliance.
+    
+    - path: "src/pipeline/**"
+      instructions: |
+        Validate stage transitions and checkpoint handling.
+        Check for proper circuit breaker patterns.
+        Review data validation at stage boundaries.
+    
+    - path: "**/*.sql"
+      instructions: |
+        Check for SQL injection vulnerabilities.
+        Verify proper indexing for query performance.
+        Review RLS policies for data security.
 
-# Custom instructions for agentic AI code review
-instructions:
-  # Global review focus areas
-  - "Focus on multi-agent communication patterns and race conditions"
-  - "Check for proper error handling in async workflows"
-  - "Verify state management across agent boundaries"
-  - "Flag any hardcoded API keys or secrets"
-  - "Ensure proper input validation for scraped data"
-  - "Check for SQL injection in Supabase queries"
-  - "Verify proper exception handling in LangGraph nodes"
-  - "Flag any blocking I/O in async contexts"
+  # High-priority checks
+  high_level_summary: true
+  poem: false
+  review_status: true
+  collapse_walkthrough: false
+  
+  # Request changes for critical issues
+  request_changes_workflow: true
 
 chat:
-  # Enable interactive chat on PRs
   auto_reply: true
 
-# Knowledge base for BidDeed.AI context
-knowledge_base:
-  # Learn from our codebase patterns
-  learnings:
-    scope: auto
-  
-  # Project-specific context
-  issues:
-    scope: auto
-  
-  # Pull request history
-  pull_requests:
-    scope: auto
+# Ignore patterns
+path_filters:
+  - "!**/*.min.js"
+  - "!**/node_modules/**"
+  - "!**/*.lock"
+  - "!**/dist/**"
+  - "!**/__pycache__/**"
+  - "!**/.git/**"
+
+# Enable learning from feedback
+early_access: true
