@@ -1,0 +1,113 @@
+name: Sunday Motivational Report
+
+on:
+  schedule:
+    # Run every Sunday at 7:00 AM EST (12:00 UTC)
+    - cron: '0 12 * * 0'
+  workflow_dispatch:
+    inputs:
+      custom_goals:
+        description: 'Custom goals for the week (comma-separated)'
+        required: false
+        default: ''
+      custom_accomplishments:
+        description: 'Last week accomplishments (comma-separated)'
+        required: false
+        default: ''
+
+jobs:
+  generate-report:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      
+      - name: Install dependencies
+        run: |
+          npm install docx
+          
+      - name: Generate Sunday Report
+        id: generate
+        env:
+          OUTPUT_PATH: ./reports
+          CUSTOM_GOALS: ${{ github.event.inputs.custom_goals }}
+          CUSTOM_ACCOMPLISHMENTS: ${{ github.event.inputs.custom_accomplishments }}
+        run: |
+          mkdir -p reports
+          
+          # Create runner script with custom inputs
+          cat > run_report.js << 'EOF'
+          const { generateSundayReport } = require('./michael_d1_agents_v3/reports/sunday_motivational_report.js');
+          
+          const weekData = {};
+          
+          if (process.env.CUSTOM_GOALS) {
+            weekData.goals = process.env.CUSTOM_GOALS.split(',').map(g => g.trim());
+          }
+          
+          if (process.env.CUSTOM_ACCOMPLISHMENTS) {
+            weekData.accomplishments = process.env.CUSTOM_ACCOMPLISHMENTS.split(',').map(a => a.trim());
+          }
+          
+          generateSundayReport(weekData).then(path => {
+            console.log(`REPORT_PATH=${path}`);
+          });
+          EOF
+          
+          node run_report.js
+          
+          # Get the generated filename
+          REPORT_FILE=$(ls -t reports/*.docx | head -1)
+          echo "report_file=$REPORT_FILE" >> $GITHUB_OUTPUT
+          echo "Generated report: $REPORT_FILE"
+      
+      - name: Upload report artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: sunday-motivational-report
+          path: reports/*.docx
+          retention-days: 30
+      
+      - name: Log to Supabase
+        if: success()
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+        run: |
+          WEEK_NUM=$(date +%V)
+          DATE_STR=$(date +%Y-%m-%d)
+          
+          curl -X POST "${SUPABASE_URL}/rest/v1/insights" \
+            -H "apikey: ${SUPABASE_KEY}" \
+            -H "Authorization: Bearer ${SUPABASE_KEY}" \
+            -H "Content-Type: application/json" \
+            -H "Prefer: return=minimal" \
+            -d "{
+              \"category\": \"michael_swim\",
+              \"type\": \"sunday_report_generated\",
+              \"content\": \"{\\\"week\\\": ${WEEK_NUM}, \\\"date\\\": \\\"${DATE_STR}\\\", \\\"status\\\": \\\"success\\\"}\",
+              \"created_at\": \"$(date -u +%Y-%m-%dT%H:%M:%SZ)\"
+            }"
+          
+          echo "✅ Logged to Supabase"
+
+  notify:
+    needs: generate-report
+    runs-on: ubuntu-latest
+    if: always()
+    
+    steps:
+      - name: Report Status
+        run: |
+          if [ "${{ needs.generate-report.result }}" == "success" ]; then
+            echo "✅ Sunday Motivational Report generated successfully!"
+            echo "📥 Download from Actions artifacts"
+          else
+            echo "❌ Report generation failed"
+          fi
