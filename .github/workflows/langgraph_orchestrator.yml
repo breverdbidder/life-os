@@ -1,0 +1,140 @@
+name: LangGraph Orchestrator
+
+on:
+  schedule:
+    # Run every 30 minutes during business hours (7 AM - 10 PM EST)
+    - cron: '*/30 7-22 * * *'
+  workflow_dispatch:
+    inputs:
+      action:
+        description: 'Action to perform'
+        required: false
+        default: 'run_cycle'
+        type: choice
+        options:
+          - run_cycle
+          - create_beca_task
+          - create_lifeos_task
+          - create_landing_task
+          - status_report
+
+env:
+  SUPABASE_URL: https://mocerqjnksmhcjzxrewo.supabase.co
+  SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+
+jobs:
+  orchestrate:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      
+      - name: Install dependencies
+        run: |
+          pip install httpx urllib3
+      
+      - name: Run orchestration cycle
+        if: github.event.inputs.action == 'run_cycle' || github.event_name == 'schedule'
+        run: |
+          python agents/orchestrator/langgraph_orchestrator.py
+      
+      - name: Create BECA fix task
+        if: github.event.inputs.action == 'create_beca_task'
+        run: |
+          python -c "
+          import asyncio
+          from agents.orchestrator.langgraph_orchestrator import TaskFactory, SupabaseClient
+          
+          async def create():
+              db = SupabaseClient()
+              task = TaskFactory.create_beca_fix_task(
+                  'Fix anti-bot detection: rotate user agents and add request delays'
+              )
+              result = await db.create_task(task)
+              print(f'Created task: {result}')
+          
+          asyncio.run(create())
+          "
+      
+      - name: Create Life OS task
+        if: github.event.inputs.action == 'create_lifeos_task'
+        run: |
+          python -c "
+          import asyncio
+          from agents.orchestrator.langgraph_orchestrator import TaskFactory, SupabaseClient
+          
+          async def create():
+              db = SupabaseClient()
+              task = TaskFactory.create_life_os_task(
+                  'Add Michael swim times section to daily report',
+                  'src/daily_report.py'
+              )
+              result = await db.create_task(task)
+              print(f'Created task: {result}')
+          
+          asyncio.run(create())
+          "
+      
+      - name: Create Landing page task
+        if: github.event.inputs.action == 'create_landing_task'
+        run: |
+          python -c "
+          import asyncio
+          from agents.orchestrator.langgraph_orchestrator import TaskFactory, SupabaseClient
+          
+          async def create():
+              db = SupabaseClient()
+              task = TaskFactory.create_landing_task(
+                  'Add How It Works section showing 12-stage Everest Ascent methodology'
+              )
+              result = await db.create_task(task)
+              print(f'Created task: {result}')
+          
+          asyncio.run(create())
+          "
+      
+      - name: Generate status report
+        if: github.event.inputs.action == 'status_report'
+        run: |
+          python -c "
+          import asyncio
+          import json
+          from agents.orchestrator.langgraph_orchestrator import SupabaseClient
+          
+          async def report():
+              db = SupabaseClient()
+              
+              # Get workflow state
+              state = await db.get_workflow_state('biddeed-main-workflow')
+              
+              # Get task counts by status
+              pending = await db._request('GET', 'orchestrated_tasks', params={'status': 'eq.pending'}) or []
+              assigned = await db._request('GET', 'orchestrated_tasks', params={'status': 'eq.assigned'}) or []
+              in_progress = await db._request('GET', 'orchestrated_tasks', params={'status': 'eq.in_progress'}) or []
+              success = await db._request('GET', 'orchestrated_tasks', params={'status': 'eq.success'}) or []
+              failed = await db._request('GET', 'orchestrated_tasks', params={'status': 'eq.failed'}) or []
+              
+              print('=' * 60)
+              print('LANGGRAPH ORCHESTRATION STATUS REPORT')
+              print('=' * 60)
+              print(f'\\nWorkflow: {state.get(\"workflow_id\", \"N/A\") if state else \"N/A\"}')
+              print(f'Current Node: {state.get(\"current_node\", \"N/A\") if state else \"N/A\"}')
+              print(f'Awaiting Human: {state.get(\"awaiting_human\", False) if state else False}')
+              print(f'\\nTask Status:')
+              print(f'  Pending:     {len(pending)}')
+              print(f'  Assigned:    {len(assigned)}')
+              print(f'  In Progress: {len(in_progress)}')
+              print(f'  Success:     {len(success)}')
+              print(f'  Failed:      {len(failed)}')
+              print(f'\\nCompleted Nodes: {state.get(\"completed_nodes\", []) if state else []}')
+              print(f'Pending Nodes:   {state.get(\"pending_nodes\", []) if state else []}')
+              print('=' * 60)
+          
+          asyncio.run(report())
+          "
