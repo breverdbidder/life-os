@@ -1,16 +1,39 @@
 {
   "name": "Aaron Gordon",
   "swimcloud_id": "1733035",
-  "school": "Merritt Island High School",
+  "school": "Edgewood Jr/Sr High School",
+  "location": "Merritt Island, FL",
   "power_index": 47.26,
   "fl_rank": 61,
   "class": 2027,
   "events": {
-    "100 Free": "47.98",
+    "100 Free": "47.85",
+    "200 Free": "1:44.31",
     "100 Back": "54.87",
     "50 Free": "22.50"
   },
-  "notes": "FHSAA 1A Region 2 (Nov 4, 2024): 4th place 100 Free, 6th place 100 Back",
+  "recent_results_2025": {
+    "FHSAA_1A_District_5": {
+      "date": "Oct 29, 2025",
+      "100_Free": "47.85 (1st place - DISTRICT CHAMPION)",
+      "200_Free": "1:45.18 (1st place - DISTRICT CHAMPION)"
+    },
+    "FHSAA_1A_Region_2": {
+      "date": "Nov 4, 2025",
+      "200_Free": "1:44.31 (2nd place - PERSONAL BEST)"
+    }
+  },
+  "2024_results": {
+    "FHSAA_1A_Region_2_Nov_4_2024": {
+      "100_Free": "47.98 (4th place)",
+      "100_Back": "54.87 (6th place)"
+    }
+  },
+  "improvement_2024_to_2025": {
+    "100_Free": "-0.13s (47.98 → 47.85)",
+    "200_Free": "New PB 1:44.31"
+  },
+  "notes": "District 5 CHAMPION in 100 Free and 200 Free (Oct 2025). Improved 100 Free PB from 47.98 to 47.85.",
   "verified": "2025-12-12",
-  "source": "SwimCloud search results"
+  "source": "SwimSwam articles Oct/Nov 2025, SwimCloud profile"
 }
