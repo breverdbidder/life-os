@@ -1,0 +1,86 @@
+{
+  "verified_date": "2025-12-12T22:00:00Z",
+  "data_sources": ["SwimCloud", "Brevard County HS Sports Results"],
+  "michael_shapira": {
+    "swimcloud_id": "3250085",
+    "pbs": {
+      "50_free": "21.86",
+      "100_free": "48.80",
+      "100_fly": "55.87",
+      "200_free": "1:53.03",
+      "100_back": "1:01.62"
+    }
+  },
+  "competitors": {
+    "Soto, Bastian": {
+      "swimcloud_id": "2928537",
+      "team": "MELB-FL",
+      "pbs": {
+        "50_free": "22.85",
+        "100_free": "50.61",
+        "100_fly": "54.25",
+        "200_im": "2:07.00"
+      },
+      "vs_michael": {
+        "50_free": "+0.99s slower",
+        "100_free": "+1.81s slower",
+        "100_fly": "-1.62s FASTER"
+      }
+    },
+    "Domboru, Gavin R": {
+      "swimcloud_id": "1518102",
+      "team": "MELB-FL",
+      "pbs": {
+        "100_free": "50.43",
+        "50_fly": "27.25",
+        "100_fly": "54.22",
+        "100_back": "54.25"
+      },
+      "vs_michael": {
+        "100_free": "+1.63s slower",
+        "100_fly": "-1.65s FASTER",
+        "100_back": "-7.37s FASTER"
+      }
+    },
+    "Kiser, Logan G": {
+      "swimcloud_id": "1681529",
+      "team": "TMSC-FL",
+      "pbs": {
+        "50_free": "24.83",
+        "100_free": "53.13"
+      },
+      "vs_michael": {
+        "50_free": "+2.97s slower",
+        "100_free": "+4.33s slower"
+      }
+    },
+    "Landry, Locky L": {
+      "swimcloud_id": "2876877",
+      "team": "TCA-FL",
+      "pbs": {
+        "100_back": "51.44"
+      },
+      "notes": "10yo prodigy - fastest in 100 Back heat by 10+ seconds"
+    },
+    "Gordon, Aaron T": {
+      "swimcloud_id": "1733035",
+      "team": "TMSC-FL",
+      "power_index": 90,
+      "pbs": {
+        "note": "Times not yet verified - highest PI in field"
+      }
+    }
+  },
+  "michael_advantages": {
+    "50_free": "FASTEST in field (21.86 vs Soto 22.85)",
+    "100_free": "FASTEST in field (48.80 vs Domboru 50.43)",
+    "seed_vs_pb": {
+      "50_free": "-1.36s faster than seed",
+      "100_free": "-2.02s faster than seed"
+    }
+  },
+  "michael_challenges": {
+    "100_back": "Landry (10yo, 51.44) unbeatable - focus on technique",
+    "100_fly": "Soto (54.25) and Domboru (54.22) have edge over Michael (55.87)"
+  }
+}
