@@ -1,0 +1,50 @@
+{
+  "meet": "Harry Meisel Championships East",
+  "dates": "December 13-14, 2025",
+  "location": "North County Aquatic Center, Sebastian, FL",
+  "swimmer": "Michael Shapira",
+  "generated": "2025-12-12T22:11:08.200033",
+  "model": "XGBoost Championship Predictor V2.0",
+  "events": {
+    "50 Free": {
+      "event_num": 42,
+      "pb": "21.86",
+      "predicted": "21.21",
+      "best_case": "21.20",
+      "win_pct": 11.0,
+      "podium_pct": 100.0,
+      "expected_place": 1.9,
+      "strategy": "\ud83d\udcaa SECURE PODIUM - Consistent splits, strong finish"
+    },
+    "50 Fly": {
+      "event_num": 28,
+      "pb": "25.39",
+      "predicted": "24.63",
+      "best_case": "24.63",
+      "win_pct": 0.0,
+      "podium_pct": 89.6,
+      "expected_place": 2.7,
+      "strategy": "\ud83d\udcaa SECURE PODIUM - Consistent splits, strong finish"
+    },
+    "100 Free": {
+      "event_num": 26,
+      "pb": "48.80",
+      "predicted": "47.35",
+      "best_case": "47.34",
+      "win_pct": 86.9,
+      "podium_pct": 100.0,
+      "expected_place": 1.1,
+      "strategy": "\ud83d\udd25 GO FOR THE WIN - Attack from the start"
+    },
+    "100 Back": {
+      "event_num": 34,
+      "pb": "1:02.52",
+      "predicted": "1:00.66",
+      "best_case": "1:00.64",
+      "win_pct": 0.0,
+      "podium_pct": 0.0,
+      "expected_place": 5.0,
+      "strategy": "\ud83c\udfaf RACE YOUR OWN RACE - Focus on PB"
+    }
+  }
+}
