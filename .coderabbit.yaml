@@ -1,0 +1,69 @@
+# CodeRabbit Configuration for BidDeed.AI
+# Agentic AI Foreclosure Auction Platform
+# https://docs.coderabbit.ai/configuration
+
+language: en-US
+
+reviews:
+  # Enable automatic reviews on all PRs
+  auto_review:
+    enabled: true
+    drafts: false
+    base_branches:
+      - main
+      - develop
+  
+  # Review profile optimized for agentic AI patterns
+  profile: assertive
+  
+  # High-value review areas for BidDeed.AI
+  path_filters:
+    # Core pipeline - highest scrutiny
+    - "src/pipeline/**"
+    - "src/agents/**"
+    - "src/scrapers/**"
+    # ML models - security critical
+    - "src/ml/**"
+    - "models/**"
+    # API and data handling
+    - "src/api/**"
+    - "src/db/**"
+  
+  # Ignore generated/vendor files
+  path_instructions:
+    - path: "**/*.min.js"
+      instructions: "Skip minified files"
+    - path: "**/node_modules/**"
+      instructions: "Skip dependencies"
+    - path: "**/__pycache__/**"
+      instructions: "Skip cache"
+
+# Custom instructions for agentic AI code review
+instructions:
+  # Global review focus areas
+  - "Focus on multi-agent communication patterns and race conditions"
+  - "Check for proper error handling in async workflows"
+  - "Verify state management across agent boundaries"
+  - "Flag any hardcoded API keys or secrets"
+  - "Ensure proper input validation for scraped data"
+  - "Check for SQL injection in Supabase queries"
+  - "Verify proper exception handling in LangGraph nodes"
+  - "Flag any blocking I/O in async contexts"
+
+chat:
+  # Enable interactive chat on PRs
+  auto_reply: true
+
+# Knowledge base for BidDeed.AI context
+knowledge_base:
+  # Learn from our codebase patterns
+  learnings:
+    scope: auto
+  
+  # Project-specific context
+  issues:
+    scope: auto
+  
+  # Pull request history
+  pull_requests:
+    scope: auto
