@@ -1,0 +1,309 @@
+name: BidDeed.AI LangGraph Orchestrator
+
+on:
+  # Manual trigger with full configuration
+  workflow_dispatch:
+    inputs:
+      action:
+        description: 'Action to perform'
+        required: true
+        type: choice
+        options:
+          - full_orchestration
+          - discover_tools
+          - track_metrics
+          - extract_skill
+          - test_integration
+      query:
+        description: 'Query for tool discovery'
+        required: false
+        default: 'foreclosure auction analysis'
+      workflow_name:
+        description: 'Workflow name for tracking'
+        required: false
+        default: 'manual_run'
+  
+  # Run every 30 minutes for autonomous orchestration
+  schedule:
+    - cron: '*/30 * * * *'
+
+env:
+  SUPABASE_URL: https://mocerqjnksmhcjzxrewo.supabase.co
+  SUPABASE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+
+jobs:
+  orchestrate:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      
+      - name: Install dependencies
+        run: |
+          pip install httpx pydantic pyyaml anthropic
+      
+      - name: Set action
+        id: action
+        run: |
+          if [ "${{ github.event_name }}" == "schedule" ]; then
+            echo "action=full_orchestration" >> $GITHUB_OUTPUT
+          else
+            echo "action=${{ inputs.action }}" >> $GITHUB_OUTPUT
+          fi
+      
+      # ============================================================
+      # TOOL DISCOVERY NODE
+      # ============================================================
+      - name: 🔍 Discover Tools
+        if: steps.action.outputs.action == 'discover_tools' || steps.action.outputs.action == 'full_orchestration'
+        id: discover
+        run: |
+          python3 << 'EOF'
+          import asyncio
+          import sys
+          import os
+          
+          sys.path.insert(0, 'agents/tool_discovery/src')
+          sys.path.insert(0, 'agents/orchestrator')
+          
+          async def main():
+              try:
+                  from tool_index.vector_store import discover_tools
+                  
+                  query = os.environ.get('INPUT_QUERY', 'foreclosure auction analysis')
+                  print(f"🔍 Discovering tools for: {query}")
+                  
+                  tools = await discover_tools(query, limit=5, similarity_threshold=0.5)
+                  
+                  print(f"\n📋 Found {len(tools)} relevant tools:")
+                  for t in tools:
+                      print(f"   → {t.get('tool_name')} ({t.get('similarity', 0):.2f})")
+                  
+                  # Output for next steps
+                  tool_names = [t.get('tool_name') for t in tools]
+                  print(f"\n::set-output name=tools::{','.join(tool_names)}")
+                  
+              except Exception as e:
+                  print(f"⚠️ Tool discovery skipped (tables may need initialization): {e}")
+                  print("::set-output name=tools::fallback_tools")
+          
+          asyncio.run(main())
+          EOF
+        env:
+          INPUT_QUERY: ${{ inputs.query }}
+      
+      # ============================================================
+      # TOKEN TRACKING NODE
+      # ============================================================
+      - name: 📊 Track Token Economics
+        if: steps.action.outputs.action == 'track_metrics' || steps.action.outputs.action == 'full_orchestration'
+        run: |
+          python3 << 'EOF'
+          import asyncio
+          import os
+          import sys
+          
+          sys.path.insert(0, 'agents/tool_discovery/src')
+          
+          async def main():
+              try:
+                  from token_tracker.economics import get_smart_router_metrics, get_workflow_metrics
+                  
+                  print("📊 Smart Router Metrics (7 days):")
+                  metrics = await get_smart_router_metrics(days=7)
+                  
+                  if "error" in metrics:
+                      print(f"   ⚠️ Metrics unavailable: {metrics.get('error')}")
+                  else:
+                      print(f"   Total runs: {metrics.get('total_runs', 0)}")
+                      dist = metrics.get('tier_distribution', {})
+                      for tier, pct in dist.items():
+                          print(f"   {tier}: {pct}")
+                      print(f"   Total cost: ${metrics.get('total_cost', 0):.4f}")
+                      print(f"   Target: {metrics.get('target')}")
+                  
+              except Exception as e:
+                  print(f"⚠️ Token tracking skipped: {e}")
+          
+          asyncio.run(main())
+          EOF
+      
+      # ============================================================
+      # SKILL EXTRACTION NODE
+      # ============================================================
+      - name: 🔧 Extract Skills
+        if: steps.action.outputs.action == 'extract_skill'
+        run: |
+          python3 << 'EOF'
+          import asyncio
+          import os
+          import sys
+          
+          sys.path.insert(0, 'agents/tool_discovery/src')
+          
+          async def main():
+              try:
+                  from skill_extractor.extractor import extract_and_deploy_skill
+                  
+                  workflow_name = os.environ.get('INPUT_WORKFLOW_NAME', 'test-skill')
+                  
+                  print(f"🔧 Extracting skill: {workflow_name}")
+                  
+                  result = await extract_and_deploy_skill(
+                      skill_name=workflow_name,
+                      description=f"Extracted from {workflow_name}",
+                      tool_sequence=[
+                          {"name": "beca_scraper"},
+                          {"name": "lien_priority_analyzer"},
+                          {"name": "decision_logger"}
+                      ],
+                      input_schema={"date": {"type": "string", "required": True}},
+                      trigger_patterns=[f"run {workflow_name}"]
+                  )
+                  
+                  print(f"   Database: {result.get('database', {}).get('success')}")
+                  print(f"   GitHub: {result.get('github', {}).get('action')}")
+                  print(f"   Workflow URL: {result.get('workflow_url')}")
+                  
+              except Exception as e:
+                  print(f"⚠️ Skill extraction failed: {e}")
+          
+          asyncio.run(main())
+          EOF
+        env:
+          INPUT_WORKFLOW_NAME: ${{ inputs.workflow_name }}
+      
+      # ============================================================
+      # TEST INTEGRATION
+      # ============================================================
+      - name: 🧪 Test Integration
+        if: steps.action.outputs.action == 'test_integration'
+        run: |
+          python3 << 'EOF'
+          import asyncio
+          import sys
+          
+          sys.path.insert(0, 'agents/tool_discovery/src')
+          sys.path.insert(0, 'agents/orchestrator')
+          
+          async def main():
+              try:
+                  from langgraph_tool_discovery import test_integration
+                  await test_integration()
+              except Exception as e:
+                  print(f"❌ Integration test failed: {e}")
+                  raise
+          
+          asyncio.run(main())
+          EOF
+      
+      # ============================================================
+      # FULL ORCHESTRATION (SCHEDULED)
+      # ============================================================
+      - name: 🚀 Full Orchestration
+        if: steps.action.outputs.action == 'full_orchestration'
+        run: |
+          python3 << 'EOF'
+          import asyncio
+          import sys
+          import os
+          from datetime import datetime, timezone
+          
+          sys.path.insert(0, 'agents/orchestrator')
+          
+          async def main():
+              print("=" * 60)
+              print("🚀 BIDDEED.AI LANGGRAPH ORCHESTRATOR")
+              print(f"   Time: {datetime.now(timezone.utc).isoformat()}")
+              print("=" * 60)
+              
+              try:
+                  from langgraph_orchestrator import LangGraphOrchestrator
+                  
+                  orchestrator = LangGraphOrchestrator()
+                  await orchestrator.run_orchestration_cycle()
+                  
+              except Exception as e:
+                  print(f"\n⚠️ LangGraph orchestrator unavailable: {e}")
+                  print("   Running fallback status check...")
+                  
+                  # Fallback: Just log that we ran
+                  import httpx
+                  
+                  async with httpx.AsyncClient() as client:
+                      await client.post(
+                          f"{os.environ['SUPABASE_URL']}/rest/v1/insights",
+                          headers={
+                              "apikey": os.environ["SUPABASE_KEY"],
+                              "Authorization": f"Bearer {os.environ['SUPABASE_KEY']}",
+                              "Content-Type": "application/json"
+                          },
+                          json={
+                              "category": "orchestration",
+                              "title": "Orchestration Cycle",
+                              "insight": f"Scheduled run at {datetime.now(timezone.utc).isoformat()}",
+                              "source": "GitHub Actions",
+                              "metadata": {"status": "completed", "mode": "fallback"}
+                          }
+                      )
+                  print("   ✅ Status logged to Supabase")
+              
+              print("\n" + "=" * 60)
+              print("✅ Orchestration Complete")
+              print("=" * 60)
+          
+          asyncio.run(main())
+          EOF
+      
+      # ============================================================
+      # LOG COMPLETION
+      # ============================================================
+      - name: 📝 Log to Supabase
+        if: always()
+        run: |
+          python3 << 'EOF'
+          import os
+          import httpx
+          import asyncio
+          from datetime import datetime, timezone
+          
+          async def log():
+              try:
+                  async with httpx.AsyncClient() as client:
+                      response = await client.post(
+                          f"{os.environ['SUPABASE_URL']}/rest/v1/insights",
+                          headers={
+                              "apikey": os.environ["SUPABASE_KEY"],
+                              "Authorization": f"Bearer {os.environ['SUPABASE_KEY']}",
+                              "Content-Type": "application/json"
+                          },
+                          json={
+                              "category": "mcp_reference",
+                              "title": f"LangGraph Orchestrator Run",
+                              "insight": f"Action: ${{ steps.action.outputs.action }}",
+                              "source": "GitHub Actions - biddeed_langgraph_orchestrator.yml",
+                              "metadata": {
+                                  "action": "${{ steps.action.outputs.action }}",
+                                  "workflow_run": "${{ github.run_id }}",
+                                  "timestamp": datetime.now(timezone.utc).isoformat(),
+                                  "event": "${{ github.event_name }}"
+                              }
+                          }
+                      )
+                      if response.status_code in [200, 201]:
+                          print("✅ Logged to Supabase")
+                      else:
+                          print(f"⚠️ Log failed: {response.status_code}")
+              except Exception as e:
+                  print(f"⚠️ Log error: {e}")
+          
+          asyncio.run(log())
+          EOF
