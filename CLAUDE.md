@@ -1,130 +1,168 @@
 # Life OS - ADHD-Optimized Productivity System
 
-> **Owner**: Ariel Shapira
-> **AI Architect**: Claude (Anthropic)
-> **Stack**: GitHub Actions + Supabase + Cloudflare Pages
-
----
+> **Ariel Shapira** | Personal Productivity & Family Management
+> Dual Timezone: 🕐 FL (America/New_York) | IL (Asia/Jerusalem)
 
 ## Build & Test Commands
 
 ```bash
-# Core Operations
-npm run dev                              # Local development server
-npm run build                            # Production build
-npm run test                             # Run test suite
+# Python (agents, tracking)
+python -m pytest tests/ -v              # Run all tests
+python -m black src/ --check            # Check formatting
+python -m flake8 src/                   # Lint code
 
-# GitHub Actions Triggers
-gh workflow run orchestrator.yml         # Run autonomous orchestrator
-gh workflow run insert_insight.yml       # Insert insight to Supabase
-gh workflow run michael_swim.yml         # Michael swim tracking
+# Node.js (chat interface)
+npm run dev                             # Dev server
+npm run build                           # Production build
 
-# Database Operations
-curl -X POST "https://mocerqjnksmhcjzxrewo.supabase.co/rest/v1/insights" \
-  -H "apikey: $SUPABASE_KEY" \
-  -H "Content-Type: application/json" \
-  -d '{"category": "learning", "data": {}}'
-
-# Cloudflare Pages
-npx wrangler pages deploy ./dist         # Deploy to Cloudflare
+# GitHub Actions (production)
+gh workflow run orchestrator.yml        # Trigger orchestrator
+gh workflow run insert_insight.yml      # Insert to Supabase
+gh run list --limit=5                   # Check workflow status
 ```
-
----
-
-## Architecture
-
-### Domains
-```
-BUSINESS     → Everest Capital, BidDeed.AI, Insurance
-MICHAEL      → D1 Swimming, Nutrition, Recruiting
-FAMILY       → Shabbat, Orthodox observance, Events
-PERSONAL     → Health, Learning, Productivity
-```
-
-### Key Directories
-```
-src/
-├── agents/             # Autonomous AI agents
-├── api/                # Cloudflare Workers endpoints
-├── dashboard/          # Web dashboard components
-├── lib/                # Shared utilities
-└── config/             # Configuration files
-
-michael_d1_agents_v3/   # Michael D1 swim tracking
-├── data/               # Swim times, rivals, meets
-├── workflows/          # GitHub Actions
-└── agents/             # Swim analysis agents
-
-.github/workflows/      # GitHub Actions automation
-├── orchestrator.yml    # 30-min autonomous orchestrator
-├── insert_insight.yml  # Supabase data insertion
-└── michael_swim.yml    # Swim tracking pipeline
-```
-
-### Database (Supabase)
-- **Host**: mocerqjnksmhcjzxrewo.supabase.co
-- **Tables**: 
-  - `tasks` - Task tracking with ADHD states
-  - `activities` - Activity logging
-  - `insights` - AI-generated insights (learning, michael_swim, health_log)
-  - `daily_metrics` - Daily productivity metrics
-  - `michael_swim_times` - Swim performance data
-  - `michael_nutrition` - Nutrition tracking
-  - `task_interventions` - ADHD intervention logs
-
----
 
 ## Code Style
 
-### JavaScript/TypeScript
-- **Style**: ES modules, async/await
-- **Linter**: ESLint with Prettier
-- **Framework**: React for dashboard
-- **API**: Cloudflare Workers
+### Python
+- **Version**: Python 3.11+
+- **Formatting**: Black (88 char lines)
+- **Type hints**: Required for public functions
+- **Docstrings**: Google style
 
-### Python (GitHub Actions)
-- **Formatter**: Black (line length 100)
-- **Linter**: Ruff
-- **Type hints**: Required
-- **Async**: Use httpx for HTTP requests
+### JavaScript
+- **Version**: Node 18+
+- **Formatting**: Prettier, 2-space indent
 
----
+## Architecture
 
-## ADHD Task States
+### Life OS Domains
 
 ```
-INITIATED → SOLUTION_PROVIDED → IN_PROGRESS → COMPLETED
-                                           ↘ ABANDONED
-                                           ↘ BLOCKED
-                                           ↘ DEFERRED
+┌─────────────────────────────────────────────────────────────┐
+│                      LIFE OS                                 │
+├─────────────┬─────────────┬─────────────┬──────────────────┤
+│  BUSINESS   │  MICHAEL    │   FAMILY    │    PERSONAL      │
+│             │  D1 SWIM    │             │                  │
+├─────────────┼─────────────┼─────────────┼──────────────────┤
+│ BidDeed.AI  │ SwimCloud   │ Shabbat     │ Health logs      │
+│ Insurance   │ Nutrition   │ Holidays    │ Learning         │
+│ Auctions    │ Recruiting  │ Events      │ ADHD tracking    │
+└─────────────┴─────────────┴─────────────┴──────────────────┘
 ```
 
-### Intervention Triggers
-- Context switch without closure
-- >30 min after solution with no update
-- Session ends with task incomplete
+### Directory Structure
 
----
+```
+life-os/
+├── src/
+│   ├── agents/
+│   │   └── orchestrator/           # Autonomous checkpoint system
+│   ├── michael_d1_agents_v3/
+│   │   ├── data/                   # SwimCloud data
+│   │   └── agents/                 # D1 recruiting agents
+│   └── utils/
+├── .github/workflows/
+│   ├── orchestrator.yml            # 30-min checkpoint
+│   └── insert_insight.yml          # Supabase inserts
+├── chat/                           # Chat interface
+└── tests/
+```
+
+### Key Files
+
+- `src/agents/orchestrator/autonomous_checkpoint_system.py` - Token monitoring
+- `src/michael_d1_agents_v3/data/` - Swim times, rivals, meets
+- `.github/workflows/orchestrator.yml` - 30-min + manual trigger
+
+### External Services
+
+| Service | Purpose | Config |
+|---------|---------|--------|
+| Supabase | Database (mocerqjnksmhcjzxrewo) | GitHub Secrets |
+| GitHub Actions | Compute | .github/workflows/ |
+| Cloudflare Pages | Chat hosting | Auto-deploy |
+| SwimCloud | Michael's swim data | API scraping |
+
+## Supabase Tables
+
+| Table | Purpose |
+|-------|---------|
+| `insights` | Learning sessions, claude_performance |
+| `michael_swim_times` | Personal bests, meet results |
+| `michael_nutrition` | Keto tracking Mon-Thu |
+| `michael_recruiting` | D1 coach outreach |
+| `health_logs` | Ariel's health tracking |
+| `tasks` | ADHD task tracking |
+| `activities` | Daily activity log |
 
 ## Michael D1 Swimming
 
-### Events
-- 50 Free, 100 Free, 200 Free
-- 100 Fly, 100 Back
+### Key Data Points
+- **SwimCloud ID**: 3250085
+- **Events**: 50/100/200 Free, 100 Fly, 100 Back
+- **School**: Satellite Beach HS (Class 2027)
+- **DOB**: July 22, 2009 (16 years old)
 
-### SwimCloud
-- Michael ID: 3250085
-- Verified rivals: Soto (2928537), Gordon (1733035), Domboru (1518102)
+### Verified Rivals
+| Name | SwimCloud ID | Power Index |
+|------|--------------|-------------|
+| Soto | 2928537 | 47 |
+| Gordon | 1733035 | 90 |
+| Domboru | 1518102 | - |
 
-### Diet Protocol
-- **Mon-Thu**: Strict keto (Michael Andrew protocol)
+### Nutrition Protocol
+- **Mon-Thu**: Strict keto (Michael Andrew model)
 - **Fri-Sun**: Moderate carbs (Shabbat observance)
+- Michael Andrew reference: 6'5-6'6", 190-205 lbs
 
----
+## ADHD Task Tracking
 
-## Critical Rules
+### Task States
+```
+INITIATED → SOLUTION_PROVIDED → IN_PROGRESS → COMPLETED/ABANDONED/BLOCKED/DEFERRED
+```
 
-1. **NEVER ask execution questions** - Execute autonomously
-2. **Dual timezone awareness** - FL (America/New_York) | IL (Asia/Jerusalem)
-3. **Supabase for persistence** - Use insert_insight.yml workflow
-4. **No local curl** - All API calls via GitHub Actions
+### Abandonment Detection
+- Context switch without closure
+- Session ends with task incomplete
+- >30 min after solution with no update
+
+### Intervention Levels
+- **Level 1 (0-30 min)**: Quick check
+- **Level 2 (30-60 min)**: Pattern observation
+- **Level 3 (>60 min)**: Accountability alert
+
+## Orthodox Observance
+
+- **Shabbat**: Friday sunset → Saturday night
+- **No work tasks during Shabbat**
+- **Kosher dietary requirements**
+- **Holiday calendar awareness**
+
+## Daily Patterns
+
+| Time | Energy | Best For |
+|------|--------|----------|
+| 9-11 AM | Peak | Complex tasks |
+| 2-4 PM | Dip | Learning/admin |
+| Evening | Family | No work pressure |
+
+## Project Rules
+
+### NEVER
+- Store API keys in code
+- Work on business tasks during Shabbat
+- Use softening language ("Would you like...")
+- Ask permission (execute autonomously)
+
+### ALWAYS
+- Log insights to Supabase via insert_insight.yml
+- Track task state changes
+- Call out abandonment patterns
+- Update PROJECT_STATE.json
+
+## Smart Router (Chat Interface)
+
+- **Default Model**: gemini-2.5-flash (FREE, 1M context)
+- **Chat URL**: life-os-aiy.pages.dev/chat
+- **GOOGLE_API_KEY**: In Cloudflare env
