@@ -1,0 +1,73 @@
+name: Hybrid News Aggregator
+
+on:
+  schedule:
+    # Run at 6 AM, 12 PM, 6 PM EST (11:00, 17:00, 23:00 UTC)
+    - cron: '0 11 * * *'  # 6 AM EST
+    - cron: '0 17 * * *'  # 12 PM EST
+    - cron: '0 23 * * *'  # 6 PM EST
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: 'Run mode'
+        required: true
+        default: 'full'
+        type: choice
+        options:
+          - full
+          - biddeed
+          - lifeos
+
+env:
+  GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
+  SUPABASE_URL: https://mocerqjnksmhcjzxrewo.supabase.co
+  SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+  TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+  TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+
+jobs:
+  aggregate-news:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+      
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip
+          pip install feedparser requests
+      
+      - name: Run Hybrid News Aggregator
+        run: |
+          MODE="${{ github.event.inputs.mode || 'full' }}"
+          echo "Running in mode: $MODE"
+          python agents/news_aggregator/hybrid_news_aggregator.py --mode $MODE
+      
+      - name: Upload results artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: news-results-${{ github.run_number }}
+          path: results_*.json
+          retention-days: 7
+      
+      - name: Summary
+        run: |
+          echo "## 🚀 Hybrid News Aggregator Complete" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Mode:** ${{ github.event.inputs.mode || 'full' }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Time:** $(date)" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          if [ -f results_*.json ]; then
+            echo "### Results Preview" >> $GITHUB_STEP_SUMMARY
+            echo '```json' >> $GITHUB_STEP_SUMMARY
+            head -50 results_*.json >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+          fi
