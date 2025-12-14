@@ -1,0 +1,52 @@
+{
+  "name": "life-os-mcp",
+  "version": "1.0.0",
+  "description": "Life OS - ADHD-Optimized Productivity System MCP Tools",
+  "server": {
+    "module": "src.mcp.life_os_mcp",
+    "class": "mcp"
+  },
+  "tools": {
+    "count": 10,
+    "list": [
+      "log_task",
+      "update_task_state",
+      "get_tasks",
+      "log_activity",
+      "get_daily_metrics",
+      "log_insight",
+      "get_michael_times",
+      "log_nutrition",
+      "trigger_intervention",
+      "get_abandonment_patterns"
+    ]
+  },
+  "environment": {
+    "required": [
+      "GITHUB_TOKEN",
+      "SUPABASE_URL",
+      "SUPABASE_KEY"
+    ],
+    "optional": [
+      "GOOGLE_API_KEY",
+      "ANTHROPIC_API_KEY"
+    ]
+  },
+  "integrations": {
+    "supabase": {
+      "host": "mocerqjnksmhcjzxrewo.supabase.co",
+      "tables": [
+        "tasks",
+        "activities",
+        "insights",
+        "daily_metrics",
+        "michael_swim_times",
+        "michael_nutrition"
+      ]
+    },
+    "swimcloud": {
+      "michael_id": "3250085",
+      "rivals": ["2928537", "1733035", "1518102"]
+    }
+  }
+}
