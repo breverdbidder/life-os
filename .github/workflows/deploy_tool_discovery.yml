@@ -1,0 +1,76 @@
+name: Deploy Agentic Tool Discovery System
+
+on:
+  push:
+    paths:
+      - 'agents/tool_discovery/**'
+  workflow_dispatch:
+    inputs:
+      init_tables:
+        description: 'Initialize Supabase tables'
+        type: boolean
+        default: false
+      seed_tools:
+        description: 'Seed initial tool index'
+        type: boolean
+        default: false
+
+env:
+  SUPABASE_URL: https://mocerqjnksmhcjzxrewo.supabase.co
+  SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      
+      - name: Install dependencies
+        run: |
+          pip install httpx pydantic pyyaml
+      
+      - name: Initialize Supabase Tables
+        if: ${{ inputs.init_tables == true }}
+        run: |
+          python agents/tool_discovery/scripts/init_tables.py
+      
+      - name: Seed Tool Index
+        if: ${{ inputs.seed_tools == true }}
+        run: |
+          python agents/tool_discovery/scripts/seed_tools.py
+      
+      - name: Verify Deployment
+        run: |
+          python -c "
+          import sys
+          sys.path.insert(0, 'agents/tool_discovery/src')
+          from tool_index.vector_store import discover_tools
+          from token_tracker.economics import get_smart_router_metrics
+          from skill_extractor.extractor import analyze_chat_for_skills
+          print('✅ All modules imported successfully')
+          "
+      
+      - name: Log Deployment
+        run: |
+          curl -X POST "$SUPABASE_URL/rest/v1/insights" \
+            -H "apikey: $SUPABASE_KEY" \
+            -H "Authorization: Bearer $SUPABASE_KEY" \
+            -H "Content-Type: application/json" \
+            -d '{
+              "category": "mcp_reference",
+              "title": "Agentic Tool Discovery Deployed",
+              "insight": "Dynamic tool discovery, token economics tracking, and skill extraction system deployed",
+              "source": "GitHub Actions",
+              "metadata": {
+                "workflow": "deploy_tool_discovery.yml",
+                "modules": ["vector_store", "economics", "extractor"]
+              }
+            }'
