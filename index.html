@@ -4,6 +4,13 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Life OS - Shapira Family Dashboard</title>
+    <!-- PWA Meta Tags -->
+    <link rel="manifest" href="/manifest.json" />
+    <meta name="theme-color" content="#22c55e" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Life OS" />
+    <link rel="apple-touch-icon" href="/icons/icon-192x192.png" />
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         :root { --purple: #8b5cf6; --blue: #3b82f6; --green: #10b981; --orange: #f59e0b; --red: #ef4444; --whatsapp: #25D366; }
@@ -846,5 +853,6 @@
         fetchOrchestratorData();
         setInterval(fetchOrchestratorData, 30000);
     </script>
+    <script src="/pwa-register.js"></script>
 </body>
 </html>
