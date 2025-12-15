@@ -1,0 +1,40 @@
+{
+  "name": "Life OS - ADHD Productivity System",
+  "short_name": "Life OS",
+  "description": "ADHD-optimized productivity system with task tracking, accountability, and multi-domain management.",
+  "start_url": "/chat",
+  "display": "standalone",
+  "background_color": "#1a1a2e",
+  "theme_color": "#22c55e",
+  "orientation": "portrait-primary",
+  "scope": "/",
+  "icons": [
+    {
+      "src": "/icons/icon-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable any"
+    },
+    {
+      "src": "/icons/icon-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable any"
+    }
+  ],
+  "categories": ["productivity", "lifestyle", "business"],
+  "shortcuts": [
+    {
+      "name": "New Task",
+      "short_name": "Task",
+      "description": "Start a new task",
+      "url": "/chat?action=new-task"
+    },
+    {
+      "name": "Michael Swimming",
+      "short_name": "Swim",
+      "description": "Michael D1 tracking",
+      "url": "/chat?domain=michael"
+    }
+  ]
+}
