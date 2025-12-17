@@ -1,0 +1,343 @@
+name: RealTDM Title Search Scraper
+
+on:
+  workflow_dispatch:
+    inputs:
+      case_ids:
+        description: 'Comma-separated case IDs (e.g., 81997,82056,82073)'
+        required: true
+      auction_date:
+        description: 'Auction date for reference'
+        required: false
+        default: '12/18/2025'
+
+  repository_dispatch:
+    types: [realtdm_title_search]
+
+jobs:
+  scrape-title-searches:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    
+    steps:
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install Playwright
+        run: |
+          npm init -y
+          npm install playwright pdf-parse
+          npx playwright install chromium --with-deps
+
+      - name: Scrape Title Search Documents
+        id: scrape
+        env:
+          CASE_IDS: ${{ github.event.inputs.case_ids || github.event.client_payload.case_ids }}
+          AUCTION_DATE: ${{ github.event.inputs.auction_date || '12/18/2025' }}
+        run: |
+          mkdir -p title_searches
+          
+          cat << 'SCRIPT' > scrape_title_search.js
+          const { chromium } = require('playwright');
+          const fs = require('fs');
+          const path = require('path');
+          
+          const CASE_IDS = (process.env.CASE_IDS || '').split(',').map(s => s.trim()).filter(Boolean);
+          
+          async function scrapeCase(page, caseId) {
+            console.log(`\n📄 Processing case ${caseId}...`);
+            
+            const result = {
+              case_id: caseId,
+              title_search_found: false,
+              pdf_url: null,
+              pdf_downloaded: false,
+              case_details: {},
+              error: null
+            };
+            
+            try {
+              // Navigate to case list and click on the case row
+              await page.goto('https://brevard.realtdm.com/public/cases/list', {
+                waitUntil: 'networkidle',
+                timeout: 60000
+              });
+              
+              await page.waitForTimeout(2000);
+              
+              // Search for the specific case
+              await page.fill('#filterCaseStatus', '');  // Clear status filter
+              
+              // Click on the case row with this ID
+              const caseRow = await page.$(`tr[data-caseid="${caseId}"]`);
+              
+              if (!caseRow) {
+                // Need to search first
+                console.log('  Searching by case ID filter...');
+                
+                // We need to find another way - search by filtering results
+                // Navigate directly using form submission
+                await page.evaluate((cid) => {
+                  document.querySelector('#caseID').value = cid;
+                  document.querySelector('#caseDetailsForm').submit();
+                }, caseId);
+                
+                await page.waitForTimeout(3000);
+              } else {
+                await caseRow.click();
+                await page.waitForTimeout(3000);
+              }
+              
+              // Look for title search section
+              const pageContent = await page.content();
+              
+              // Screenshot the case detail page
+              await page.screenshot({ 
+                path: `title_searches/case_${caseId}_detail.png`, 
+                fullPage: true 
+              });
+              
+              // Save HTML for analysis
+              fs.writeFileSync(`title_searches/case_${caseId}_detail.html`, pageContent);
+              
+              // Look for PDF links
+              const pdfLinks = await page.$$eval('a[href*=".pdf"], a[href*="document"], a[href*="file"]', links => 
+                links.map(l => ({ href: l.href, text: l.textContent.trim() }))
+              );
+              
+              console.log(`  Found ${pdfLinks.length} potential document links`);
+              result.document_links = pdfLinks;
+              
+              // Look for "Title Search" or "Abstract" links
+              for (const link of pdfLinks) {
+                if (link.text.toLowerCase().includes('title') || 
+                    link.text.toLowerCase().includes('abstract') ||
+                    link.text.toLowerCase().includes('search')) {
+                  console.log(`  📥 Found title search: ${link.text}`);
+                  result.title_search_found = true;
+                  result.pdf_url = link.href;
+                  
+                  // Try to download
+                  try {
+                    const download = await page.waitForEvent('download', {
+                      timeout: 10000,
+                      predicate: () => true
+                    });
+                    const downloadPath = `title_searches/case_${caseId}_title_search.pdf`;
+                    await download.saveAs(downloadPath);
+                    result.pdf_downloaded = true;
+                    result.pdf_path = downloadPath;
+                    console.log(`  ✅ Downloaded to ${downloadPath}`);
+                  } catch (e) {
+                    // Direct download attempt
+                    const response = await page.goto(link.href);
+                    if (response && response.ok()) {
+                      const buffer = await response.body();
+                      const downloadPath = `title_searches/case_${caseId}_title_search.pdf`;
+                      fs.writeFileSync(downloadPath, buffer);
+                      result.pdf_downloaded = true;
+                      result.pdf_path = downloadPath;
+                      console.log(`  ✅ Downloaded directly to ${downloadPath}`);
+                    }
+                  }
+                  break;
+                }
+              }
+              
+              // Extract visible case details from page
+              const details = await page.evaluate(() => {
+                const data = {};
+                // Try to extract key fields
+                document.querySelectorAll('td, th, div, span').forEach(el => {
+                  const text = el.textContent.trim();
+                  if (text.includes('Parcel') || text.includes('Certificate') || 
+                      text.includes('Amount') || text.includes('Applicant') ||
+                      text.includes('Owner') || text.includes('Address')) {
+                    const nextEl = el.nextElementSibling;
+                    if (nextEl) {
+                      data[text.replace(':', '').trim()] = nextEl.textContent.trim();
+                    }
+                  }
+                });
+                return data;
+              });
+              
+              result.case_details = details;
+              
+            } catch (error) {
+              console.log(`  ❌ Error: ${error.message}`);
+              result.error = error.message;
+            }
+            
+            return result;
+          }
+          
+          async function main() {
+            console.log('🔍 RealTDM Title Search Scraper');
+            console.log(`📋 Cases: ${CASE_IDS.join(', ')}`);
+            console.log('='.repeat(60));
+            
+            const browser = await chromium.launch({
+              headless: true,
+              args: ['--no-sandbox', '--disable-setuid-sandbox']
+            });
+            
+            const context = await browser.newContext({
+              userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120.0.0.0',
+              viewport: { width: 1920, height: 1080 },
+              acceptDownloads: true
+            });
+            
+            const page = await context.newPage();
+            const results = [];
+            
+            for (const caseId of CASE_IDS) {
+              const result = await scrapeCase(page, caseId);
+              results.push(result);
+            }
+            
+            await browser.close();
+            
+            // Summary
+            console.log('\n' + '='.repeat(60));
+            console.log('📊 Summary');
+            console.log('='.repeat(60));
+            
+            const found = results.filter(r => r.title_search_found).length;
+            const downloaded = results.filter(r => r.pdf_downloaded).length;
+            
+            console.log(`Total cases: ${results.length}`);
+            console.log(`Title searches found: ${found}`);
+            console.log(`PDFs downloaded: ${downloaded}`);
+            
+            // Save results
+            fs.writeFileSync('title_searches/results.json', JSON.stringify(results, null, 2));
+            
+            console.log('\n✅ Results saved to title_searches/results.json');
+          }
+          
+          main().catch(console.error);
+          SCRIPT
+          
+          node scrape_title_search.js
+
+      - name: Analyze Title Search PDFs
+        run: |
+          cat << 'PYEOF' > analyze_pdfs.py
+          import os
+          import json
+          import subprocess
+          
+          results_path = 'title_searches/results.json'
+          if not os.path.exists(results_path):
+              print("No results file found")
+              exit(0)
+          
+          with open(results_path) as f:
+              results = json.load(f)
+          
+          print("=" * 60)
+          print("📄 Title Search Analysis")
+          print("=" * 60)
+          
+          analysis = []
+          
+          for r in results:
+              case_id = r['case_id']
+              print(f"\nCase {case_id}:")
+              
+              item = {
+                  'case_id': case_id,
+                  'has_title_search': r.get('title_search_found', False),
+                  'pdf_path': r.get('pdf_path'),
+                  'liens_found': [],
+                  'mortgages_found': [],
+                  'judgments_found': [],
+                  'tax_info': {},
+                  'analysis_complete': False
+              }
+              
+              pdf_path = r.get('pdf_path')
+              if pdf_path and os.path.exists(pdf_path):
+                  print(f"  PDF: {pdf_path}")
+                  
+                  # Extract text using pdftotext
+                  try:
+                      text = subprocess.check_output(
+                          ['pdftotext', pdf_path, '-'],
+                          stderr=subprocess.DEVNULL
+                      ).decode('utf-8', errors='ignore')
+                      
+                      # Analyze for key terms
+                      text_lower = text.lower()
+                      
+                      # Check for liens
+                      if 'lien' in text_lower:
+                          print("  ⚠️ LIENS found in document")
+                          item['liens_found'].append("Lien references detected")
+                      
+                      # Check for mortgages
+                      if 'mortgage' in text_lower:
+                          print("  ⚠️ MORTGAGE found in document")
+                          item['mortgages_found'].append("Mortgage references detected")
+                      
+                      # Check for judgments
+                      if 'judgment' in text_lower or 'judgement' in text_lower:
+                          print("  ⚠️ JUDGMENT found in document")
+                          item['judgments_found'].append("Judgment references detected")
+                      
+                      # Check for HOA
+                      if 'hoa' in text_lower or 'association' in text_lower:
+                          print("  ⚠️ HOA found in document")
+                          item['liens_found'].append("HOA reference detected")
+                      
+                      # Extract tax certificate info
+                      if 'certificate' in text_lower:
+                          print("  📜 Tax certificate references found")
+                      
+                      item['analysis_complete'] = True
+                      item['text_preview'] = text[:500]
+                      
+                  except Exception as e:
+                      print(f"  ❌ PDF analysis error: {e}")
+              else:
+                  print("  No PDF available")
+              
+              analysis.append(item)
+          
+          # Save analysis
+          with open('title_searches/analysis.json', 'w') as f:
+              json.dump(analysis, f, indent=2)
+          
+          print("\n" + "=" * 60)
+          print("✅ Analysis saved to title_searches/analysis.json")
+          PYEOF
+          
+          pip install pdfplumber --quiet --break-system-packages 2>/dev/null
+          apt-get update && apt-get install -y poppler-utils 2>/dev/null || true
+          python3 analyze_pdfs.py
+
+      - name: Upload Results
+        uses: actions/upload-artifact@v4
+        with:
+          name: title-searches-${{ github.run_id }}
+          path: title_searches/
+          retention-days: 90
+
+      - name: Save to Supabase
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+        run: |
+          if [ -f "title_searches/analysis.json" ]; then
+            curl -s -X POST "$SUPABASE_URL/rest/v1/insights" \
+              -H "apikey: $SUPABASE_KEY" \
+              -H "Authorization: Bearer $SUPABASE_KEY" \
+              -H "Content-Type: application/json" \
+              -d "{
+                \"category\": \"title_search_analysis\",
+                \"content\": \"Title Search Analysis - ${{ env.AUCTION_DATE }}\",
+                \"metadata\": $(cat title_searches/analysis.json)
+              }"
+          fi
