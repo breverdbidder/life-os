@@ -1,0 +1,240 @@
+name: RealTDM Stealth Scraper
+
+on:
+  workflow_dispatch:
+    inputs:
+      sale_date:
+        description: 'Sale date (MM/DD/YYYY)'
+        required: true
+        default: '12/18/2025'
+
+jobs:
+  scrape:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    
+    steps:
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install Dependencies
+        run: |
+          pip install playwright
+          playwright install chromium --with-deps
+
+      - name: Scrape RealTDM
+        env:
+          SALE_DATE: ${{ github.event.inputs.sale_date }}
+        run: |
+          python3 << 'PYEOF'
+          import asyncio
+          import json
+          import re
+          import os
+          from playwright.async_api import async_playwright
+
+          BASE_URL = "https://brevard.realtdm.com"
+          USERNAME = "Everest8"
+          PASSWORD = "Everest18$"
+          SALE_DATE = os.environ.get('SALE_DATE', '12/18/2025')
+
+          async def scrape_realtdm():
+              print("=" * 70)
+              print("🎭 RealTDM Stealth Scraper")
+              print(f"   Sale Date: {SALE_DATE}")
+              print("=" * 70)
+              
+              async with async_playwright() as p:
+                  browser = await p.chromium.launch(
+                      headless=True,
+                      args=['--no-sandbox', '--disable-setuid-sandbox', '--disable-blink-features=AutomationControlled']
+                  )
+                  
+                  context = await browser.new_context(
+                      user_agent='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0.0.0',
+                      viewport={'width': 1920, 'height': 1080}
+                  )
+                  
+                  await context.add_init_script("""
+                      Object.defineProperty(navigator, 'webdriver', {get: () => undefined});
+                      window.chrome = {runtime: {}};
+                  """)
+                  
+                  page = await context.new_page()
+                  results = {'sale_date': SALE_DATE, 'cases': []}
+                  
+                  try:
+                      # Login
+                      print("\n[1] Logging in...")
+                      await page.goto(BASE_URL, wait_until='networkidle', timeout=30000)
+                      await page.wait_for_timeout(2000)
+                      
+                      username_field = await page.query_selector('input[name="username"]')
+                      if username_field:
+                          await page.fill('input[name="username"]', USERNAME)
+                          await page.fill('input[name="password"]', PASSWORD)
+                          await page.screenshot(path='01_before_login.png')
+                          
+                          login_btn = await page.query_selector('input[type="submit"], button[type="submit"]')
+                          if login_btn:
+                              await login_btn.click()
+                          else:
+                              await page.keyboard.press('Enter')
+                          
+                          await page.wait_for_timeout(3000)
+                          await page.screenshot(path='02_after_login.png')
+                          
+                          content = await page.content()
+                          if 'dashboard' in content.lower() or 'logout' in content.lower():
+                              print("    ✅ Logged in!")
+                          else:
+                              print(f"    Current URL: {page.url}")
+                      
+                      # Go to cases
+                      print("\n[2] Navigating to cases...")
+                      await page.goto(f"{BASE_URL}/public/cases/list", wait_until='networkidle')
+                      await page.wait_for_timeout(2000)
+                      
+                      # Filter by date
+                      print(f"\n[3] Filtering by date: {SALE_DATE}")
+                      start_date = await page.query_selector('#filterSaleDateStart, input[name="filterSaleDateStart"]')
+                      end_date = await page.query_selector('#filterSaleDateStop, input[name="filterSaleDateStop"]')
+                      
+                      if start_date and end_date:
+                          await start_date.fill(SALE_DATE)
+                          await end_date.fill(SALE_DATE)
+                          filter_btn = await page.query_selector('.btn-search, button:has-text("Filter")')
+                          if filter_btn:
+                              await filter_btn.click()
+                              await page.wait_for_timeout(2000)
+                      
+                      await page.screenshot(path='03_cases_filtered.png')
+                      
+                      # Get case rows
+                      print("\n[4] Finding cases...")
+                      rows = await page.query_selector_all('tr.load-case[data-caseid]')
+                      print(f"    Found {len(rows)} rows")
+                      
+                      cases = []
+                      for row in rows:
+                          case_id = await row.get_attribute('data-caseid')
+                          cells = await row.query_selector_all('td')
+                          if len(cells) >= 7:
+                              cases.append({
+                                  'case_id': case_id,
+                                  'status': (await cells[1].inner_text()).strip(),
+                                  'case_number': (await cells[2].inner_text()).strip(),
+                                  'parcel_id': (await cells[5].inner_text()).strip(),
+                                  'sale_date': (await cells[6].inner_text()).strip(),
+                                  'surplus': (await cells[7].inner_text()).strip() if len(cells) > 7 else ''
+                              })
+                      
+                      # Get details for each case
+                      print(f"\n[5] Getting details for {len(cases)} cases...")
+                      
+                      for i, case in enumerate(cases):
+                          case_id = case['case_id']
+                          print(f"    [{i+1}/{len(cases)}] Case {case['case_number']}...", end=' ')
+                          
+                          try:
+                              row = await page.query_selector(f'tr[data-caseid="{case_id}"]')
+                              if row:
+                                  await row.click()
+                                  await page.wait_for_timeout(2000)
+                                  await page.screenshot(path=f'case_{case_id}.png')
+                                  
+                                  html = await page.content()
+                                  
+                                  # Extract certificate details
+                                  cert_match = re.search(r'Certificate\s*#?\s*:?\s*(\d+-\d+|\d+)', html, re.I)
+                                  if cert_match:
+                                      case['certificate_number'] = cert_match.group(1)
+                                  
+                                  face_match = re.search(r'Face\s*(?:Amount)?\s*:?\s*\$?([\d,\.]+)', html, re.I)
+                                  if face_match:
+                                      case['face_amount'] = face_match.group(1)
+                                  
+                                  int_match = re.search(r'Interest\s*(?:Rate)?\s*:?\s*([\d\.]+)\s*%', html, re.I)
+                                  if int_match:
+                                      case['interest_rate'] = f"{int_match.group(1)}%"
+                                  
+                                  holder_match = re.search(r'(?:Certificate\s*)?Holder\s*:?\s*([^<\n]{3,50})', html, re.I)
+                                  if holder_match:
+                                      case['certificate_holder'] = holder_match.group(1).strip()
+                                  
+                                  # Property info
+                                  prop_match = re.search(r'Property\s*(?:Address)?\s*:?\s*([^<\n]{5,100})', html, re.I)
+                                  if prop_match:
+                                      case['property_address'] = prop_match.group(1).strip()
+                                  
+                                  print(f"Cert: {case.get('certificate_number', 'N/A')}")
+                                  
+                                  # Go back
+                                  close_btn = await page.query_selector('.close, [data-dismiss="modal"]')
+                                  if close_btn:
+                                      await close_btn.click()
+                                  else:
+                                      await page.go_back()
+                                  await page.wait_for_timeout(1000)
+                          except Exception as e:
+                              print(f"Error: {str(e)[:30]}")
+                              case['error'] = str(e)
+                      
+                      results['cases'] = cases
+                      results['total'] = len(cases)
+                      
+                  except Exception as e:
+                      print(f"❌ Error: {e}")
+                      results['error'] = str(e)
+                      await page.screenshot(path='error.png')
+                  
+                  finally:
+                      await browser.close()
+                  
+                  # Save results
+                  with open('realtdm_results.json', 'w') as f:
+                      json.dump(results, f, indent=2)
+                  
+                  print(f"\n✅ Saved {len(results.get('cases', []))} cases")
+
+          asyncio.run(scrape_realtdm())
+          PYEOF
+
+      - name: Display Results
+        run: |
+          echo "=== RESULTS ==="
+          cat realtdm_results.json
+
+      - name: Upload Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: realtdm-results-${{ github.run_id }}
+          path: |
+            *.png
+            *.json
+          retention-days: 30
+
+      - name: Save to Supabase
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+        run: |
+          curl -X POST "$SUPABASE_URL/rest/v1/insights" \
+            -H "apikey: $SUPABASE_KEY" \
+            -H "Authorization: Bearer $SUPABASE_KEY" \
+            -H "Content-Type: application/json" \
+            -d "{\"category\":\"realtdm_title_search\",\"content\":\"Tax Deed Title Search - ${{ github.event.inputs.sale_date }}\",\"metadata\":$(cat realtdm_results.json)}" || true
+
+      - name: Upload to GitHub Data Repo
+        env:
+          GH_TOKEN: ${{ secrets.GH_PAT }}
+        run: |
+          DATE_SAFE=$(echo "${{ github.event.inputs.sale_date }}" | tr '/' '-')
+          CONTENT=$(base64 -w 0 realtdm_results.json)
+          
+          curl -X PUT \
+            -H "Authorization: token $GH_TOKEN" \
+            "https://api.github.com/repos/breverdbidder/brevard-bidder-scraper/contents/data/taxdeed/title_search_${DATE_SAFE}.json" \
+            -d "{\"message\":\"Add title search for ${{ github.event.inputs.sale_date }}\",\"content\":\"$CONTENT\"}" || true
