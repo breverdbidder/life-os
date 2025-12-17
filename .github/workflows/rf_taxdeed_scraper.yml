@@ -1,0 +1,258 @@
+name: RealForeclose Tax Deed Scraper
+
+on:
+  workflow_dispatch:
+    inputs:
+      auction_date:
+        description: 'Auction date (MM/DD/YYYY)'
+        required: true
+        default: '12/18/2025'
+  schedule:
+    - cron: '0 13 18 12 *'  # 8 AM EST on Dec 18
+
+jobs:
+  scrape:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install Playwright
+        run: |
+          npm init -y
+          npm install playwright
+          npx playwright install chromium --with-deps
+
+      - name: Scrape RealForeclose with Login
+        env:
+          RF_USERNAME: ${{ secrets.RF_USERNAME }}
+          RF_PASSWORD: ${{ secrets.RF_PASSWORD }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+        run: |
+          cat << 'SCRIPT' > scrape.js
+          const { chromium } = require('playwright');
+          const fs = require('fs');
+          
+          const AUCTION_DATE = '${{ github.event.inputs.auction_date }}' || '12/18/2025';
+          const USERNAME = process.env.RF_USERNAME || '';
+          const PASSWORD = process.env.RF_PASSWORD || '';
+          
+          async function scrape() {
+            console.log('='.repeat(60));
+            console.log('🏛️ BidDeed.AI - RealForeclose Tax Deed Scraper');
+            console.log('='.repeat(60));
+            console.log('📅 Date:', AUCTION_DATE);
+            console.log('👤 User:', USERNAME ? USERNAME.substring(0,3) + '***' : 'Anonymous');
+            
+            const browser = await chromium.launch({
+              headless: true,
+              args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-blink-features=AutomationControlled']
+            });
+            
+            const context = await browser.newContext({
+              userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+              viewport: { width: 1920, height: 1080 }
+            });
+            
+            const page = await context.newPage();
+            const results = { 
+              properties: [], 
+              metadata: {
+                auction_date: AUCTION_DATE,
+                auction_type: 'Tax Deed',
+                source: 'brevard.realforeclose.com'
+              }
+            };
+            
+            try {
+              // Step 1: Load main page
+              console.log('\n[1] Loading RealForeclose...');
+              await page.goto('https://brevard.realforeclose.com/index.cfm', {
+                waitUntil: 'networkidle',
+                timeout: 60000
+              });
+              await page.waitForTimeout(2000);
+              console.log('  ✅ Title:', await page.title());
+              await page.screenshot({ path: 'step1_main.png', fullPage: true });
+              
+              // Step 2: Login
+              if (USERNAME && PASSWORD) {
+                console.log('\n[2] Logging in as', USERNAME.substring(0,3) + '***');
+                try {
+                  await page.waitForSelector('#LogName', { timeout: 5000 });
+                  await page.fill('#LogName', USERNAME);
+                  await page.fill('#LogPass', PASSWORD);
+                  await page.click('#LogButton');
+                  await page.waitForTimeout(3000);
+                  
+                  const html = await page.content();
+                  if (html.includes('islog="Y"')) {
+                    console.log('  ✅ Login successful!');
+                    results.metadata.logged_in = true;
+                  } else if (html.includes('Invalid') || html.includes('Bad')) {
+                    console.log('  ❌ Invalid credentials');
+                    results.metadata.logged_in = false;
+                  } else {
+                    console.log('  ⚠️ Login status unclear');
+                    results.metadata.logged_in = 'unknown';
+                  }
+                  await page.screenshot({ path: 'step2_login.png', fullPage: true });
+                } catch (e) {
+                  console.log('  ⚠️ Login form error:', e.message);
+                }
+              } else {
+                console.log('\n[2] No credentials - anonymous access');
+                results.metadata.logged_in = false;
+              }
+              
+              // Step 3: Navigate to auction date
+              console.log('\n[3] Navigating to', AUCTION_DATE, 'auction...');
+              const url = `https://brevard.realforeclose.com/index.cfm?zaction=AUCTION&zmethod=PREVIEW&AuctionDate=${AUCTION_DATE}`;
+              await page.goto(url, { waitUntil: 'networkidle', timeout: 60000 });
+              await page.waitForTimeout(2000);
+              console.log('  ✅ Title:', await page.title());
+              await page.screenshot({ path: 'step3_auction.png', fullPage: true });
+              
+              // Step 4: Extract data
+              console.log('\n[4] Extracting auction data...');
+              const html = await page.content();
+              fs.writeFileSync('auction_page.html', html);
+              
+              // Check for cases
+              if (html.toLowerCase().includes('no cases currently')) {
+                console.log('  ⚠️ No cases posted for this date yet');
+                results.metadata.status = 'no_cases_posted';
+              } else {
+                // Extract AESSION IDs (auction item identifiers)
+                const aessionMatch = html.match(/AESSION=([A-Za-z0-9]+)/gi) || [];
+                const aessions = [...new Set(aessionMatch.map(m => m.split('=')[1]))];
+                console.log('  📋 Found', aessions.length, 'auction items');
+                
+                // Extract case numbers
+                const caseMatch = html.match(/\d{2}-\d{4}-[A-Z]{2}-\d+/g) || [];
+                const cases = [...new Set(caseMatch)];
+                console.log('  📄 Found', cases.length, 'case numbers');
+                
+                // Extract parcel IDs
+                const parcelMatch = html.match(/\b\d{7,8}\b/g) || [];
+                const parcels = [...new Set(parcelMatch)];
+                console.log('  🏠 Found', parcels.length, 'parcel patterns');
+                
+                // Build properties list
+                for (let i = 0; i < Math.max(aessions.length, cases.length); i++) {
+                  results.properties.push({
+                    aession: aessions[i] || null,
+                    case_number: cases[i] || null,
+                    parcel_id: parcels[i] || null,
+                    auction_date: AUCTION_DATE,
+                    auction_type: 'Tax Deed'
+                  });
+                }
+                
+                results.metadata.status = 'data_found';
+              }
+              
+              // Step 5: If logged in, try to get more details
+              if (results.metadata.logged_in === true && results.properties.length > 0) {
+                console.log('\n[5] Fetching property details (logged in)...');
+                
+                for (let i = 0; i < Math.min(results.properties.length, 10); i++) {
+                  const prop = results.properties[i];
+                  if (prop.aession) {
+                    try {
+                      const detailUrl = `https://brevard.realforeclose.com/index.cfm?zaction=AUCTION&zmethod=DETAILS&Aession=${prop.aession}`;
+                      await page.goto(detailUrl, { waitUntil: 'networkidle', timeout: 30000 });
+                      await page.waitForTimeout(1000);
+                      
+                      const detailHtml = await page.content();
+                      
+                      // Extract opening bid
+                      const bidMatch = detailHtml.match(/Opening Bid[:\s]*\$?([\d,]+\.?\d*)/i);
+                      if (bidMatch) prop.opening_bid = bidMatch[1].replace(',', '');
+                      
+                      // Extract address
+                      const addrMatch = detailHtml.match(/Property Address[:\s]*([^<\n]+)/i);
+                      if (addrMatch) prop.address = addrMatch[1].trim();
+                      
+                      // Extract certificate info
+                      const certMatch = detailHtml.match(/Certificate[:\s#]*(\d+-\d+)/i);
+                      if (certMatch) prop.certificate = certMatch[1];
+                      
+                      console.log(`  [${i+1}] ${prop.case_number || prop.aession}: $${prop.opening_bid || 'N/A'}`);
+                      
+                      await page.waitForTimeout(500);
+                    } catch (e) {
+                      console.log(`  [${i+1}] Error:`, e.message.substring(0, 50));
+                    }
+                  }
+                }
+              }
+              
+              results.metadata.scraped_at = new Date().toISOString();
+              results.metadata.total_properties = results.properties.length;
+              
+            } catch (error) {
+              console.error('\n❌ Error:', error.message);
+              results.error = error.message;
+            } finally {
+              await browser.close();
+            }
+            
+            // Save results
+            fs.writeFileSync('taxdeed_results.json', JSON.stringify(results, null, 2));
+            
+            // Summary
+            console.log('\n' + '='.repeat(60));
+            console.log('📊 RESULTS SUMMARY');
+            console.log('='.repeat(60));
+            console.log('  Auction Date:', results.metadata.auction_date);
+            console.log('  Logged In:', results.metadata.logged_in);
+            console.log('  Status:', results.metadata.status || 'completed');
+            console.log('  Properties:', results.properties.length);
+            console.log('='.repeat(60));
+            
+            return results;
+          }
+          
+          scrape().catch(err => {
+            console.error('Fatal error:', err);
+            process.exit(1);
+          });
+          SCRIPT
+          
+          node scrape.js
+
+      - name: Save to Supabase
+        if: always()
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+        run: |
+          if [ -f "taxdeed_results.json" ]; then
+            echo "Saving to Supabase..."
+            curl -s -X POST "$SUPABASE_URL/rest/v1/insights" \
+              -H "apikey: $SUPABASE_KEY" \
+              -H "Authorization: Bearer $SUPABASE_KEY" \
+              -H "Content-Type: application/json" \
+              -d "{
+                \"category\": \"taxdeed_auction\",
+                \"content\": \"RealForeclose Tax Deed Scrape - ${{ github.event.inputs.auction_date }}\",
+                \"metadata\": $(cat taxdeed_results.json)
+              }" && echo "✅ Saved to Supabase"
+          fi
+
+      - name: Upload Results
+        uses: actions/upload-artifact@v4
+        with:
+          name: taxdeed-results-${{ github.run_id }}
+          path: |
+            *.png
+            *.html
+            *.json
+          retention-days: 30
