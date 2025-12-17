@@ -1,0 +1,212 @@
+name: RealForeclose DAYLIST V4 (Click Through)
+
+on:
+  workflow_dispatch:
+    inputs:
+      auction_date:
+        description: 'Auction date MM/DD/YYYY'
+        default: '12/18/2025'
+
+jobs:
+  scrape:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install Playwright
+        run: |
+          npm init -y
+          npm install playwright
+          npx playwright install chromium --with-deps
+
+      - name: Scrape via Click-Through
+        env:
+          RF_USERNAME: ${{ secrets.RF_USERNAME }}
+          RF_PASSWORD: ${{ secrets.RF_PASSWORD }}
+        run: |
+          node << 'JSEOF'
+          const { chromium } = require('playwright');
+          const fs = require('fs');
+          
+          const DATE = '${{ github.event.inputs.auction_date }}' || '12/18/2025';
+          const USER = process.env.RF_USERNAME || '';
+          const PASS = process.env.RF_PASSWORD || '';
+          
+          (async () => {
+            console.log('='.repeat(60));
+            console.log('BidDeed.AI - RealForeclose DAYLIST V4');
+            console.log('Method: Click through splash page');
+            console.log('Date:', DATE);
+            console.log('='.repeat(60));
+            
+            const browser = await chromium.launch({ headless: true });
+            const context = await browser.newContext({
+              userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120.0.0.0'
+            });
+            const page = await context.newPage();
+            
+            try {
+              // Step 1: Load splash page
+              console.log('\n[1] Loading splash page...');
+              await page.goto('https://brevard.realforeclose.com/', { 
+                waitUntil: 'networkidle', 
+                timeout: 30000 
+              });
+              await page.waitForTimeout(2000);
+              await page.screenshot({ path: 'step1_splash.png' });
+              console.log('  Title:', await page.title());
+              
+              // Step 2: Try to login first
+              if (USER && PASS) {
+                console.log('\n[2] Attempting login...');
+                try {
+                  await page.fill('input[name="LogName"], #LogName', USER);
+                  await page.fill('input[name="LogPass"], #LogPass, input[type="password"]', PASS);
+                  await page.click('#LogButton, button:has-text("Submit"), input[value="Submit"]');
+                  await page.waitForTimeout(3000);
+                  console.log('  Login submitted');
+                  
+                  // Dismiss any popups
+                  for (let i = 0; i < 3; i++) {
+                    const ok = await page.$('input[value="ok"], input[value="OK"]');
+                    if (ok) { await ok.click(); await page.waitForTimeout(500); }
+                  }
+                } catch(e) {
+                  console.log('  Login failed:', e.message);
+                }
+              }
+              
+              // Step 3: Click AUCTION CALENDAR
+              console.log('\n[3] Clicking AUCTION CALENDAR...');
+              try {
+                // Try various selectors
+                const selectors = [
+                  'a:has-text("AUCTION CALENDAR")',
+                  'a:has-text("Auction Calendar")',
+                  '[href*="CALENDAR"]',
+                  '[href*="calendar"]'
+                ];
+                
+                let clicked = false;
+                for (const sel of selectors) {
+                  const el = await page.$(sel);
+                  if (el) {
+                    console.log('  Found:', sel);
+                    await el.click();
+                    clicked = true;
+                    break;
+                  }
+                }
+                
+                if (!clicked) {
+                  // Click by text content
+                  await page.click('text=AUCTION CALENDAR');
+                }
+                
+                await page.waitForTimeout(3000);
+                await page.screenshot({ path: 'step3_calendar.png' });
+                console.log('  New title:', await page.title());
+                
+              } catch(e) {
+                console.log('  Calendar click failed:', e.message);
+                // Try direct URL
+                console.log('  Trying direct URL...');
+                await page.goto(`https://brevard.realforeclose.com/index.cfm?zaction=AUCTION&Zmethod=PREVIEW&AuctionDate=${DATE}`, {
+                  waitUntil: 'networkidle'
+                });
+              }
+              
+              // Dismiss popups again
+              for (let i = 0; i < 3; i++) {
+                const ok = await page.$('input[value="ok"], input[value="OK"]');
+                if (ok) { await ok.click(); await page.waitForTimeout(500); }
+              }
+              
+              // Step 4: Navigate to specific date if needed
+              console.log('\n[4] Looking for', DATE, 'listings...');
+              
+              // Try to find a link to our date
+              const dateLink = await page.$(`a[href*="${DATE}"], a[href*="AuctionDate=${DATE}"]`);
+              if (dateLink) {
+                console.log('  Found date link, clicking...');
+                await dateLink.click();
+                await page.waitForTimeout(2000);
+              }
+              
+              // Try DAYLIST URL
+              console.log('  Going to DAYLIST...');
+              await page.goto(`https://brevard.realforeclose.com/index.cfm?zaction=AUCTION&Zmethod=DAYLIST&AUCTIONDATE=${DATE}`, {
+                waitUntil: 'networkidle',
+                timeout: 30000
+              });
+              await page.waitForTimeout(2000);
+              
+              // Final popup dismissal
+              for (let i = 0; i < 3; i++) {
+                const ok = await page.$('input[value="ok"], input[value="OK"]');
+                if (ok) { await ok.click(); await page.waitForTimeout(500); }
+              }
+              
+              await page.screenshot({ path: 'step4_daylist.png', fullPage: true });
+              
+              // Step 5: Extract data
+              console.log('\n[5] Extracting data...');
+              const html = await page.content();
+              fs.writeFileSync('daylist.html', html);
+              
+              console.log('  Title:', await page.title());
+              console.log('  HTML length:', html.length);
+              
+              // Parse
+              const aessions = [...new Set((html.match(/AESSION=([A-Za-z0-9]+)/gi) || []).map(m => m.replace(/AESSION=/i, '')))];
+              const cases = [...new Set(html.match(/\d{4}TD\d+/g) || [])];
+              const parcels = [...new Set(html.match(/\d{2}-\d{2}-\d{2}-\d{2}-[\d.]+/g) || [])];
+              
+              console.log('  AESSION IDs:', aessions.length);
+              console.log('  Tax Deed Cases:', cases.length);
+              console.log('  Parcel IDs:', parcels.length);
+              
+              const results = {
+                auction_date: DATE,
+                scrape_time: new Date().toISOString(),
+                page_title: await page.title(),
+                html_length: html.length,
+                aessions: aessions,
+                cases: cases,
+                parcels: parcels
+              };
+              
+              fs.writeFileSync('results.json', JSON.stringify(results, null, 2));
+              
+              console.log('\n' + '='.repeat(60));
+              if (cases.length > 0) {
+                console.log('SUCCESS:', cases.length, 'tax deed cases found');
+                cases.slice(0, 10).forEach(c => console.log('  -', c));
+              } else {
+                console.log('NO LISTINGS FOUND');
+                console.log('Page title:', await page.title());
+              }
+              console.log('='.repeat(60));
+              
+            } catch(error) {
+              console.error('Error:', error);
+              await page.screenshot({ path: 'error.png' });
+            }
+            
+            await browser.close();
+          })();
+          JSEOF
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: daylist-v4-results
+          path: |
+            daylist.html
+            results.json
+            *.png
