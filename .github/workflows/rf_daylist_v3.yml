@@ -1,0 +1,171 @@
+name: RealForeclose DAYLIST V3
+
+on:
+  workflow_dispatch:
+    inputs:
+      auction_date:
+        description: 'Auction date MM/DD/YYYY'
+        default: '12/18/2025'
+
+jobs:
+  scrape:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install Playwright
+        run: |
+          npm init -y
+          npm install playwright
+          npx playwright install chromium --with-deps
+
+      - name: Scrape DAYLIST
+        env:
+          RF_USERNAME: ${{ secrets.RF_USERNAME }}
+          RF_PASSWORD: ${{ secrets.RF_PASSWORD }}
+        run: |
+          node << 'JSEOF'
+          const { chromium } = require('playwright');
+          const fs = require('fs');
+          
+          const DATE = '${{ github.event.inputs.auction_date }}' || '12/18/2025';
+          const USER = process.env.RF_USERNAME || '';
+          const PASS = process.env.RF_PASSWORD || '';
+          
+          (async () => {
+            console.log('='.repeat(60));
+            console.log('BidDeed.AI - RealForeclose DAYLIST Scraper V3');
+            console.log('Target Date:', DATE);
+            console.log('='.repeat(60));
+            
+            const browser = await chromium.launch({ headless: true });
+            const context = await browser.newContext({
+              userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120.0.0.0'
+            });
+            const page = await context.newPage();
+            
+            // Helper to dismiss popups
+            async function dismissPopups() {
+              for (let i = 0; i < 3; i++) {
+                try {
+                  const okBtn = await page.$('input[value="ok"], input[value="OK"], button:has-text("OK"), button:has-text("ok")');
+                  if (okBtn) {
+                    console.log('  Dismissing popup...');
+                    await okBtn.click();
+                    await page.waitForTimeout(1000);
+                  }
+                  
+                  const cancelBtn = await page.$('input[value="CANCEL"], button:has-text("CANCEL")');
+                  if (cancelBtn) {
+                    console.log('  Dismissing via CANCEL...');
+                    await cancelBtn.click();
+                    await page.waitForTimeout(1000);
+                  }
+                } catch(e) {}
+                await page.waitForTimeout(500);
+              }
+            }
+            
+            try {
+              // Step 1: Load main page
+              console.log('\n[1] Loading main page...');
+              await page.goto('https://brevard.realforeclose.com/', { waitUntil: 'networkidle', timeout: 30000 });
+              await page.waitForTimeout(2000);
+              await dismissPopups();
+              await page.screenshot({ path: 'step1_main.png' });
+              
+              // Step 2: Login if credentials available
+              if (USER && PASS) {
+                console.log('\n[2] Logging in...');
+                try {
+                  await page.fill('#LogName', USER);
+                  await page.fill('#LogPass', PASS);
+                  await page.click('#LogButton');
+                  await page.waitForTimeout(3000);
+                  await dismissPopups();
+                  
+                  const html = await page.content();
+                  console.log('  Logged in:', html.includes('Everest8') ? 'YES' : 'NO');
+                } catch(e) {
+                  console.log('  Login failed:', e.message);
+                }
+              }
+              
+              // Step 3: Navigate DIRECTLY to DAYLIST URL
+              console.log('\n[3] Loading DAYLIST page...');
+              const daylistUrl = `https://brevard.realforeclose.com/index.cfm?zaction=AUCTION&Zmethod=DAYLIST&AUCTIONDATE=${DATE}`;
+              console.log('  URL:', daylistUrl);
+              
+              await page.goto(daylistUrl, { waitUntil: 'networkidle', timeout: 30000 });
+              await page.waitForTimeout(3000);
+              await dismissPopups();
+              await page.screenshot({ path: 'step3_daylist.png', fullPage: true });
+              
+              // Save raw HTML
+              const html = await page.content();
+              fs.writeFileSync('daylist.html', html);
+              console.log('  HTML length:', html.length);
+              console.log('  Title:', await page.title());
+              
+              // Step 4: Extract properties
+              console.log('\n[4] Extracting data...');
+              
+              // Find all auction item links
+              const aessionLinks = html.match(/AESSION=([A-Za-z0-9]+)/gi) || [];
+              const uniqueAessions = [...new Set(aessionLinks.map(m => m.replace(/AESSION=/i, '')))];
+              console.log('  AESSION IDs:', uniqueAessions.length);
+              
+              const caseMatches = html.match(/\d{4}TD\d+/g) || [];
+              const uniqueCases = [...new Set(caseMatches)];
+              console.log('  Tax Deed Cases:', uniqueCases.length);
+              
+              const parcelMatches = html.match(/\d{2}-\d{2}-\d{2}-\d{2}-[\d.]+/g) || [];
+              const uniqueParcels = [...new Set(parcelMatches)];
+              console.log('  Parcel IDs:', uniqueParcels.length);
+              
+              // Build results
+              const results = {
+                auction_date: DATE,
+                scrape_time: new Date().toISOString(),
+                aessions: uniqueAessions,
+                cases: uniqueCases,
+                parcels: uniqueParcels,
+                html_length: html.length,
+                page_title: await page.title()
+              };
+              
+              fs.writeFileSync('results.json', JSON.stringify(results, null, 2));
+              
+              console.log('\n' + '='.repeat(60));
+              console.log('COMPLETE');
+              console.log('  Cases:', uniqueCases.length);
+              console.log('  Parcels:', uniqueParcels.length);
+              console.log('='.repeat(60));
+              
+              if (uniqueCases.length > 0) {
+                console.log('\nCases found:');
+                uniqueCases.slice(0, 20).forEach(c => console.log('  -', c));
+              }
+              
+            } catch(error) {
+              console.error('Error:', error);
+              await page.screenshot({ path: 'error.png' });
+            }
+            
+            await browser.close();
+          })();
+          JSEOF
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: daylist-v3-results
+          path: |
+            daylist.html
+            results.json
+            *.png
