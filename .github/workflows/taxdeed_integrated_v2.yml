@@ -1,0 +1,530 @@
+name: Tax Deed Agent V2 - Integrated Pipeline
+
+on:
+  workflow_dispatch:
+    inputs:
+      auction_date:
+        description: 'Auction date (MM/DD/YYYY)'
+        required: false
+        default: ''
+      skip_realtdm:
+        description: 'Skip RealTDM (use RealForeclose only)'
+        required: false
+        default: 'false'
+        type: boolean
+
+  schedule:
+    # 6 AM EST on 3rd Wednesday of month
+    - cron: '0 11 15-21 * 3'
+    # Also 6 PM EST day before for pre-auction prep
+    - cron: '0 23 14-20 * 2'
+
+  repository_dispatch:
+    types: [taxdeed_scrape, taxdeed_integrated]
+
+env:
+  NODE_VERSION: '20'
+
+jobs:
+  calculate-date:
+    runs-on: ubuntu-latest
+    outputs:
+      auction_date: ${{ steps.calc.outputs.date }}
+      date_start: ${{ steps.calc.outputs.start }}
+      date_end: ${{ steps.calc.outputs.end }}
+    steps:
+      - name: Calculate auction date
+        id: calc
+        run: |
+          INPUT="${{ github.event.inputs.auction_date }}"
+          if [ -n "$INPUT" ]; then
+            echo "date=$INPUT" >> $GITHUB_OUTPUT
+            echo "start=$INPUT" >> $GITHUB_OUTPUT
+            echo "end=$INPUT" >> $GITHUB_OUTPUT
+          else
+            YEAR=$(date +%Y)
+            MONTH=$(date +%m)
+            FIRST=$(date -d "$YEAR-$MONTH-01" +%u)
+            if [ $FIRST -le 3 ]; then
+              DAY=$((3 - FIRST + 1 + 14))
+            else
+              DAY=$((3 - FIRST + 8 + 14))
+            fi
+            DATE="$MONTH/$DAY/$YEAR"
+            echo "date=$DATE" >> $GITHUB_OUTPUT
+            echo "start=$MONTH/01/$YEAR" >> $GITHUB_OUTPUT
+            echo "end=$MONTH/28/$YEAR" >> $GITHUB_OUTPUT
+          fi
+
+  scrape-realtdm:
+    needs: calculate-date
+    if: github.event.inputs.skip_realtdm != 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    outputs:
+      cases_json: ${{ steps.scrape.outputs.cases }}
+      case_count: ${{ steps.scrape.outputs.count }}
+    
+    steps:
+      - name: Scrape RealTDM Cases
+        id: scrape
+        run: |
+          echo "🔍 Scraping RealTDM for ${{ needs.calculate-date.outputs.auction_date }}"
+          
+          # Scrape active cases for auction date
+          RESPONSE=$(curl -s -X POST "https://brevard.realtdm.com/public/cases/list" \
+            -H "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120.0.0.0" \
+            -H "Content-Type: application/x-www-form-urlencoded" \
+            -d "filterPageNumber=1&filterCasesPerPage=100&filterFiltered=1&filterCaseStatus=1072&filterSaleDateStart=${{ needs.calculate-date.outputs.date_start }}&filterSaleDateStop=${{ needs.calculate-date.outputs.date_end }}&isPublic=1")
+          
+          # Save raw HTML
+          echo "$RESPONSE" > realtdm_raw.html
+          
+          # Parse cases using Python
+          cat << 'PYEOF' > parse_realtdm.py
+          import re
+          import json
+          import sys
+          
+          with open('realtdm_raw.html', 'r') as f:
+              html = f.read()
+          
+          pattern = re.compile(
+              r'data-caseID="(\d+)".*?'
+              r'<td class="text-left">(\w+)</td>.*?'
+              r'<td class="text-right">(\d+)</td>.*?'
+              r'<td class="text-right">([^<]+)</td>.*?'
+              r'<td class="text-right">(\d+)</td>.*?'
+              r'<td class="text-right">(\d+)</td>.*?'
+              r'<td class="text-right">([^<]+)</td>.*?'
+              r'<td class="text-right">\$([^<]+)</td>',
+              re.DOTALL
+          )
+          
+          cases = []
+          for m in pattern.finditer(html):
+              case_id, status, case_num, created, app_num, parcel, sale_date, surplus = m.groups()
+              cases.append({
+                  "case_id": case_id,
+                  "case_number": case_num,
+                  "parcel_id": parcel,
+                  "sale_date": sale_date.strip(),
+                  "status": status,
+                  "date_created": created.strip(),
+                  "surplus_balance": float(surplus.replace(",", ""))
+              })
+          
+          with open('realtdm_cases.json', 'w') as f:
+              json.dump(cases, f)
+          
+          print(f"Found {len(cases)} cases")
+          PYEOF
+          
+          python3 parse_realtdm.py
+          
+          # Output for next job
+          COUNT=$(cat realtdm_cases.json | jq 'length')
+          echo "count=$COUNT" >> $GITHUB_OUTPUT
+          echo "cases=$(cat realtdm_cases.json | jq -c '.')" >> $GITHUB_OUTPUT
+          
+          echo "✅ Found $COUNT cases in RealTDM"
+
+      - name: Upload RealTDM Data
+        uses: actions/upload-artifact@v4
+        with:
+          name: realtdm-data
+          path: |
+            realtdm_raw.html
+            realtdm_cases.json
+          retention-days: 90
+
+  scrape-realforeclose:
+    needs: calculate-date
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    outputs:
+      properties_json: ${{ steps.scrape.outputs.properties }}
+      property_count: ${{ steps.scrape.outputs.count }}
+    
+    steps:
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install Playwright
+        run: |
+          npm init -y
+          npm install playwright
+          npx playwright install chromium --with-deps
+
+      - name: Scrape RealForeclose
+        id: scrape
+        env:
+          RF_USERNAME: ${{ secrets.RF_USERNAME }}
+          RF_PASSWORD: ${{ secrets.RF_PASSWORD }}
+          AUCTION_DATE: ${{ needs.calculate-date.outputs.auction_date }}
+        run: |
+          cat << 'SCRIPT' > scrape_rf.js
+          const { chromium } = require('playwright');
+          const fs = require('fs');
+          
+          const DATE = process.env.AUCTION_DATE;
+          const USER = process.env.RF_USERNAME;
+          const PASS = process.env.RF_PASSWORD;
+          
+          const dismissPopups = async (page, n=5) => {
+            for(let i=0;i<n;i++){
+              try{
+                const b=await page.$('input[value="OK"]');
+                if(b){await b.click();await page.waitForTimeout(800);}
+                else break;
+              }catch{break;}
+            }
+          };
+          
+          (async () => {
+            console.log('🏛️ RealForeclose Scraper -', DATE);
+            
+            const browser = await chromium.launch({headless:true,args:['--no-sandbox']});
+            const page = await (await browser.newContext({
+              userAgent:'Mozilla/5.0 Chrome/120.0.0.0',
+              viewport:{width:1920,height:1080}
+            })).newPage();
+            
+            const props = [];
+            
+            try {
+              // Login
+              await page.goto('https://brevard.realforeclose.com/index.cfm',{waitUntil:'networkidle',timeout:60000});
+              await page.waitForTimeout(2000);
+              if(USER && PASS){
+                await page.fill('#LogName', USER);
+                await page.fill('#LogPass', PASS);
+                await page.click('#LogButton');
+                await page.waitForTimeout(3000);
+                await dismissPopups(page);
+                console.log('✅ Logged in');
+              }
+              
+              // Navigate to DAYLIST
+              await page.goto('https://brevard.realforeclose.com/index.cfm?zaction=AUCTION&zmethod=DAYLIST',{waitUntil:'networkidle',timeout:60000});
+              await page.waitForTimeout(2000);
+              await dismissPopups(page);
+              await page.screenshot({path:'rf_list.png',fullPage:true});
+              
+              // Get all pages
+              let html = await page.content();
+              const pm = html.match(/page \d+ of (\d+)/i);
+              const pages = pm ? parseInt(pm[1]) : 1;
+              
+              for(let p=2;p<=pages&&p<=10;p++){
+                const btn = await page.$('input[value="NEXT >"]');
+                if(btn){
+                  await btn.click();
+                  await page.waitForTimeout(2000);
+                  await dismissPopups(page);
+                  html += await page.content();
+                }
+              }
+              
+              fs.writeFileSync('rf_raw.html', html);
+              
+              // Parse
+              const cases = [...new Set((html.match(/>(\d{6})</g)||[]).map(m=>m.slice(1,-1)))];
+              const bids = (html.match(/Opening Bid:[^$]*\$([0-9,]+\.\d+)/g)||[]).map(m=>parseFloat(m.replace(/[^0-9.]/g,'')));
+              const assessed = (html.match(/Assessed Value:[^$]*\$([0-9,]+\.\d+)/g)||[]).map(m=>parseFloat(m.replace(/[^0-9.]/g,'')));
+              const parcels = [...new Set((html.match(/>(\d{7})</g)||[]).map(m=>m.slice(1,-1)))];
+              
+              for(let i=0;i<Math.max(cases.length,bids.length);i++){
+                props.push({
+                  case_number: cases[i] || null,
+                  opening_bid: bids[i] || 0,
+                  assessed_value: assessed[i] || 0,
+                  parcel_id: parcels[i] || null,
+                  auction_date: DATE,
+                  source: 'realforeclose'
+                });
+              }
+              
+              console.log(`✅ Found ${props.length} properties`);
+              
+            } catch(e) {
+              console.error('❌ Error:', e.message);
+            } finally {
+              await browser.close();
+            }
+            
+            fs.writeFileSync('rf_properties.json', JSON.stringify(props, null, 2));
+          })();
+          SCRIPT
+          
+          node scrape_rf.js
+          
+          # Output
+          COUNT=$(cat rf_properties.json | jq 'length')
+          echo "count=$COUNT" >> $GITHUB_OUTPUT
+          echo "properties=$(cat rf_properties.json | jq -c '.')" >> $GITHUB_OUTPUT
+
+      - name: Upload RealForeclose Data
+        uses: actions/upload-artifact@v4
+        with:
+          name: realforeclose-data
+          path: |
+            rf_raw.html
+            rf_properties.json
+            rf_list.png
+          retention-days: 90
+
+  merge-and-enrich:
+    needs: [calculate-date, scrape-realtdm, scrape-realforeclose]
+    if: always() && needs.scrape-realforeclose.result == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    
+    steps:
+      - name: Download Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: ./data
+          merge-multiple: true
+
+      - name: Merge Data Sources
+        id: merge
+        run: |
+          echo "🔗 Merging data sources..."
+          
+          cat << 'PYEOF' > merge_enrich.py
+          import json
+          import os
+          import urllib.request
+          import time
+          
+          # Load RealForeclose data
+          rf_props = []
+          if os.path.exists('data/rf_properties.json'):
+              with open('data/rf_properties.json') as f:
+                  rf_props = json.load(f)
+          print(f"RealForeclose: {len(rf_props)} properties")
+          
+          # Load RealTDM data
+          tdm_cases = []
+          if os.path.exists('data/realtdm_cases.json'):
+              with open('data/realtdm_cases.json') as f:
+                  tdm_cases = json.load(f)
+          print(f"RealTDM: {len(tdm_cases)} cases")
+          
+          # Build TDM lookup
+          tdm_by_parcel = {c['parcel_id']: c for c in tdm_cases}
+          tdm_by_case = {c['case_number']: c for c in tdm_cases}
+          
+          # Merge - start with RealForeclose
+          merged = []
+          for prop in rf_props:
+              parcel = prop.get('parcel_id', '')
+              case_num = prop.get('case_number', '')
+              
+              item = {
+                  'case_number': case_num,
+                  'parcel_id': parcel,
+                  'auction_date': prop.get('auction_date', ''),
+                  'opening_bid': prop.get('opening_bid', 0),
+                  'assessed_value': prop.get('assessed_value', 0),
+                  'data_sources': ['realforeclose']
+              }
+              
+              # Merge RealTDM
+              tdm = tdm_by_parcel.get(parcel) or tdm_by_case.get(case_num)
+              if tdm:
+                  item['realtdm_case_id'] = tdm.get('case_id')
+                  item['realtdm_status'] = tdm.get('status')
+                  item['surplus_balance'] = tdm.get('surplus_balance', 0)
+                  item['date_created'] = tdm.get('date_created')
+                  item['data_sources'].append('realtdm')
+              
+              merged.append(item)
+          
+          # Add any TDM cases not in RealForeclose
+          rf_parcels = {p.get('parcel_id') for p in rf_props}
+          for case in tdm_cases:
+              if case['parcel_id'] not in rf_parcels:
+                  merged.append({
+                      'case_number': case['case_number'],
+                      'parcel_id': case['parcel_id'],
+                      'auction_date': case['sale_date'],
+                      'opening_bid': 0,
+                      'assessed_value': 0,
+                      'realtdm_case_id': case['case_id'],
+                      'realtdm_status': case['status'],
+                      'surplus_balance': case.get('surplus_balance', 0),
+                      'date_created': case.get('date_created'),
+                      'data_sources': ['realtdm']
+                  })
+          
+          print(f"Merged: {len(merged)} properties")
+          
+          # BCPAO enrichment
+          print("Enriching with BCPAO...")
+          for i, prop in enumerate(merged):
+              parcel = prop.get('parcel_id', '')
+              if not parcel:
+                  continue
+              
+              try:
+                  url = f"https://www.bcpao.us/api/v1/search?account={parcel}"
+                  req = urllib.request.Request(url)
+                  with urllib.request.urlopen(req, timeout=10) as resp:
+                      data = json.loads(resp.read().decode())
+                      if isinstance(data, list) and len(data) > 0:
+                          bcpao = data[0]
+                          prop['address'] = bcpao.get('siteAddress', '')
+                          prop['market_value'] = bcpao.get('marketValue', prop.get('assessed_value', 0))
+                          prop['year_built'] = (bcpao.get('yearBuilt') or '').strip()
+                          prop['land_use'] = (bcpao.get('landUseCode') or '').strip()
+                          prop['owner'] = bcpao.get('owners', '')
+                          prop['photo_url'] = bcpao.get('masterPhotoUrl', '')
+                          if 'bcpao' not in prop['data_sources']:
+                              prop['data_sources'].append('bcpao')
+              except Exception as e:
+                  pass
+              
+              if i % 5 == 0:
+                  print(f"  Enriched {i+1}/{len(merged)}")
+              time.sleep(0.3)
+          
+          # Analysis
+          print("Analyzing...")
+          for prop in merged:
+              market = prop.get('market_value', 0) or prop.get('assessed_value', 0)
+              bid = prop.get('opening_bid', 0)
+              
+              if market > 0 and bid > 0:
+                  ratio = (bid / market) * 100
+                  prop['bid_market_ratio'] = round(ratio, 1)
+                  
+                  if ratio <= 10:
+                      prop['recommendation'] = 'BID'
+                  elif ratio <= 25:
+                      prop['recommendation'] = 'REVIEW'
+                  else:
+                      prop['recommendation'] = 'SKIP'
+              elif market > 0:
+                  prop['recommendation'] = 'REVIEW'
+          
+          # Stats
+          result = {
+              'auction_date': merged[0]['auction_date'] if merged else '',
+              'properties': merged,
+              'metadata': {
+                  'total_properties': len(merged),
+                  'from_realforeclose': sum(1 for p in merged if 'realforeclose' in p['data_sources']),
+                  'from_realtdm': sum(1 for p in merged if 'realtdm' in p['data_sources']),
+                  'from_bcpao': sum(1 for p in merged if 'bcpao' in p['data_sources']),
+                  'total_opening_bids': sum(p.get('opening_bid', 0) for p in merged),
+                  'total_market_value': sum(p.get('market_value', 0) for p in merged),
+                  'bid_count': sum(1 for p in merged if p.get('recommendation') == 'BID'),
+                  'review_count': sum(1 for p in merged if p.get('recommendation') == 'REVIEW'),
+                  'skip_count': sum(1 for p in merged if p.get('recommendation') == 'SKIP'),
+                  'agent': 'TaxDeedAgentV2'
+              }
+          }
+          
+          with open('taxdeed_integrated.json', 'w') as f:
+              json.dump(result, f, indent=2)
+          
+          print(f"\n✅ Complete!")
+          print(f"   Total: {len(merged)}")
+          print(f"   BID: {result['metadata']['bid_count']}")
+          print(f"   REVIEW: {result['metadata']['review_count']}")
+          print(f"   SKIP: {result['metadata']['skip_count']}")
+          PYEOF
+          
+          python3 merge_enrich.py
+
+      - name: Save to Supabase
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+        run: |
+          if [ -f "taxdeed_integrated.json" ]; then
+            curl -s -X POST "$SUPABASE_URL/rest/v1/insights" \
+              -H "apikey: $SUPABASE_KEY" \
+              -H "Authorization: Bearer $SUPABASE_KEY" \
+              -H "Content-Type: application/json" \
+              -d "{
+                \"category\": \"taxdeed_auction\",
+                \"content\": \"Tax Deed Integrated V2 - ${{ needs.calculate-date.outputs.auction_date }}\",
+                \"metadata\": $(cat taxdeed_integrated.json)
+              }" && echo "✅ Saved to Supabase"
+          fi
+
+      - name: Generate Report
+        run: |
+          cat << 'PYEOF' > generate_report.py
+          import json
+          
+          with open('taxdeed_integrated.json') as f:
+              data = json.load(f)
+          
+          props = data['properties']
+          meta = data['metadata']
+          
+          report = f"""# 🏛️ Tax Deed Auction Report - Integrated V2
+          
+          **Date:** {data['auction_date']}
+          **Agent:** TaxDeedAgentV2 (Integrated Pipeline)
+          
+          ## Summary
+          
+          | Metric | Value |
+          |--------|-------|
+          | Total Properties | **{meta['total_properties']}** |
+          | From RealForeclose | {meta['from_realforeclose']} |
+          | From RealTDM | {meta['from_realtdm']} |
+          | BCPAO Enriched | {meta['from_bcpao']} |
+          | Total Opening Bids | ${meta['total_opening_bids']:,.0f} |
+          | Total Market Value | ${meta['total_market_value']:,.0f} |
+          
+          ## Recommendations
+          
+          - **BID:** {meta['bid_count']}
+          - **REVIEW:** {meta['review_count']}
+          - **SKIP:** {meta['skip_count']}
+          
+          ## Top Opportunities (BID)
+          
+          | Case | Address | Bid | Market | Ratio | Sources |
+          |------|---------|-----|--------|-------|---------|
+          """
+          
+          bid_props = sorted(
+              [p for p in props if p.get('recommendation') == 'BID'],
+              key=lambda x: x.get('bid_market_ratio', 999)
+          )[:10]
+          
+          for p in bid_props:
+              addr = p.get('address', 'Unknown')[:40]
+              sources = ', '.join(p.get('data_sources', []))
+              report += f"| {p['case_number']} | {addr} | ${p.get('opening_bid', 0):,.0f} | ${p.get('market_value', 0):,.0f} | {p.get('bid_market_ratio', 0)}% | {sources} |\n"
+          
+          report += """
+          ---
+          *Generated by BidDeed.AI Tax Deed Agent V2*
+          *Data Sources: RealForeclose + RealTDM + BCPAO*
+          """
+          
+          with open('taxdeed_report.md', 'w') as f:
+              f.write(report)
+          
+          print(report)
+          PYEOF
+          
+          python3 generate_report.py
+
+      - name: Upload Final Results
+        uses: actions/upload-artifact@v4
+        with:
+          name: taxdeed-integrated-${{ github.run_id }}
+          path: |
+            taxdeed_integrated.json
+            taxdeed_report.md
+          retention-days: 90
