@@ -2,14 +2,22 @@ name: RealTDM Title Search V2
 
 on:
   workflow_dispatch:
+    inputs:
+      sale_date:
+        description: 'Sale date MM/DD/YYYY'
+        required: true
+        default: '12/18/2025'
+  schedule:
+    - cron: '0 6 * * 3'  # Every Wednesday at 6 AM
 
 jobs:
-  scrape:
+  title_search:
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 30
     
     steps:
-      - uses: actions/setup-node@v4
+      - name: Setup Node
+        uses: actions/setup-node@v4
         with:
           node-version: '20'
 
@@ -19,109 +27,133 @@ jobs:
           npm install playwright
           npx playwright install chromium --with-deps
 
-      - name: Scrape Dec 18 Cases
+      - name: Scrape RealTDM
         env:
-          RF_USERNAME: ${{ secrets.RF_USERNAME }}
-          RF_PASSWORD: ${{ secrets.RF_PASSWORD }}
+          SALE_DATE: ${{ github.event.inputs.sale_date || '12/18/2025' }}
         run: |
-          node << 'NODESCRIPT'
+          node << 'EOF'
           const { chromium } = require('playwright');
           const fs = require('fs');
           
-          const USERNAME = process.env.RF_USERNAME;
-          const PASSWORD = process.env.RF_PASSWORD;
-          
-          const CASES = [
-            { id: '81997', num: '250342', parcel: '2422906' },
-            { id: '82056', num: '250354', parcel: '2913986' },
-            { id: '82073', num: '250369', parcel: '2000369' },
-            { id: '82077', num: '250352', parcel: '2823886' },
-            { id: '82082', num: '250362', parcel: '2949376' },
-            { id: '82211', num: '250387', parcel: '2401183' },
-            { id: '82212', num: '250398', parcel: '2421499' },
-            { id: '82270', num: '250412', parcel: '2814834' },
-            { id: '82349', num: '250397', parcel: '2403506' },
-            { id: '82392', num: '250424', parcel: '2811581' }
-          ];
+          const BASE_URL = 'https://brevard.realtdm.com';
+          const USERNAME = 'Everest8';
+          const PASSWORD = 'Everest18$';
+          const SALE_DATE = process.env.SALE_DATE;
           
           (async () => {
-            console.log('RealTDM Title Search V2');
+            console.log('=== RealTDM Title Search ===');
+            console.log('Sale Date:', SALE_DATE);
             
-            const browser = await chromium.launch({ headless: true });
-            const page = await browser.newPage();
-            const results = { cases: [] };
+            const browser = await chromium.launch({ headless: true, args: ['--no-sandbox'] });
+            const context = await browser.newContext({
+              userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120.0.0.0'
+            });
+            
+            const page = await context.newPage();
+            const results = { sale_date: SALE_DATE, cases: [] };
             
             try {
-              await page.goto('https://brevard.realtdm.com/');
-              await page.waitForTimeout(2000);
-              
+              // Login
+              console.log('Logging in...');
+              await page.goto(BASE_URL, { waitUntil: 'networkidle', timeout: 60000 });
               await page.fill('input[name="username"]', USERNAME);
               await page.fill('input[name="password"]', PASSWORD);
-              await page.click('button[type="submit"], input[type="submit"]');
-              await page.waitForTimeout(3000);
               await page.screenshot({ path: 'login.png' });
               
-              // Post to get filtered list
-              await page.goto('https://brevard.realtdm.com/public/cases/list');
-              await page.waitForTimeout(2000);
+              const btn = await page.$('input[type="submit"]');
+              if (btn) await btn.click();
+              await page.waitForTimeout(3000);
+              await page.screenshot({ path: 'after_login.png' });
               
-              // Try setting date filters via form
-              const startInput = await page.$('#filterSaleDateStart, input[name="filterSaleDateStart"]');
-              const endInput = await page.$('#filterSaleDateStop, input[name="filterSaleDateStop"]');
+              // Get cases
+              console.log('Getting cases...');
+              await page.goto(BASE_URL + '/public/cases/list', { waitUntil: 'networkidle' });
               
-              if (startInput) {
-                await startInput.fill('12/18/2025');
-                await endInput.fill('12/18/2025');
-                
-                const submit = await page.$('button[type="submit"], input[type="submit"], .btn-primary');
-                if (submit) await submit.click();
-                await page.waitForTimeout(3000);
+              const start = await page.$('#filterSaleDateStart');
+              const end = await page.$('#filterSaleDateStop');
+              if (start && end) {
+                await start.fill(SALE_DATE);
+                await end.fill(SALE_DATE);
+                const filterBtn = await page.$('.btn-search');
+                if (filterBtn) await filterBtn.click();
+                await page.waitForTimeout(2000);
+              }
+              await page.screenshot({ path: 'cases.png' });
+              
+              // Extract
+              const rows = await page.$$('tr.load-case[data-caseid]');
+              console.log('Found', rows.length, 'cases');
+              
+              for (const row of rows) {
+                const id = await row.getAttribute('data-caseid');
+                const cells = await row.$$('td');
+                if (cells.length >= 7) {
+                  results.cases.push({
+                    case_id: id,
+                    case_number: await cells[2].innerText(),
+                    parcel_id: await cells[5].innerText(),
+                    sale_date: await cells[6].innerText()
+                  });
+                }
               }
               
-              await page.screenshot({ path: 'list.png', fullPage: true });
-              
-              const html = await page.content();
-              fs.writeFileSync('list.html', html);
-              
-              // Check for cases
-              for (const c of CASES) {
-                const row = await page.$(`tr[data-caseid="${c.id}"]`);
-                if (row) {
-                  const text = await row.textContent();
-                  results.cases.push({
-                    case_id: c.id,
-                    case_number: c.num,
-                    parcel: c.parcel,
-                    found: true,
-                    row_text: text.replace(/\s+/g, ' ').trim()
-                  });
-                  console.log('Found:', c.num, text.substring(0, 80));
-                } else {
-                  results.cases.push({
-                    case_id: c.id,
-                    case_number: c.num,
-                    parcel: c.parcel,
-                    found: false
-                  });
-                  console.log('Not found:', c.num);
+              // Get details
+              for (let i = 0; i < results.cases.length; i++) {
+                const c = results.cases[i];
+                console.log('Getting details for case', c.case_number);
+                try {
+                  const row = await page.$('tr[data-caseid="' + c.case_id + '"]');
+                  if (row) {
+                    await row.click();
+                    await page.waitForTimeout(2000);
+                    await page.screenshot({ path: 'case_' + c.case_id + '.png' });
+                    
+                    const html = await page.content();
+                    
+                    const cert = html.match(/Certificate\s*#?\s*:?\s*([\d-]+)/i);
+                    if (cert) c.certificate_number = cert[1];
+                    
+                    const face = html.match(/Face\s*(?:Amount)?\s*:?\s*\$?([\d,\.]+)/i);
+                    if (face) c.face_amount = face[1];
+                    
+                    const rate = html.match(/Interest\s*:?\s*([\d\.]+)\s*%/i);
+                    if (rate) c.interest_rate = rate[1] + '%';
+                    
+                    const holder = html.match(/Holder\s*:?\s*([A-Za-z][^<\n]{2,50})/i);
+                    if (holder) c.certificate_holder = holder[1].trim();
+                    
+                    console.log('  Cert:', c.certificate_number || 'N/A', '| Face:', c.face_amount || 'N/A');
+                    
+                    const close = await page.$('.close, [data-dismiss="modal"]');
+                    if (close) await close.click();
+                    else await page.goBack();
+                    await page.waitForTimeout(1000);
+                  }
+                } catch (e) {
+                  console.log('  Error:', e.message.substring(0,50));
                 }
               }
               
             } catch (e) {
               console.error('Error:', e.message);
               results.error = e.message;
+              await page.screenshot({ path: 'error.png' });
             }
             
             await browser.close();
             fs.writeFileSync('results.json', JSON.stringify(results, null, 2));
-            console.log(JSON.stringify(results, null, 2));
+            console.log('Done! Cases:', results.cases.length);
           })();
-          NODESCRIPT
+          EOF
 
-      - uses: actions/upload-artifact@v4
+      - name: Upload Artifacts
+        uses: actions/upload-artifact@v4
         with:
           name: title-search-${{ github.run_id }}
           path: |
             *.png
             *.json
-            *.html
+          retention-days: 30
+
+      - name: Display Results
+        run: cat results.json
