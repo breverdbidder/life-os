@@ -1,0 +1,127 @@
+name: RealTDM Title Search V2
+
+on:
+  workflow_dispatch:
+
+jobs:
+  scrape:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    
+    steps:
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install Playwright
+        run: |
+          npm init -y
+          npm install playwright
+          npx playwright install chromium --with-deps
+
+      - name: Scrape Dec 18 Cases
+        env:
+          RF_USERNAME: ${{ secrets.RF_USERNAME }}
+          RF_PASSWORD: ${{ secrets.RF_PASSWORD }}
+        run: |
+          node << 'NODESCRIPT'
+          const { chromium } = require('playwright');
+          const fs = require('fs');
+          
+          const USERNAME = process.env.RF_USERNAME;
+          const PASSWORD = process.env.RF_PASSWORD;
+          
+          const CASES = [
+            { id: '81997', num: '250342', parcel: '2422906' },
+            { id: '82056', num: '250354', parcel: '2913986' },
+            { id: '82073', num: '250369', parcel: '2000369' },
+            { id: '82077', num: '250352', parcel: '2823886' },
+            { id: '82082', num: '250362', parcel: '2949376' },
+            { id: '82211', num: '250387', parcel: '2401183' },
+            { id: '82212', num: '250398', parcel: '2421499' },
+            { id: '82270', num: '250412', parcel: '2814834' },
+            { id: '82349', num: '250397', parcel: '2403506' },
+            { id: '82392', num: '250424', parcel: '2811581' }
+          ];
+          
+          (async () => {
+            console.log('RealTDM Title Search V2');
+            
+            const browser = await chromium.launch({ headless: true });
+            const page = await browser.newPage();
+            const results = { cases: [] };
+            
+            try {
+              await page.goto('https://brevard.realtdm.com/');
+              await page.waitForTimeout(2000);
+              
+              await page.fill('input[name="username"]', USERNAME);
+              await page.fill('input[name="password"]', PASSWORD);
+              await page.click('button[type="submit"], input[type="submit"]');
+              await page.waitForTimeout(3000);
+              await page.screenshot({ path: 'login.png' });
+              
+              // Post to get filtered list
+              await page.goto('https://brevard.realtdm.com/public/cases/list');
+              await page.waitForTimeout(2000);
+              
+              // Try setting date filters via form
+              const startInput = await page.$('#filterSaleDateStart, input[name="filterSaleDateStart"]');
+              const endInput = await page.$('#filterSaleDateStop, input[name="filterSaleDateStop"]');
+              
+              if (startInput) {
+                await startInput.fill('12/18/2025');
+                await endInput.fill('12/18/2025');
+                
+                const submit = await page.$('button[type="submit"], input[type="submit"], .btn-primary');
+                if (submit) await submit.click();
+                await page.waitForTimeout(3000);
+              }
+              
+              await page.screenshot({ path: 'list.png', fullPage: true });
+              
+              const html = await page.content();
+              fs.writeFileSync('list.html', html);
+              
+              // Check for cases
+              for (const c of CASES) {
+                const row = await page.$(`tr[data-caseid="${c.id}"]`);
+                if (row) {
+                  const text = await row.textContent();
+                  results.cases.push({
+                    case_id: c.id,
+                    case_number: c.num,
+                    parcel: c.parcel,
+                    found: true,
+                    row_text: text.replace(/\s+/g, ' ').trim()
+                  });
+                  console.log('Found:', c.num, text.substring(0, 80));
+                } else {
+                  results.cases.push({
+                    case_id: c.id,
+                    case_number: c.num,
+                    parcel: c.parcel,
+                    found: false
+                  });
+                  console.log('Not found:', c.num);
+                }
+              }
+              
+            } catch (e) {
+              console.error('Error:', e.message);
+              results.error = e.message;
+            }
+            
+            await browser.close();
+            fs.writeFileSync('results.json', JSON.stringify(results, null, 2));
+            console.log(JSON.stringify(results, null, 2));
+          })();
+          NODESCRIPT
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: title-search-${{ github.run_id }}
+          path: |
+            *.png
+            *.json
+            *.html
