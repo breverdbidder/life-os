@@ -1,0 +1,199 @@
+name: RealTDM Case Detail Scraper
+
+on:
+  workflow_dispatch:
+    inputs:
+      case_ids:
+        description: 'Case IDs to scrape (comma-separated)'
+        required: true
+        default: '81997,82056,82073,82077,82082,82211,82212,82270,82349,82392'
+
+jobs:
+  scrape:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    
+    steps:
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install Playwright
+        run: |
+          npm init -y
+          npm install playwright
+          npx playwright install chromium --with-deps
+
+      - name: Scrape Case Details
+        env:
+          RF_USERNAME: ${{ secrets.RF_USERNAME }}
+          RF_PASSWORD: ${{ secrets.RF_PASSWORD }}
+          CASE_IDS: ${{ github.event.inputs.case_ids }}
+        run: |
+          cat << 'SCRIPT' > scrape.js
+          const { chromium } = require('playwright');
+          const fs = require('fs');
+          
+          const USERNAME = process.env.RF_USERNAME;
+          const PASSWORD = process.env.RF_PASSWORD;
+          const CASE_IDS = process.env.CASE_IDS.split(',');
+          
+          async function main() {
+            console.log('='.repeat(60));
+            console.log('🔍 RealTDM Case Detail Scraper');
+            console.log('='.repeat(60));
+            console.log('Cases:', CASE_IDS.join(', '));
+            
+            const browser = await chromium.launch({
+              headless: true,
+              args: ['--no-sandbox']
+            });
+            
+            const context = await browser.newContext({
+              userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120.0.0.0'
+            });
+            
+            const page = await context.newPage();
+            const results = { cases: [], scraped_at: new Date().toISOString() };
+            
+            try {
+              // Login to RealTDM
+              console.log('\n[1] Logging in to RealTDM...');
+              await page.goto('https://brevard.realtdm.com/', { 
+                waitUntil: 'networkidle',
+                timeout: 60000 
+              });
+              await page.waitForTimeout(2000);
+              
+              // Fill login form
+              const usernameField = await page.$('input[name="username"]');
+              const passwordField = await page.$('input[name="password"]');
+              
+              if (usernameField && passwordField) {
+                await usernameField.fill(USERNAME);
+                await passwordField.fill(PASSWORD);
+                
+                const loginBtn = await page.$('input[type="submit"], button[type="submit"]');
+                if (loginBtn) {
+                  await loginBtn.click();
+                  await page.waitForTimeout(3000);
+                }
+              }
+              
+              await page.screenshot({ path: 'after_login.png' });
+              
+              // Check if logged in
+              const pageContent = await page.content();
+              if (pageContent.includes('Dashboard') || pageContent.includes('Cases') || pageContent.includes('Welcome')) {
+                console.log('✅ Logged in successfully');
+              } else {
+                console.log('⚠️ Login status unclear, continuing...');
+              }
+              
+              // Navigate to public cases list first
+              console.log('\n[2] Navigating to cases...');
+              await page.goto('https://brevard.realtdm.com/public/cases/list', {
+                waitUntil: 'networkidle',
+                timeout: 60000
+              });
+              await page.waitForTimeout(2000);
+              await page.screenshot({ path: 'cases_list.png' });
+              
+              // Try to scrape each case
+              console.log('\n[3] Scraping case details...');
+              
+              for (const caseId of CASE_IDS) {
+                console.log(`\n  Fetching case ${caseId}...`);
+                
+                try {
+                  // Try clicking on the case row if visible
+                  const caseRow = await page.$(`tr[data-caseid="${caseId}"]`);
+                  
+                  if (caseRow) {
+                    await caseRow.click();
+                    await page.waitForTimeout(2000);
+                    
+                    const caseContent = await page.content();
+                    await page.screenshot({ path: `case_${caseId}.png` });
+                    
+                    // Extract case details
+                    const caseData = {
+                      case_id: caseId,
+                      html_length: caseContent.length
+                    };
+                    
+                    // Try to extract key fields
+                    const caseNumMatch = caseContent.match(/Case\s*#?\s*:?\s*(\d{6})/i);
+                    if (caseNumMatch) caseData.case_number = caseNumMatch[1];
+                    
+                    const parcelMatch = caseContent.match(/Parcel\s*#?\s*:?\s*(\d{7})/i);
+                    if (parcelMatch) caseData.parcel_id = parcelMatch[1];
+                    
+                    const certMatch = caseContent.match(/Certificate\s*#?\s*:?\s*([^\s<]+)/i);
+                    if (certMatch) caseData.certificate_number = certMatch[1];
+                    
+                    const faceMatch = caseContent.match(/Face\s*Amount\s*:?\s*\$?([\d,\.]+)/i);
+                    if (faceMatch) caseData.face_amount = faceMatch[1];
+                    
+                    const holderMatch = caseContent.match(/Certificate\s*Holder\s*:?\s*([^<\n]+)/i);
+                    if (holderMatch) caseData.certificate_holder = holderMatch[1].trim();
+                    
+                    const statusMatch = caseContent.match(/Status\s*:?\s*([A-Z]+)/i);
+                    if (statusMatch) caseData.status = statusMatch[1];
+                    
+                    results.cases.push(caseData);
+                    console.log(`    ✓ Extracted: ${JSON.stringify(caseData)}`);
+                    
+                    // Go back to list
+                    await page.goBack();
+                    await page.waitForTimeout(1000);
+                  } else {
+                    console.log(`    ✗ Case row not found`);
+                    results.cases.push({ case_id: caseId, error: 'Not found in list' });
+                  }
+                  
+                } catch (e) {
+                  console.log(`    ✗ Error: ${e.message}`);
+                  results.cases.push({ case_id: caseId, error: e.message });
+                }
+              }
+              
+            } catch (error) {
+              console.error('Error:', error.message);
+              results.error = error.message;
+            } finally {
+              await browser.close();
+            }
+            
+            fs.writeFileSync('realtdm_cases.json', JSON.stringify(results, null, 2));
+            console.log('\n✅ Results saved to realtdm_cases.json');
+          }
+          
+          main().catch(console.error);
+          SCRIPT
+          
+          node scrape.js
+
+      - name: Upload Results
+        uses: actions/upload-artifact@v4
+        with:
+          name: realtdm-cases-${{ github.run_id }}
+          path: |
+            *.png
+            *.json
+          retention-days: 30
+
+      - name: Save to Supabase
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+        run: |
+          if [ -f realtdm_cases.json ]; then
+            cat realtdm_cases.json
+            curl -X POST "$SUPABASE_URL/rest/v1/insights" \
+              -H "apikey: $SUPABASE_KEY" \
+              -H "Authorization: Bearer $SUPABASE_KEY" \
+              -H "Content-Type: application/json" \
+              -d "{\"category\":\"realtdm_cases\",\"content\":\"Dec 18 Tax Deed Case Details\",\"metadata\":$(cat realtdm_cases.json)}" \
+              && echo "✅ Saved to Supabase"
+          fi
