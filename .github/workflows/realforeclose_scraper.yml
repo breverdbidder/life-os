@@ -1,0 +1,75 @@
+name: RealForeclose Tax Deed Scraper
+
+on:
+  workflow_dispatch:
+    inputs:
+      auction_date:
+        description: 'Auction date MM/DD/YYYY'
+        default: '12/18/2025'
+
+jobs:
+  scrape:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install
+        run: pip install curl_cffi
+
+      - name: Scrape DAYLIST
+        run: |
+          python3 << 'PYEOF'
+          import json, re
+          from curl_cffi import requests
+
+          print("="*70)
+          print("REALFORECLOSE TAX DEED SCRAPER")
+          print("="*70)
+
+          session = requests.Session(impersonate='chrome120')
+          
+          # Hit the DAYLIST URL directly
+          url = "https://brevard.realforeclose.com/index.cfm?zaction=AUCTION&Zmethod=DAYLIST&AUCTIONDATE=${{ inputs.auction_date }}"
+          print(f"\nFetching: {url}")
+          
+          r = session.get(url, timeout=30)
+          print(f"Status: {r.status_code}, Length: {len(r.text)} bytes")
+
+          # Save HTML
+          with open("daylist.html", "w") as f:
+              f.write(r.text)
+
+          # Extract data
+          aessions = list(set(re.findall(r'AESSION=([A-Za-z0-9]+)', r.text)))
+          cases = list(set(re.findall(r'\d{4}TD\d+', r.text)))
+          parcels = list(set(re.findall(r'\d{2}-\d{2}-\d{2}-\d{2}-[\d.]+', r.text)))
+
+          print(f"\nResults:")
+          print(f"  AESSION IDs: {len(aessions)}")
+          print(f"  Tax Deed Cases: {len(cases)}")
+          print(f"  Parcel IDs: {len(parcels)}")
+
+          if cases:
+              print("\nCases found:")
+              for c in cases[:20]:
+                  print(f"  - {c}")
+
+          # Save JSON
+          results = {
+              "auction_date": "${{ inputs.auction_date }}",
+              "aessions": aessions,
+              "cases": cases,
+              "parcels": parcels
+          }
+          with open("results.json", "w") as f:
+              json.dump(results, f, indent=2)
+
+          print("\n" + "="*70)
+          print(f"COMPLETE - {len(cases)} cases found")
+          print("="*70)
+          PYEOF
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: realforeclose-results
+          path: |
+            daylist.html
+            results.json
