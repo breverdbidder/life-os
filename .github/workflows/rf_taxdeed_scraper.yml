@@ -13,7 +13,7 @@ on:
 jobs:
   scrape:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
     
     steps:
       - uses: actions/checkout@v4
@@ -27,7 +27,7 @@ jobs:
           npm install playwright
           npx playwright install chromium --with-deps
 
-      - name: Scrape RealForeclose
+      - name: Scrape Tax Deed Auctions
         env:
           RF_USERNAME: ${{ secrets.RF_USERNAME }}
           RF_PASSWORD: ${{ secrets.RF_PASSWORD }}
@@ -42,31 +42,23 @@ jobs:
           const USERNAME = process.env.RF_USERNAME || '';
           const PASSWORD = process.env.RF_PASSWORD || '';
           
-          // Helper to dismiss all popups
           async function dismissPopups(page, maxAttempts = 5) {
             for (let i = 0; i < maxAttempts; i++) {
               try {
-                // Try multiple selectors for OK button
-                const okButton = await page.$('input[value="OK"], input[value="ok"], button:has-text("OK"), .ok-button, #okButton');
+                const okButton = await page.$('input[value="OK"], input[value="ok"]');
                 if (okButton) {
-                  console.log('    Clicking OK button...');
                   await okButton.click();
-                  await page.waitForTimeout(1000);
-                } else {
-                  break;
-                }
-              } catch (e) {
-                break;
-              }
+                  await page.waitForTimeout(800);
+                } else break;
+              } catch (e) { break; }
             }
           }
           
           async function scrape() {
             console.log('='.repeat(60));
-            console.log('🏛️ BidDeed.AI - RealForeclose Tax Deed Scraper V3');
+            console.log('🏛️ BidDeed.AI - Tax Deed Scraper V4');
             console.log('='.repeat(60));
-            console.log('📅 Date:', AUCTION_DATE);
-            console.log('👤 User:', USERNAME ? USERNAME.substring(0,3) + '***' : 'Anonymous');
+            console.log('📅 Target:', AUCTION_DATE);
             
             const browser = await chromium.launch({
               headless: true,
@@ -74,7 +66,7 @@ jobs:
             });
             
             const context = await browser.newContext({
-              userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36',
+              userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120.0.0.0',
               viewport: { width: 1920, height: 1080 }
             });
             
@@ -89,168 +81,101 @@ jobs:
             };
             
             try {
-              // Step 1: Load main page
-              console.log('\n[1] Loading RealForeclose...');
+              // Step 1: Load and login
+              console.log('\n[1] Loading site...');
               await page.goto('https://brevard.realforeclose.com/index.cfm', {
-                waitUntil: 'networkidle',
-                timeout: 60000
+                waitUntil: 'networkidle', timeout: 60000
               });
               await page.waitForTimeout(2000);
-              await page.screenshot({ path: 'step1_main.png' });
               
-              // Step 2: Login
               if (USERNAME && PASSWORD) {
-                console.log('\n[2] Logging in...');
-                try {
-                  await page.waitForSelector('#LogName', { timeout: 5000 });
-                  await page.fill('#LogName', USERNAME);
-                  await page.fill('#LogPass', PASSWORD);
-                  await page.click('#LogButton');
-                  await page.waitForTimeout(3000);
-                  console.log('  ✅ Login submitted');
-                  
-                  // Dismiss any popups after login
-                  await dismissPopups(page);
-                  
-                  await page.screenshot({ path: 'step2_login.png' });
-                  
-                  const html = await page.content();
-                  results.metadata.logged_in = html.includes('Welcome:') || html.includes('Everest8') || html.includes('Log Off');
-                  console.log('  Logged in:', results.metadata.logged_in);
-                } catch (e) {
-                  console.log('  Login error:', e.message);
-                }
+                console.log('[2] Logging in...');
+                await page.fill('#LogName', USERNAME);
+                await page.fill('#LogPass', PASSWORD);
+                await page.click('#LogButton');
+                await page.waitForTimeout(3000);
+                await dismissPopups(page);
+                results.metadata.logged_in = true;
+                console.log('  ✅ Logged in');
               }
               
-              // Step 3: Navigate to Calendar and dismiss popups
-              console.log('\n[3] Going to Calendar...');
-              await page.goto('https://brevard.realforeclose.com/index.cfm?zaction=AUCTION&zmethod=CALENDAR', {
-                waitUntil: 'networkidle',
-                timeout: 60000
-              });
-              await page.waitForTimeout(2000);
-              await dismissPopups(page);
-              await page.screenshot({ path: 'step3_calendar.png' });
-              
-              // Step 4: Navigate to specific auction date
-              console.log('\n[4] Going to', AUCTION_DATE, '...');
-              await page.goto(`https://brevard.realforeclose.com/index.cfm?zaction=AUCTION&zmethod=PREVIEW&AuctionDate=${AUCTION_DATE}`, {
-                waitUntil: 'networkidle',
-                timeout: 60000
-              });
-              await page.waitForTimeout(2000);
-              await dismissPopups(page);
-              await page.screenshot({ path: 'step4_auction.png' });
-              
-              // Step 5: Extract data
-              console.log('\n[5] Extracting data...');
-              const html = await page.content();
-              fs.writeFileSync('auction_page.html', html);
-              
-              // Check page content
-              const pageText = await page.evaluate(() => document.body.innerText);
-              
-              if (pageText.toLowerCase().includes('no cases currently') || 
-                  pageText.toLowerCase().includes('there are no cases') ||
-                  pageText.toLowerCase().includes('no auctions')) {
-                console.log('  ⚠️ No cases posted yet for this date');
-                results.metadata.status = 'no_cases_posted';
-              } else {
-                // Extract AESSION IDs
-                const aessions = [...new Set((html.match(/AESSION=([A-Za-z0-9]+)/gi) || []).map(a => a.split('=')[1]))];
-                console.log('  AESSION IDs:', aessions.length);
-                
-                // Extract case numbers (tax deed format)
-                const tdCases = [...new Set(html.match(/\d{4}TD\d+/g) || [])];
-                console.log('  Tax Deed cases:', tdCases.length);
-                
-                // Extract parcel IDs
-                const parcels = [...new Set(html.match(/\b\d{7,8}\b/g) || [])];
-                console.log('  Parcel patterns:', parcels.length);
-                
-                // Build properties
-                const maxLen = Math.max(aessions.length, tdCases.length);
-                for (let i = 0; i < maxLen; i++) {
-                  results.properties.push({
-                    aession: aessions[i] || null,
-                    case_number: tdCases[i] || null,
-                    parcel_id: parcels[i] || null,
-                    auction_date: AUCTION_DATE
-                  });
-                }
-                
-                results.metadata.status = maxLen > 0 ? 'data_found' : 'no_data';
-              }
-              
-              // Step 6: Try Place Bid page
-              console.log('\n[6] Checking Place Bid page...');
+              // Step 2: Go directly to Place Bid / DAYLIST page (has actual listings)
+              console.log('\n[3] Loading auction listings...');
               await page.goto('https://brevard.realforeclose.com/index.cfm?zaction=AUCTION&zmethod=DAYLIST', {
-                waitUntil: 'networkidle',
-                timeout: 30000
+                waitUntil: 'networkidle', timeout: 60000
               });
-              await page.waitForTimeout(1000);
+              await page.waitForTimeout(2000);
               await dismissPopups(page);
-              await page.screenshot({ path: 'step6_placebid.png' });
+              await page.screenshot({ path: 'auction_list.png', fullPage: true });
               
-              const bidHtml = await page.content();
-              fs.writeFileSync('placebid_page.html', bidHtml);
+              // Step 3: Extract data from all pages
+              console.log('\n[4] Extracting auction data...');
+              let allHtml = await page.content();
+              fs.writeFileSync('auction_page1.html', allHtml);
               
-              // Check for items on Place Bid
-              const bidAessions = [...new Set((bidHtml.match(/AESSION=([A-Za-z0-9]+)/gi) || []).map(a => a.split('=')[1]))];
-              if (bidAessions.length > 0 && results.properties.length === 0) {
-                console.log('  Found', bidAessions.length, 'items on Place Bid');
-                for (const aes of bidAessions) {
-                  results.properties.push({ aession: aes, auction_date: AUCTION_DATE });
-                }
-                results.metadata.status = 'data_found';
-              }
+              // Check for pagination
+              const pageMatch = allHtml.match(/page \d+ of (\d+)/);
+              const totalPages = pageMatch ? parseInt(pageMatch[1]) : 1;
+              console.log(`  Pages: ${totalPages}`);
               
-              // Step 7: If items found, get details
-              if (results.properties.length > 0 && results.metadata.logged_in) {
-                console.log('\n[7] Fetching property details...');
-                for (let i = 0; i < Math.min(results.properties.length, 20); i++) {
-                  const prop = results.properties[i];
-                  if (!prop.aession) continue;
-                  
-                  try {
-                    await page.goto(`https://brevard.realforeclose.com/index.cfm?zaction=AUCTION&zmethod=DETAILS&Aession=${prop.aession}`, {
-                      waitUntil: 'networkidle',
-                      timeout: 20000
-                    });
+              // Go through all pages
+              for (let p = 2; p <= totalPages && p <= 10; p++) {
+                try {
+                  const nextBtn = await page.$('input[value="NEXT >"]');
+                  if (nextBtn) {
+                    await nextBtn.click();
+                    await page.waitForTimeout(2000);
                     await dismissPopups(page);
-                    
-                    const detailHtml = await page.content();
-                    
-                    // Opening bid
-                    const bidMatch = detailHtml.match(/Opening Bid[:\s]*\$?([\d,]+\.?\d*)/i);
-                    if (bidMatch) prop.opening_bid = parseFloat(bidMatch[1].replace(/,/g, ''));
-                    
-                    // Address
-                    const addrMatch = detailHtml.match(/Property Address[:\s]*([^<\n]+)/i);
-                    if (addrMatch) prop.address = addrMatch[1].trim();
-                    
-                    // Parcel
-                    const parcelMatch = detailHtml.match(/Parcel[:\s#]*(\d{7,8})/i);
-                    if (parcelMatch) prop.parcel_id = parcelMatch[1];
-                    
-                    // Certificate
-                    const certMatch = detailHtml.match(/Certificate[:\s#]*(\d+-?\d*)/i);
-                    if (certMatch) prop.certificate = certMatch[1];
-                    
-                    console.log(`  [${i+1}] ${prop.case_number || prop.aession}: $${prop.opening_bid || 'N/A'} - ${prop.address || 'N/A'}`);
-                    
-                    await page.waitForTimeout(500);
-                  } catch (e) {
-                    console.log(`  [${i+1}] Error: ${e.message.substring(0, 40)}`);
+                    const pageHtml = await page.content();
+                    allHtml += pageHtml;
+                    fs.writeFileSync(`auction_page${p}.html`, pageHtml);
+                    console.log(`  Loaded page ${p}`);
                   }
-                }
+                } catch (e) { break; }
               }
               
-              results.metadata.scraped_at = new Date().toISOString();
+              // Step 4: Parse the data
+              console.log('\n[5] Parsing listings...');
+              
+              // Extract case numbers (6-digit)
+              const caseNums = [...new Set(allHtml.match(/>(\d{6})</g) || [])].map(m => m.slice(1, -1));
+              
+              // Extract opening bids
+              const bids = (allHtml.match(/Opening Bid:[^$]*\$([0-9,]+\.\d+)/g) || [])
+                .map(m => parseFloat(m.replace(/[^0-9.]/g, '')));
+              
+              // Extract assessed values
+              const assessed = (allHtml.match(/Assessed Value:[^$]*\$([0-9,]+\.\d+)/g) || [])
+                .map(m => parseFloat(m.replace(/[^0-9.]/g, '')));
+              
+              // Extract parcel IDs (7-digit)
+              const parcels = [...new Set(allHtml.match(/>(\d{7})</g) || [])].map(m => m.slice(1, -1));
+              
+              // Build property list
+              for (let i = 0; i < caseNums.length; i++) {
+                results.properties.push({
+                  case_number: caseNums[i] || null,
+                  opening_bid: bids[i] || null,
+                  assessed_value: assessed[i] || null,
+                  parcel_id: parcels[i] || null,
+                  auction_date: AUCTION_DATE,
+                  auction_type: 'Tax Deed'
+                });
+              }
+              
+              // Summary stats
               results.metadata.total_properties = results.properties.length;
+              results.metadata.total_opening_bids = results.properties.reduce((sum, p) => sum + (p.opening_bid || 0), 0);
+              results.metadata.total_assessed_value = results.properties.reduce((sum, p) => sum + (p.assessed_value || 0), 0);
+              results.metadata.scraped_at = new Date().toISOString();
+              results.metadata.status = results.properties.length > 0 ? 'data_found' : 'no_data';
+              
+              console.log(`\n  ✅ Found ${results.properties.length} properties`);
+              console.log(`  💰 Total Opening Bids: $${results.metadata.total_opening_bids.toLocaleString()}`);
+              console.log(`  🏠 Total Assessed: $${results.metadata.total_assessed_value.toLocaleString()}`);
               
             } catch (error) {
-              console.error('\n❌ Error:', error.message);
+              console.error('❌ Error:', error.message);
               results.error = error.message;
             } finally {
               await browser.close();
@@ -259,11 +184,7 @@ jobs:
             fs.writeFileSync('taxdeed_results.json', JSON.stringify(results, null, 2));
             
             console.log('\n' + '='.repeat(60));
-            console.log('📊 FINAL RESULTS');
-            console.log('  Date:', results.metadata.auction_date);
-            console.log('  Logged In:', results.metadata.logged_in);
-            console.log('  Status:', results.metadata.status);
-            console.log('  Properties:', results.properties.length);
+            console.log('📊 COMPLETE');
             console.log('='.repeat(60));
           }
           
@@ -285,7 +206,7 @@ jobs:
               -H "Content-Type: application/json" \
               -d "{
                 \"category\": \"taxdeed_auction\",
-                \"content\": \"RealForeclose Tax Deed - ${{ github.event.inputs.auction_date }}\",
+                \"content\": \"Dec 18 Tax Deed - $(cat taxdeed_results.json | jq -r '.metadata.total_properties') properties\",
                 \"metadata\": $(cat taxdeed_results.json)
               }" && echo "✅ Saved to Supabase"
           fi
