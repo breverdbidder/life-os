@@ -1,0 +1,280 @@
+name: Tax Deed Auction - 6HR Autonomous Monitor
+
+on:
+  workflow_dispatch:
+    inputs:
+      auction_date:
+        description: 'Auction date (MM/DD/YYYY)'
+        required: false
+        default: '12/18/2025'
+
+env:
+  RF_USERNAME: Everest8
+  RF_PASSWORD: Everest18$
+  SUPABASE_URL: https://mocerqjnksmhcjzxrewo.supabase.co
+  SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+
+jobs:
+  autonomous-monitor:
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    
+    steps:
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      
+      - name: Install Playwright
+        run: |
+          npm init -y
+          npm install playwright
+          npx playwright install chromium --with-deps
+      
+      - name: 6-Hour Autonomous Monitor
+        run: |
+          node << 'NODESCRIPT'
+          const { chromium } = require("playwright");
+          const https = require("https");
+          const fs = require("fs");
+
+          const RF_USER = process.env.RF_USERNAME || "Everest8";
+          const RF_PASS = process.env.RF_PASSWORD || "Everest18$";
+          const SUPABASE_URL = process.env.SUPABASE_URL;
+          const SUPABASE_KEY = process.env.SUPABASE_KEY;
+          const AUCTION_DATE = "${{ github.event.inputs.auction_date }}" || "12/18/2025";
+
+          // State
+          let allItems = {};
+          let iteration = 0;
+          let auctionEnded = false;
+          const startTime = Date.now();
+          const MAX_RUNTIME = 6 * 60 * 60 * 1000; // 6 hours
+
+          async function saveToSupabase(data) {
+            if (!SUPABASE_KEY) return;
+            
+            const postData = JSON.stringify(data);
+            const options = {
+              hostname: "mocerqjnksmhcjzxrewo.supabase.co",
+              port: 443,
+              path: "/rest/v1/auction_live_feed",
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                "apikey": SUPABASE_KEY,
+                "Authorization": `Bearer ${SUPABASE_KEY}`,
+                "Prefer": "return=minimal"
+              }
+            };
+            
+            return new Promise((resolve) => {
+              const req = https.request(options, (res) => {
+                console.log(`    Supabase: ${res.statusCode}`);
+                resolve();
+              });
+              req.on("error", (e) => console.log(`    Supabase error: ${e.message}`));
+              req.write(postData);
+              req.end();
+            });
+          }
+
+          (async () => {
+            console.log("=".repeat(70));
+            console.log("  BIDDEED.AI - TAX DEED 6-HOUR AUTONOMOUS MONITOR");
+            console.log(`  Auction Date: ${AUCTION_DATE}`);
+            console.log(`  Started: ${new Date().toISOString()}`);
+            console.log("=".repeat(70));
+
+            const browser = await chromium.launch({ headless: true });
+            const context = await browser.newContext({
+              userAgent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+            });
+            const page = await context.newPage();
+
+            // LOGIN
+            console.log("\n[LOGIN] Authenticating...");
+            await page.goto("https://brevard.realforeclose.com/index.cfm");
+            await page.waitForLoadState("networkidle");
+            
+            // Check for login form
+            const logNameInput = await page.$("input#LogName, input[name=LogName]");
+            if (logNameInput) {
+              await page.fill("input#LogName, input[name=LogName]", RF_USER);
+              await page.fill("input#LogPass, input[name=LogPass]", RF_PASS);
+              
+              // Click login
+              const loginBtn = await page.$("input[type=button][onclick*=doLogin], input[value*=Log]");
+              if (loginBtn) {
+                await loginBtn.click();
+              } else {
+                await page.keyboard.press("Enter");
+              }
+              await page.waitForTimeout(3000);
+              await page.waitForLoadState("networkidle");
+            }
+
+            const afterLogin = await page.content();
+            if (afterLogin.toLowerCase().includes("logout") || afterLogin.toLowerCase().includes("log out")) {
+              console.log("    ✅ LOGIN SUCCESS");
+            } else {
+              console.log("    ⚠️ Login uncertain, proceeding...");
+            }
+
+            // DAYLIST URL for tax deed
+            const daylistUrl = `https://brevard.realforeclose.com/index.cfm?zaction=AUCTION&Zmethod=DAYLIST&AESSION=1&ESSION=1&AUCTIONDATE=${AUCTION_DATE}`;
+
+            // MAIN MONITOR LOOP
+            console.log("\n[MONITOR] Starting autonomous monitoring loop...");
+            console.log(`    Refresh interval: 60 seconds`);
+            console.log(`    Max runtime: 6 hours`);
+
+            while (Date.now() - startTime < MAX_RUNTIME && !auctionEnded) {
+              iteration++;
+              const now = new Date();
+              const elapsed = Math.floor((Date.now() - startTime) / 60000);
+              
+              console.log(`\n${"=".repeat(50)}`);
+              console.log(`[ITERATION ${iteration}] ${now.toISOString()} (${elapsed} min elapsed)`);
+              console.log(`${"=".repeat(50)}`);
+
+              try {
+                // Navigate to daylist
+                await page.goto(daylistUrl, { waitUntil: "networkidle", timeout: 30000 });
+                await page.waitForTimeout(2000);
+
+                const content = await page.content();
+                
+                // Take screenshot every 10 iterations
+                if (iteration % 10 === 1) {
+                  await page.screenshot({ path: `screenshot_${iteration.toString().padStart(4, "0")}.png`, fullPage: true });
+                }
+
+                // Check auction status
+                const isLive = content.toLowerCase().includes("bidding") || 
+                               content.toLowerCase().includes("current bid") ||
+                               content.includes("BID NOW");
+                const hasEnded = content.toLowerCase().includes("auction has ended") ||
+                                content.toLowerCase().includes("no cases currently");
+                const hasItems = content.includes("AUCTION_ITEM") || 
+                                content.includes("Opening Bid") ||
+                                content.includes("Parcel ID");
+
+                console.log(`    Status: ${isLive ? "🔴 LIVE" : hasEnded ? "🏁 ENDED" : hasItems ? "📋 ITEMS FOUND" : "⏳ WAITING"}`);
+
+                if (hasItems) {
+                  // Extract auction items
+                  const items = await page.$$eval(".AUCTION_ITEM, tr[id*='Area'], .auction-row", rows => {
+                    return rows.map(row => {
+                      const text = row.textContent || "";
+                      const html = row.innerHTML || "";
+                      
+                      // Extract parcel
+                      const parcelMatch = text.match(/(\d{7})/);
+                      // Extract bid amount
+                      const bidMatch = text.match(/\$[\d,]+(?:\.\d{2})?/);
+                      // Extract case number
+                      const caseMatch = text.match(/05-\d{4}-CA-\d+|TD\d+/i);
+                      
+                      return {
+                        parcel: parcelMatch ? parcelMatch[1] : null,
+                        bid: bidMatch ? bidMatch[0] : null,
+                        case: caseMatch ? caseMatch[0] : null,
+                        raw: text.substring(0, 300)
+                      };
+                    }).filter(item => item.parcel || item.case);
+                  });
+
+                  console.log(`    Items extracted: ${items.length}`);
+
+                  // Track changes
+                  let newCount = 0, changedCount = 0;
+                  for (const item of items) {
+                    const key = item.parcel || item.case || `item_${items.indexOf(item)}`;
+                    
+                    if (!allItems[key]) {
+                      allItems[key] = { ...item, firstSeen: now.toISOString(), bidHistory: [] };
+                      newCount++;
+                      console.log(`    🆕 NEW: ${key} - ${item.bid || "N/A"}`);
+                    } else if (allItems[key].bid !== item.bid) {
+                      const oldBid = allItems[key].bid;
+                      allItems[key].bidHistory.push({ bid: oldBid, at: allItems[key].lastUpdated });
+                      allItems[key].bid = item.bid;
+                      allItems[key].lastUpdated = now.toISOString();
+                      changedCount++;
+                      console.log(`    💰 BID CHANGE: ${key} ${oldBid} → ${item.bid}`);
+                    }
+                    allItems[key].lastUpdated = now.toISOString();
+                  }
+
+                  if (newCount > 0 || changedCount > 0) {
+                    console.log(`    Summary: ${newCount} new, ${changedCount} changed, ${Object.keys(allItems).length} total`);
+                  }
+                }
+
+                // Save to Supabase
+                await saveToSupabase({
+                  iteration,
+                  timestamp: now.toISOString(),
+                  auction_date: AUCTION_DATE,
+                  auction_type: "tax_deed",
+                  is_live: isLive,
+                  has_ended: hasEnded,
+                  items_count: Object.keys(allItems).length,
+                  items_data: JSON.stringify(allItems),
+                  elapsed_minutes: elapsed
+                });
+
+                // Check for end
+                if (hasEnded) {
+                  console.log("\n🏁 AUCTION HAS ENDED - Capturing final state...");
+                  await page.screenshot({ path: "final_screenshot.png", fullPage: true });
+                  auctionEnded = true;
+                }
+
+              } catch (err) {
+                console.log(`    ❌ Error: ${err.message}`);
+              }
+
+              // Wait 60 seconds before next check
+              if (!auctionEnded) {
+                await page.waitForTimeout(60000);
+              }
+            }
+
+            // FINAL SUMMARY
+            console.log("\n" + "=".repeat(70));
+            console.log("  AUCTION MONITORING COMPLETE");
+            console.log("=".repeat(70));
+            console.log(`Total iterations: ${iteration}`);
+            console.log(`Total runtime: ${Math.floor((Date.now() - startTime) / 60000)} minutes`);
+            console.log(`Items tracked: ${Object.keys(allItems).length}`);
+            console.log("\nFINAL ITEMS:");
+            for (const [key, data] of Object.entries(allItems)) {
+              console.log(`  ${key}: ${data.bid || "N/A"} (history: ${data.bidHistory?.length || 0} changes)`);
+            }
+
+            // Save final JSON
+            fs.writeFileSync("auction_final_results.json", JSON.stringify({
+              auction_date: AUCTION_DATE,
+              auction_type: "tax_deed", 
+              total_iterations: iteration,
+              runtime_minutes: Math.floor((Date.now() - startTime) / 60000),
+              ended_naturally: auctionEnded,
+              items: allItems
+            }, null, 2));
+
+            await browser.close();
+            console.log("\n✅ Monitor shutdown complete");
+          })();
+          NODESCRIPT
+      
+      - name: Upload Results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: taxdeed-auction-results-${{ github.run_number }}
+          path: |
+            *.png
+            *.json
+          retention-days: 30
