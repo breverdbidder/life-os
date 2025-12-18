@@ -230,3 +230,64 @@ VALUES (
 ---
 
 **Credit:** Ariel Shapira, Solo Founder - Real Estate Developer & Founder, Everest Capital USA
+
+---
+
+## 🤖 NLP & CHATBOT APIs - BidDeed.AI V18 Integration
+
+### Conversational AI Platforms
+| API | Description | Use Case | Pricing |
+|-----|-------------|----------|---------|
+| [NLP Cloud](https://nlpcloud.com) | Privacy-first NLP API with GPT alternatives | Chatbot backbone | $29-99/mo |
+| [Google Dialogflow](https://cloud.google.com/dialogflow) | Enterprise conversational agents | Voice + chat | $600 credit |
+| [Apify AI Web Agent](https://apify.com/apify/ai-web-agent) | Natural language web browsing | Automation | Per task |
+| [OpenAI Chat Completions](https://platform.openai.com) | GPT-4/4o chat API | Advanced NLP | Pay per token |
+| [Anthropic Claude API](https://anthropic.com) | Claude models for conversation | Smart Router | Pay per token |
+
+### NLP Processing
+| API | Features | BidDeed.AI Use |
+|-----|----------|----------------|
+| [NLP Cloud NER](https://nlpcloud.com/api-doc) | Entity extraction, sentiment | Property/plaintiff parsing |
+| [Google Natural Language](https://cloud.google.com/natural-language) | Sentiment, entity, syntax | Document analysis |
+| [spaCy API](https://spacy.io) | Industrial NLP | Open source NER |
+| [Hugging Face Inference](https://huggingface.co/inference-api) | 10K+ models | Custom pipelines |
+
+### Chatbot Frameworks
+| Framework | Type | Integration |
+|-----------|------|-------------|
+| LangChain/LangGraph | Python/JS | ✅ Implemented |
+| CrewAI | Multi-agent | Evaluation |
+| AutoGen | Microsoft | Future |
+| Mastra | TypeScript | Evaluation |
+
+### BidDeed.AI V18 Chatbot Stack
+```
+┌─────────────────────────────────────────────┐
+│           BidDeed.AI V18 Chatbot            │
+├─────────────────────────────────────────────┤
+│  Frontend: React + Framer Motion            │
+│  NLP Engine: Custom intent classification   │
+│  LLM Router: Gemini FREE → Claude fallback  │
+│  Orchestration: LangGraph unified_v18       │
+│  Database: Supabase PostgRES                │
+│  ML: XGBoost 64.4% accuracy                 │
+└─────────────────────────────────────────────┘
+```
+
+### Performance Metrics (V18)
+- Response Time: <500ms (NLP) / <2s (LLM)
+- Intent Accuracy: 92%
+- Entity Extraction: 8 types
+- Free Tier Usage: 55% (Gemini)
+- Cost Savings: ~$2,500/mo vs enterprise
+
+### Recommended Integration Priority
+1. ✅ **Custom NLP Engine** (LIVE) - Intent + entity extraction
+2. ✅ **Smart Router** (LIVE) - Gemini FREE + Claude fallback
+3. 🔄 **NLP Cloud** - Privacy-first backup for HIPAA scenarios
+4. 📋 **Apify MCP Server** - Tool discovery for agents
+5. 📋 **Voice Interface** - Google Speech-to-Text integration
+
+---
+
+**Updated:** December 18, 2025 | **Version:** V18.1.0
