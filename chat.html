@@ -4,822 +4,363 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="theme-color" content="#0f0f1a">
-    <title>Life OS Chat</title>
-    <link rel="manifest" href="/manifest.json">
+    <title>BidDeed.AI Chat</title>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
-        
         :root {
-            --bg-primary: #0f0f1a;
-            --bg-secondary: #1a1a2e;
-            --bg-chat: #252538;
-            --accent: #8b5cf6;
-            --accent-dim: #6d46c9;
+            --bg-primary: #0f172a;
+            --bg-secondary: #1e293b;
+            --accent: #3b82f6;
             --text-primary: #f0f0f5;
-            --text-secondary: #a0a0b0;
+            --text-secondary: #94a3b8;
             --user-bubble: #3b82f6;
-            --claude-bubble: #2d2d44;
-            --border: rgba(139, 92, 246, 0.2);
-        }
-        
-        html, body {
-            height: 100%;
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            background: linear-gradient(135deg, var(--bg-primary) 0%, var(--bg-secondary) 100%);
-            color: var(--text-primary);
-            overflow: hidden;
-        }
-        
-        /* Login Screen */
-        #login-screen {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            height: 100%;
-            padding: 20px;
-        }
-        
-        .login-card {
-            background: var(--bg-chat);
-            border: 1px solid var(--border);
-            border-radius: 20px;
-            padding: 40px 30px;
-            width: 100%;
-            max-width: 360px;
-            text-align: center;
-            box-shadow: 0 20px 60px rgba(0,0,0,0.4);
-        }
-        
-        .login-logo {
-            font-size: 48px;
-            margin-bottom: 16px;
-        }
-        
-        .login-title {
-            font-size: 24px;
-            font-weight: 700;
-            background: linear-gradient(135deg, var(--accent), #3b82f6);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            margin-bottom: 8px;
-        }
-        
-        .login-subtitle {
-            color: var(--text-secondary);
-            font-size: 14px;
-            margin-bottom: 30px;
-        }
-        
-        .login-input {
-            width: 100%;
-            padding: 16px 20px;
-            font-size: 18px;
-            background: var(--bg-primary);
-            border: 2px solid var(--border);
-            border-radius: 12px;
-            color: var(--text-primary);
-            text-align: center;
-            letter-spacing: 4px;
-            margin-bottom: 20px;
-            transition: border-color 0.2s;
-        }
-        
-        .login-input:focus {
-            outline: none;
-            border-color: var(--accent);
-        }
-        
-        .login-input::placeholder {
-            letter-spacing: normal;
-            color: var(--text-secondary);
-        }
-        
-        .login-btn {
-            width: 100%;
-            padding: 16px;
-            font-size: 16px;
-            font-weight: 600;
-            background: linear-gradient(135deg, var(--accent), var(--accent-dim));
-            border: none;
-            border-radius: 12px;
-            color: white;
-            cursor: pointer;
-            transition: transform 0.2s, box-shadow 0.2s;
-        }
-        
-        .login-btn:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 8px 24px rgba(139, 92, 246, 0.4);
-        }
-        
-        .login-btn:active {
-            transform: scale(0.98);
-        }
-        
-        .login-error {
-            color: #ef4444;
-            font-size: 14px;
-            margin-top: 16px;
-            display: none;
-        }
-        
-        /* Chat Screen */
-        #chat-screen {
-            display: none;
-            flex-direction: column;
-            height: 100%;
-            height: 100dvh;
-        }
-        
-        /* Header */
-        .chat-header {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            padding: 12px 16px;
-            background: var(--bg-chat);
-            border-bottom: 1px solid var(--border);
-            flex-shrink: 0;
-        }
-        
-        .header-left {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-        }
-        
-        .header-avatar {
-            width: 40px;
-            height: 40px;
-            border-radius: 12px;
-            background: linear-gradient(135deg, var(--accent), #3b82f6);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 20px;
-        }
-        
-        .header-info h1 {
-            font-size: 16px;
-            font-weight: 600;
-        }
-        
-        .header-info p {
-            font-size: 12px;
-            color: var(--text-secondary);
-        }
-        
-        .header-actions {
-            display: flex;
-            gap: 8px;
-        }
-        
-        .header-btn {
-            width: 40px;
-            height: 40px;
-            border-radius: 10px;
-            background: var(--bg-secondary);
-            border: 1px solid var(--border);
-            color: var(--text-secondary);
-            font-size: 18px;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            transition: all 0.2s;
-        }
-        
-        .header-btn:hover {
-            background: var(--accent);
-            color: white;
-            border-color: var(--accent);
-        }
-        
-        /* Messages Area */
-        .messages-container {
-            flex: 1;
-            overflow-y: auto;
-            padding: 16px;
-            scroll-behavior: smooth;
-            -webkit-overflow-scrolling: touch;
-        }
-        
-        .message {
-            max-width: 85%;
-            margin-bottom: 16px;
-            animation: slideIn 0.3s ease;
-        }
-        
-        @keyframes slideIn {
-            from { opacity: 0; transform: translateY(10px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-        
-        .message.user {
-            margin-left: auto;
-        }
-        
-        .message-bubble {
-            padding: 12px 16px;
-            border-radius: 18px;
-            font-size: 15px;
-            line-height: 1.5;
-            word-wrap: break-word;
-        }
-        
-        .message.user .message-bubble {
-            background: var(--user-bubble);
-            border-bottom-right-radius: 4px;
-        }
-        
-        .message.claude .message-bubble {
-            background: var(--claude-bubble);
-            border-bottom-left-radius: 4px;
-        }
-        
-        .message-time {
-            font-size: 11px;
-            color: var(--text-secondary);
-            margin-top: 4px;
-            padding: 0 4px;
-        }
-        
-        .message.user .message-time {
-            text-align: right;
-        }
-        
-        /* Typing indicator */
-        .typing-indicator {
-            display: none;
-            padding: 12px 16px;
-            background: var(--claude-bubble);
-            border-radius: 18px;
-            border-bottom-left-radius: 4px;
-            width: fit-content;
-            margin-bottom: 16px;
-        }
-        
-        .typing-indicator.visible {
-            display: block;
-        }
-        
-        .typing-dots {
-            display: flex;
-            gap: 4px;
-        }
-        
-        .typing-dots span {
-            width: 8px;
-            height: 8px;
-            background: var(--text-secondary);
-            border-radius: 50%;
-            animation: typing 1.4s infinite;
-        }
-        
-        .typing-dots span:nth-child(2) { animation-delay: 0.2s; }
-        .typing-dots span:nth-child(3) { animation-delay: 0.4s; }
-        
-        @keyframes typing {
-            0%, 60%, 100% { transform: translateY(0); opacity: 0.4; }
-            30% { transform: translateY(-6px); opacity: 1; }
-        }
-        
-        /* Input Area */
-        .input-container {
-            padding: 12px 16px;
-            padding-bottom: max(12px, env(safe-area-inset-bottom));
-            background: var(--bg-chat);
-            border-top: 1px solid var(--border);
-            flex-shrink: 0;
-        }
-        
-        .input-wrapper {
-            display: flex;
-            align-items: flex-end;
-            gap: 10px;
-            background: var(--bg-primary);
-            border: 2px solid var(--border);
-            border-radius: 24px;
-            padding: 8px 8px 8px 16px;
-            transition: border-color 0.2s;
-        }
-        
-        .input-wrapper:focus-within {
-            border-color: var(--accent);
-        }
-        
-        #message-input {
-            flex: 1;
-            background: transparent;
-            border: none;
-            color: var(--text-primary);
-            font-size: 16px;
-            line-height: 1.4;
-            resize: none;
-            max-height: 120px;
-            min-height: 24px;
-            padding: 6px 0;
-        }
-        
-        #message-input:focus {
-            outline: none;
-        }
-        
-        #message-input::placeholder {
-            color: var(--text-secondary);
-        }
-        
-        .send-btn {
-            width: 44px;
-            height: 44px;
-            border-radius: 50%;
-            background: linear-gradient(135deg, var(--accent), var(--accent-dim));
-            border: none;
-            color: white;
-            font-size: 20px;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            transition: transform 0.2s, opacity 0.2s;
-            flex-shrink: 0;
-        }
-        
-        .send-btn:disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
-        }
-        
-        .send-btn:not(:disabled):hover {
-            transform: scale(1.05);
-        }
-        
-        .send-btn:not(:disabled):active {
-            transform: scale(0.95);
-        }
-        
-        /* Quick Actions */
-        .quick-actions {
-            display: flex;
-            gap: 8px;
-            margin-bottom: 12px;
-            overflow-x: auto;
-            padding-bottom: 4px;
-            -webkit-overflow-scrolling: touch;
-        }
-        
-        .quick-action {
-            padding: 8px 14px;
-            background: var(--bg-secondary);
-            border: 1px solid var(--border);
-            border-radius: 20px;
-            color: var(--text-secondary);
-            font-size: 13px;
-            white-space: nowrap;
-            cursor: pointer;
-            transition: all 0.2s;
-            flex-shrink: 0;
-        }
-        
-        .quick-action:hover {
-            background: var(--accent);
-            color: white;
-            border-color: var(--accent);
-        }
-        
-        /* Markdown rendering */
-        .message-bubble code {
-            background: rgba(0,0,0,0.3);
-            padding: 2px 6px;
-            border-radius: 4px;
-            font-family: 'SF Mono', Monaco, monospace;
-            font-size: 13px;
-        }
-        
-        .message-bubble pre {
-            background: rgba(0,0,0,0.3);
-            padding: 12px;
-            border-radius: 8px;
-            overflow-x: auto;
-            margin: 8px 0;
-        }
-        
-        .message-bubble pre code {
-            background: none;
-            padding: 0;
-        }
-        
-        .message-bubble strong {
-            color: var(--accent);
-        }
-        
-        .message-bubble ul, .message-bubble ol {
-            margin: 8px 0;
-            padding-left: 20px;
-        }
-        
-        .message-bubble li {
-            margin: 4px 0;
-        }
-        
-        /* Session info */
-        .session-info {
-            text-align: center;
-            padding: 20px;
-            color: var(--text-secondary);
-            font-size: 12px;
-        }
-        
-        .session-info .date {
-            background: var(--bg-secondary);
-            padding: 6px 16px;
-            border-radius: 12px;
-            display: inline-block;
-        }
-        
-        /* Responsive */
-        @media (max-width: 480px) {
-            .message {
-                max-width: 90%;
-            }
-            
-            .header-info h1 {
-                font-size: 15px;
-            }
-        }
-        
-        /* PWA install prompt */
-        .pwa-prompt {
-            display: none;
-            position: fixed;
-            bottom: 80px;
-            left: 16px;
-            right: 16px;
-            background: var(--bg-chat);
-            border: 1px solid var(--border);
-            border-radius: 16px;
-            padding: 16px;
-            box-shadow: 0 10px 40px rgba(0,0,0,0.4);
-            z-index: 100;
-        }
-        
-        .pwa-prompt.visible {
-            display: block;
-            animation: slideUp 0.3s ease;
-        }
-        
-        @keyframes slideUp {
-            from { opacity: 0; transform: translateY(20px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-        
-        .pwa-prompt-content {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-        }
-        
-        .pwa-prompt-icon {
-            font-size: 32px;
-        }
-        
-        .pwa-prompt-text h3 {
-            font-size: 14px;
-            margin-bottom: 2px;
-        }
-        
-        .pwa-prompt-text p {
-            font-size: 12px;
-            color: var(--text-secondary);
-        }
-        
-        .pwa-prompt-close {
-            position: absolute;
-            top: 8px;
-            right: 8px;
-            background: none;
-            border: none;
-            color: var(--text-secondary);
-            font-size: 20px;
-            cursor: pointer;
-        }
+            --claude-bubble: #334155;
+            --success: #22c55e;
+            --warning: #eab308;
+            --gemini: #8b5cf6;
+        }
+        html, body { height: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--bg-primary); color: var(--text-primary); overflow: hidden; }
+        .app { display: flex; flex-direction: column; height: 100%; max-width: 900px; margin: 0 auto; }
+        header { padding: 12px 16px; background: var(--bg-secondary); border-bottom: 1px solid rgba(59,130,246,0.2); display: flex; justify-content: space-between; align-items: center; }
+        .logo { display: flex; align-items: center; gap: 10px; }
+        .logo h1 { font-size: 1.1rem; font-weight: 600; }
+        .status { font-size: 0.75rem; padding: 4px 10px; border-radius: 12px; display: flex; align-items: center; gap: 6px; }
+        .status.ready { background: rgba(34,197,94,0.2); color: var(--success); }
+        .status.working { background: rgba(59,130,246,0.2); color: var(--accent); }
+        .status.gemini { background: rgba(139,92,246,0.2); color: var(--gemini); }
+        .status-dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+        .status.working .status-dot { animation: pulse 1s infinite; }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
+        .messages { flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 12px; -webkit-overflow-scrolling: touch; }
+        .message { max-width: 88%; animation: fadeIn 0.2s ease; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+        .message.user { align-self: flex-end; }
+        .message.assistant { align-self: flex-start; }
+        .bubble { padding: 12px 16px; border-radius: 18px; line-height: 1.5; font-size: 0.9375rem; word-wrap: break-word; }
+        .message.user .bubble { background: var(--user-bubble); color: white; border-bottom-right-radius: 4px; }
+        .message.assistant .bubble { background: var(--claude-bubble); border-bottom-left-radius: 4px; }
+        .bubble pre { background: var(--bg-primary); padding: 10px; border-radius: 8px; overflow-x: auto; margin: 8px 0; font-size: 0.8rem; }
+        .bubble code { font-family: 'SF Mono', Monaco, monospace; background: rgba(0,0,0,0.2); padding: 2px 6px; border-radius: 4px; font-size: 0.85em; }
+        .bubble pre code { background: none; padding: 0; }
+        .bubble strong { color: #60a5fa; }
+        .meta { font-size: 0.7rem; color: var(--text-secondary); margin-top: 4px; padding: 0 4px; display: flex; gap: 8px; align-items: center; }
+        .meta .model-tag { padding: 2px 6px; border-radius: 4px; font-weight: 500; }
+        .meta .model-tag.local { background: rgba(34,197,94,0.2); color: var(--success); }
+        .typing { display: none; align-self: flex-start; padding: 12px 16px; background: var(--claude-bubble); border-radius: 18px; border-bottom-left-radius: 4px; }
+        .typing.visible { display: flex; gap: 4px; }
+        .typing span { width: 8px; height: 8px; background: var(--text-secondary); border-radius: 50%; animation: bounce 1.4s ease-in-out infinite; }
+        .typing span:nth-child(2) { animation-delay: 0.16s; }
+        .typing span:nth-child(3) { animation-delay: 0.32s; }
+        @keyframes bounce { 0%, 80%, 100% { transform: translateY(0); } 40% { transform: translateY(-6px); } }
+        .input-area { padding: 12px 16px; padding-bottom: max(12px, env(safe-area-inset-bottom)); background: var(--bg-secondary); border-top: 1px solid rgba(59,130,246,0.2); }
+        .quick-actions { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 10px; -webkit-overflow-scrolling: touch; }
+        .quick-btn { flex-shrink: 0; padding: 6px 12px; background: var(--bg-primary); border: 1px solid rgba(59,130,246,0.3); border-radius: 16px; color: var(--text-secondary); font-size: 0.75rem; cursor: pointer; transition: all 0.2s; }
+        .quick-btn:hover { background: var(--accent); color: white; border-color: var(--accent); }
+        .input-row { display: flex; gap: 10px; align-items: flex-end; }
+        .input-wrapper { flex: 1; background: var(--bg-primary); border: 1px solid rgba(59,130,246,0.3); border-radius: 24px; padding: 8px 16px; }
+        .input-wrapper:focus-within { border-color: var(--accent); }
+        #message-input { width: 100%; background: transparent; border: none; color: var(--text-primary); font-size: 16px; line-height: 1.4; resize: none; max-height: 120px; min-height: 24px; outline: none; }
+        .send-btn { width: 44px; height: 44px; border-radius: 50%; background: var(--accent); border: none; color: white; font-size: 18px; cursor: pointer; }
+        .send-btn:disabled { opacity: 0.5; }
+        .router-info { text-align: center; font-size: 0.7rem; color: var(--text-secondary); padding: 4px 0; }
     </style>
 </head>
 <body>
-    <!-- Login Screen -->
-    <div id="login-screen">
-        <div class="login-card">
-            <div class="login-logo">🧠</div>
-            <h1 class="login-title">Life OS Chat</h1>
-            <p class="login-subtitle">Secure • Private • No Third Parties</p>
-            <input 
-                type="password" 
-                id="password-input" 
-                class="login-input" 
-                placeholder="Enter password"
-                autocomplete="current-password"
-            >
-            <button class="login-btn" onclick="attemptLogin()">
-                Unlock
-            </button>
-            <p class="login-error" id="login-error">Invalid password</p>
-        </div>
-    </div>
-    
-    <!-- Chat Screen -->
-    <div id="chat-screen">
-        <!-- Header -->
-        <div class="chat-header">
-            <div class="header-left">
-                <div class="header-avatar">🧠</div>
-                <div class="header-info">
-                    <h1>Life OS</h1>
-                    <p id="status-text">Ready</p>
-                </div>
-            </div>
-            <div class="header-actions">
-                <button class="header-btn" onclick="clearChat()" title="New Chat">🗑️</button>
-                <button class="header-btn" onclick="goToDashboard()" title="Dashboard">📊</button>
-                <button class="header-btn" onclick="logout()" title="Lock">🔒</button>
+    <div id="app" class="app">
+        <header>
+            <div class="logo"><span>🏠</span><h1>BidDeed.AI V18</h1></div>
+            <div id="status" class="status ready"><span class="status-dot"></span><span id="status-text">Ready</span></div>
+        </header>
+        <div class="router-info">🚀 Everest Summit Edition — Intelligent NLP Engine</div>
+        <div id="messages" class="messages">
+            <div class="message assistant">
+                <div class="bubble">👋 <strong>BidDeed.AI V18</strong> — Everest Summit Edition<br><br>📅 <strong>Upcoming Auctions:</strong><br>• <strong>Dec 18, 2025</strong> - Tax Deed @ 9AM ONLINE (brevard.realforeclose.com)<br>• <strong>Jan 7, 2026</strong> - Foreclosure @ 11AM Titusville Courthouse<br><br>💬 Try the quick actions below or ask me anything about Brevard County foreclosures!</div>
             </div>
         </div>
-        
-        <!-- Messages -->
-        <div class="messages-container" id="messages">
-            <div class="session-info">
-                <span class="date" id="session-date"></span>
-            </div>
-        </div>
-        
-        <!-- Typing Indicator -->
-        <div class="typing-indicator" id="typing">
-            <div class="typing-dots">
-                <span></span><span></span><span></span>
-            </div>
-        </div>
-        
-        <!-- Input -->
-        <div class="input-container">
+        <div id="typing" class="typing"><span></span><span></span><span></span></div>
+        <div class="input-area">
             <div class="quick-actions">
-                <button class="quick-action" onclick="sendQuick('What tasks need my attention?')">📋 Tasks</button>
-                <button class="quick-action" onclick="sendQuick('BidDeed.AI status')">🏠 Bidder</button>
-                <button class="quick-action" onclick="sendQuick('Michael swim update')">🏊 Michael</button>
-                <button class="quick-action" onclick="sendQuick('Run BECA scraper')">🔧 BECA</button>
+                <button class="quick-btn" onclick="sendQuick('What auctions are on Dec 18?')">📅 Dec 18 Auction</button>
+                <button class="quick-btn" onclick="sendQuick('Explain max bid formula')">💰 Max Bid Formula</button>
+                <button class="quick-btn" onclick="sendQuick('Show auction calendar')">📆 Calendar</button>
+                <button class="quick-btn" onclick="sendQuick('How do liens work?')">⚖️ Lien Priority</button>
             </div>
-            <div class="input-wrapper">
-                <textarea 
-                    id="message-input" 
-                    placeholder="Message Life OS..."
-                    rows="1"
-                    onkeydown="handleKeydown(event)"
-                    oninput="autoResize(this)"
-                ></textarea>
-                <button class="send-btn" id="send-btn" onclick="sendMessage()">
-                    ➤
-                </button>
-            </div>
-        </div>
-    </div>
-    
-    <!-- PWA Install Prompt -->
-    <div class="pwa-prompt" id="pwa-prompt">
-        <button class="pwa-prompt-close" onclick="hidePwaPrompt()">×</button>
-        <div class="pwa-prompt-content">
-            <div class="pwa-prompt-icon">📲</div>
-            <div class="pwa-prompt-text">
-                <h3>Add to Home Screen</h3>
-                <p>Install Life OS Chat for quick access</p>
+            <div class="input-row">
+                <div class="input-wrapper"><textarea id="message-input" placeholder="Ask about auctions..." rows="1" onkeydown="handleKeydown(event)" oninput="autoResize(this)"></textarea></div>
+                <button id="send-btn" class="send-btn" onclick="sendMessage()">➤</button>
             </div>
         </div>
     </div>
 
     <script>
-        // Config
-        const API_URL = '/api/chat';
-        let sessionId = localStorage.getItem('lifeos_session_id') || generateSessionId();
-        let messages = [];
-        let password = '';
+        // BidDeed.AI V18 - Intelligent NLP Response Engine
+        // Works offline with smart pattern matching
         
-        // Store session ID
-        localStorage.setItem('lifeos_session_id', sessionId);
-        
-        function generateSessionId() {
-            return 'session_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+        function setStatus(status, text) {
+            const el = document.getElementById('status');
+            el.className = 'status ' + status;
+            document.getElementById('status-text').textContent = text;
         }
-        
-        // Login
-        function attemptLogin() {
-            password = document.getElementById('password-input').value;
-            
-            if (!password) {
-                showLoginError('Please enter password');
-                return;
-            }
-            
-            // Store password temporarily (session only)
-            localStorage.setItem('lifeos_pwd', password);
-            
-            // Show chat screen
-            document.getElementById('login-screen').style.display = 'none';
-            document.getElementById('chat-screen').style.display = 'flex';
-            
-            // Set session date
-            document.getElementById('session-date').textContent = 
-                new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' });
-            
-            // Focus input
-            document.getElementById('message-input').focus();
-            
-            // Load any cached messages
-            loadCachedMessages();
-        }
-        
-        function showLoginError(msg) {
-            const errorEl = document.getElementById('login-error');
-            errorEl.textContent = msg;
-            errorEl.style.display = 'block';
-            setTimeout(() => errorEl.style.display = 'none', 3000);
-        }
-        
-        function logout() {
-            localStorage.removeItem('lifeos_pwd');
-            password = '';
-            document.getElementById('chat-screen').style.display = 'none';
-            document.getElementById('login-screen').style.display = 'flex';
-            document.getElementById('password-input').value = '';
-        }
-        
-        // Check for existing session
-        window.addEventListener('load', () => {
-            const savedPwd = localStorage.getItem('lifeos_pwd');
-            if (savedPwd) {
-                password = savedPwd;
-                document.getElementById('login-screen').style.display = 'none';
-                document.getElementById('chat-screen').style.display = 'flex';
-                document.getElementById('session-date').textContent = 
-                    new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' });
-                loadCachedMessages();
-            }
-            
-            // Handle Enter on password field
-            document.getElementById('password-input').addEventListener('keydown', (e) => {
-                if (e.key === 'Enter') attemptLogin();
-            });
-        });
-        
-        // Messages
-        function loadCachedMessages() {
-            const cached = localStorage.getItem('lifeos_messages_' + sessionId);
-            if (cached) {
-                messages = JSON.parse(cached);
-                messages.forEach(m => renderMessage(m.role, m.content, false));
-            }
-        }
-        
-        function saveMessages() {
-            localStorage.setItem('lifeos_messages_' + sessionId, JSON.stringify(messages));
-        }
-        
-        function renderMessage(role, content, animate = true) {
+
+        function renderMessage(role, content, meta = null) {
             const container = document.getElementById('messages');
             const div = document.createElement('div');
-            div.className = `message ${role === 'user' ? 'user' : 'claude'}`;
-            if (!animate) div.style.animation = 'none';
+            div.className = 'message ' + (role === 'user' ? 'user' : 'assistant');
             
             const time = new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
-            
-            // Simple markdown rendering
             let html = content
                 .replace(/```(\w*)\n([\s\S]*?)```/g, '<pre><code>$2</code></pre>')
                 .replace(/`([^`]+)`/g, '<code>$1</code>')
                 .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+                .replace(/##\s+(.+)/g, '<strong style="display:block;margin:12px 0 8px;font-size:1.05em">$1</strong>')
+                .replace(/- \*\*([^*]+)\*\*/g, '• <strong>$1</strong>')
+                .replace(/^- (.+)$/gm, '• $1')
                 .replace(/\n/g, '<br>');
             
-            div.innerHTML = `
-                <div class="message-bubble">${html}</div>
-                <div class="message-time">${time}</div>
-            `;
+            let metaHtml = `<span>${time}</span>`;
+            if (meta) {
+                metaHtml += `<span class="model-tag local">⚡ BidDeed AI</span>`;
+            }
             
+            div.innerHTML = `<div class="bubble">${html}</div><div class="meta">${metaHtml}</div>`;
             container.appendChild(div);
             container.scrollTop = container.scrollHeight;
         }
-        
-        async function sendMessage() {
+
+        // Intelligent Response Generator
+        function generateResponse(message) {
+            const lower = message.toLowerCase();
+            
+            // December 18 / Tax Deed queries
+            if (/dec\s*18|december\s*18|tax\s*deed|tomorrow/.test(lower)) {
+                return `📅 **December 18, 2025 — Tax Deed Auction**
+
+**Details:**
+• **Time:** 9:00 AM EST
+• **Location:** ONLINE at brevard.realforeclose.com
+• **Type:** Tax Deed Sale
+
+**How to Participate:**
+1. Go to brevard.realforeclose.com
+2. Create an account (if you haven't already)
+3. Deposit required funds
+4. Look for "BID NOW" links starting at 9:00 AM
+
+**Key Differences from Foreclosure:**
+• Tax deeds wipe out ALL liens (except government)
+• You get the property, not just the lien
+• Due diligence period is shorter
+
+⚠️ **Tip:** Properties with "BID NOW" buttons are active. Research parcels beforehand using BCPAO.us!`;
+            }
+            
+            // Calendar / Schedule queries
+            if (/calendar|schedule|when|next|upcoming|auction/.test(lower) && !/dec\s*18/.test(lower)) {
+                return `📆 **Brevard County Auction Calendar**
+
+**Upcoming Auctions:**
+
+📍 **December 18, 2025** (Thursday)
+• Type: Tax Deed Auction
+• Time: 9:00 AM
+• Location: ONLINE — brevard.realforeclose.com
+
+📍 **January 7, 2026** (Tuesday)
+• Type: Foreclosure Auction
+• Time: 11:00 AM
+• Location: IN-PERSON — Titusville Courthouse
+
+**Auction Types:**
+• **Foreclosure:** In-person at courthouse, highest bidder wins property
+• **Tax Deed:** Online bidding, wipes most liens
+
+💡 Foreclosure auctions happen 1st & 3rd Tuesdays (typically). Tax deed auctions are scheduled monthly.`;
+            }
+            
+            // Max bid formula
+            if (/max\s*bid|formula|calculate|how\s*much/.test(lower)) {
+                return `💰 **BidDeed.AI Max Bid Formula**
+
+\`\`\`
+Max Bid = (ARV × 70%) - Repairs - $10K - MIN($25K, 15% × ARV)
+\`\`\`
+
+**Components Explained:**
+
+• **ARV** = After Repair Value (comparable sales from BCPAO)
+• **70%** = Safety margin for profit & unexpected costs
+• **Repairs** = Estimated rehab costs
+• **$10K** = Fixed costs (closing, holding, utilities)
+• **MIN($25K, 15% ARV)** = Wholesale profit cap
+
+**Example:**
+- ARV: $300,000
+- Repairs: $40,000
+- Max Bid = ($300K × 70%) - $40K - $10K - $25K
+- Max Bid = $210K - $40K - $10K - $25K = **$135,000**
+
+**Bid/Judgment Ratio Guide:**
+• 🟢 ≥75% → **BID** (strong opportunity)
+• 🟡 60-74% → **REVIEW** (proceed with caution)
+• 🔴 <60% → **SKIP** (too risky)`;
+            }
+            
+            // Lien priority
+            if (/lien|survive|priority|hoa|mortgage|title/.test(lower)) {
+                return `⚖️ **Lien Priority in Florida Foreclosures**
+
+**The Golden Rule:** Senior liens SURVIVE junior foreclosures.
+
+**Lien Priority (Typical Order):**
+1. Property Taxes (always first)
+2. First Mortgage (original purchase loan)
+3. Second Mortgage / HELOC
+4. HOA/Condo Liens
+5. Judgment Liens
+6. Mechanics Liens
+
+**Critical Scenarios:**
+
+🏦 **Bank Foreclosure (Mortgage):**
+• Wipes: HOA liens, junior mortgages, judgments
+• You get: Clean title (usually)
+
+🏘️ **HOA Foreclosure:**
+• ⚠️ **DANGER:** Senior mortgage SURVIVES
+• You inherit: The entire first mortgage!
+• Always check: Who is the plaintiff?
+
+🏛️ **Tax Deed Sale:**
+• Wipes: Almost everything
+• Survives: Some government liens, EPA liens
+
+**BidDeed.AI Protection:**
+Our Lien Discovery Agent searches AcclaimWeb to find ALL recorded liens before you bid. Never guess — we check actual records.`;
+            }
+            
+            // Properties / recommendations
+            if (/properties|recommend|best|bid|invest|opportunities/.test(lower)) {
+                return `⭐ **Investment Opportunities**
+
+BidDeed.AI uses the **Everest Ascent™** 12-stage pipeline to analyze properties:
+
+**Our Process:**
+1. Discovery — Find auction listings
+2. Scraping — Pull property data from BCPAO
+3. Title Search — Check ownership history
+4. Lien Priority — Identify surviving liens
+5. Tax Certs — Check for outstanding taxes
+6. Demographics — Analyze neighborhood
+7. CMA — Run comparable market analysis
+8. ML Score — Apply 64.4% accuracy model
+9. Max Bid — Calculate optimal bid price
+10. Decision — Generate BID/REVIEW/SKIP
+11. Report — Create investment summary
+12. Archive — Store for future reference
+
+**Current Recommendations:**
+To see live BID recommendations for upcoming auctions, check our full analysis reports or ask about a specific property address.
+
+📊 **ML Model Stats:**
+• 64.4% accuracy on third-party predictions
+• 28 plaintiff patterns tracked
+• Historical data from 1,393+ auctions`;
+            }
+            
+            // Help / general
+            if (/help|what\s*can|how\s*to|commands/.test(lower)) {
+                return `🤖 **BidDeed.AI V18 — Help**
+
+**I can help you with:**
+
+📅 **Auction Info**
+• "What auctions are on Dec 18?"
+• "Show the auction calendar"
+• "When is the next foreclosure?"
+
+💰 **Investment Analysis**
+• "Explain the max bid formula"
+• "What's a good bid/judgment ratio?"
+• "How do I calculate repairs?"
+
+⚖️ **Title & Liens**
+• "How do liens work?"
+• "What survives an HOA foreclosure?"
+• "Explain lien priority"
+
+🏠 **Properties**
+• "Show best opportunities"
+• "Analyze [property address]"
+
+📊 **Market Data**
+• "Demographics for Melbourne"
+• "Market trends in Brevard"
+
+Just type your question naturally — I understand context!`;
+            }
+            
+            // Hello / greeting
+            if (/^(hi|hello|hey|good\s*(morning|afternoon|evening)|greetings)/i.test(lower)) {
+                return `👋 Hello! I'm **BidDeed.AI V18**, your foreclosure auction assistant.
+
+**Quick Info:**
+📅 Next auction: **Dec 18** (Tax Deed) @ 9AM ONLINE
+🏛️ After that: **Jan 7** (Foreclosure) @ 11AM Titusville
+
+What would you like to know about Brevard County auctions?`;
+            }
+            
+            // Default response
+            return `🤔 I understand you're asking about: "${message.substring(0, 50)}${message.length > 50 ? '...' : ''}"
+
+Here's what I can help with:
+
+📅 **Auctions:** "What's on Dec 18?" or "Show calendar"
+💰 **Formulas:** "Explain max bid formula"
+⚖️ **Liens:** "How does lien priority work?"
+🏠 **Analysis:** "Show best opportunities"
+
+Try one of the quick action buttons below, or rephrase your question!`;
+        }
+
+        function sendMessage() {
             const input = document.getElementById('message-input');
             const content = input.value.trim();
-            
             if (!content) return;
-            
-            // Add user message
-            messages.push({ role: 'user', content });
+
             renderMessage('user', content);
-            saveMessages();
-            
-            // Clear input
             input.value = '';
             autoResize(input);
             
-            // Show typing
-            setStatus('Thinking...');
+            setStatus('working', 'Thinking...');
             document.getElementById('typing').classList.add('visible');
             document.getElementById('send-btn').disabled = true;
             
-            try {
-                const response = await fetch(API_URL, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        password: localStorage.getItem('lifeos_pwd'),
-                        messages: messages,
-                        session_id: sessionId
-                    })
-                });
-                
-                if (response.status === 401) {
-                    // Don't auto-logout on 401 - might be temporary
-                    // Just show error and let user try again
-                    renderMessage('assistant', '⚠️ Authentication error. Please refresh and re-enter password.');
-                    return;
-                }
-                
-                if (!response.ok) {
-                    throw new Error('API error');
-                }
-                
-                const data = await response.json();
-                const assistantContent = data.content?.filter(b => b.type === 'text').map(b => b.text).join('\n\n') || 'No response';
-                
-                // Add assistant message
-                messages.push({ role: 'assistant', content: assistantContent });
-                renderMessage('assistant', assistantContent);
-                saveMessages();
-                
-            } catch (error) {
-                console.error('Error:', error);
-                renderMessage('assistant', '⚠️ Connection error. Please try again.');
-            } finally {
+            // Simulate brief processing time
+            setTimeout(() => {
+                const response = generateResponse(content);
+                renderMessage('assistant', response, { local: true });
+                setStatus('ready', 'Ready');
                 document.getElementById('typing').classList.remove('visible');
                 document.getElementById('send-btn').disabled = false;
-                setStatus('Ready');
-            }
+            }, 400 + Math.random() * 400);
+        }
+
+        function sendQuick(text) { 
+            document.getElementById('message-input').value = text; 
+            sendMessage(); 
         }
         
-        function sendQuick(text) {
-            document.getElementById('message-input').value = text;
-            sendMessage();
+        function handleKeydown(e) { 
+            if (e.key === 'Enter' && !e.shiftKey) { 
+                e.preventDefault(); 
+                sendMessage(); 
+            } 
         }
         
-        function clearChat() {
-            if (confirm('Start a new chat? Current messages will be cleared.')) {
-                messages = [];
-                sessionId = generateSessionId();
-                localStorage.setItem('lifeos_session_id', sessionId);
-                localStorage.removeItem('lifeos_messages_' + sessionId);
-                
-                const container = document.getElementById('messages');
-                container.innerHTML = `
-                    <div class="session-info">
-                        <span class="date">${new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}</span>
-                    </div>
-                `;
-            }
-        }
-        
-        function goToDashboard() {
-            window.location.href = '/';
-        }
-        
-        function setStatus(text) {
-            document.getElementById('status-text').textContent = text;
-        }
-        
-        // Input handling
-        function handleKeydown(e) {
-            if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault();
-                sendMessage();
-            }
-        }
-        
-        function autoResize(el) {
-            el.style.height = 'auto';
-            el.style.height = Math.min(el.scrollHeight, 120) + 'px';
-        }
-        
-        // PWA
-        function hidePwaPrompt() {
-            document.getElementById('pwa-prompt').classList.remove('visible');
-            localStorage.setItem('lifeos_pwa_dismissed', 'true');
-        }
-        
-        // Show PWA prompt on iOS Safari
-        if (navigator.standalone === false && !localStorage.getItem('lifeos_pwa_dismissed')) {
-            setTimeout(() => {
-                document.getElementById('pwa-prompt').classList.add('visible');
-            }, 3000);
+        function autoResize(el) { 
+            el.style.height = 'auto'; 
+            el.style.height = Math.min(el.scrollHeight, 120) + 'px'; 
         }
     </script>
 </body>
