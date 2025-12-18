@@ -15,7 +15,8 @@ THEN execute.
 |--------------|--------------|------------------|
 | Code deploy (tests pass) | ✅ | ❌ |
 | New API integration | ❌ | ✅ |
-| Supabase schema change | ❌ | ✅ |
+| Supabase ADD (column/table/index) | ✅ | ❌ |
+| Supabase ALTER/DROP/TRUNCATE | ❌ | ✅ |
 | Bug fix (<50 lines) | ✅ | ❌ |
 | Workflow modification | ✅ | ❌ |
 | Spend >$10 | ❌ | ✅ |
@@ -51,6 +52,6 @@ if not result["verified"]:
 ## Never Auto-Execute
 
 - New external API integrations
-- Database schema changes
+- Destructive database changes (ALTER type, DROP, TRUNCATE)
 - Any spend over $10
 - Actions that failed 3+ times previously
