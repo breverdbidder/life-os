@@ -1,0 +1,210 @@
+name: Tax Deed Live Monitor V2
+
+on:
+  workflow_dispatch:
+
+env:
+  RF_USERNAME: ${{ secrets.RF_USERNAME }}
+  RF_PASSWORD: ${{ secrets.RF_PASSWORD }}
+
+jobs:
+  monitor:
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install Playwright
+        run: |
+          npm init -y
+          npm install playwright
+          npx playwright install chromium --with-deps
+
+      - name: Monitor Live Auction
+        env:
+          RF_USER: ${{ secrets.RF_USERNAME }}
+          RF_PASS: ${{ secrets.RF_PASSWORD }}
+        run: |
+          node << 'NODEOF'
+          const { chromium } = require("playwright");
+
+          (async () => {
+            console.log("=".repeat(60));
+            console.log("TAX DEED LIVE MONITOR - Dec 18, 2025");
+            console.log("Auction starts 9:00 AM EST");
+            console.log("=".repeat(60));
+
+            const RF_USER = process.env.RF_USER || "Everest8";
+            const RF_PASS = process.env.RF_PASS || "Everest18$";
+
+            const browser = await chromium.launch({ headless: true });
+            const context = await browser.newContext({
+              userAgent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+            });
+            const page = await context.newPage();
+
+            try {
+              // Step 1: Go to main page
+              console.log("\n[1] Loading RealForeclose...");
+              await page.goto("https://brevard.realforeclose.com/index.cfm", { 
+                waitUntil: "networkidle", 
+                timeout: 30000 
+              });
+
+              // Step 2: Login
+              console.log("[2] Logging in as", RF_USER);
+              await page.fill("#LogName", RF_USER);
+              await page.fill("#LogPass", RF_PASS);
+              
+              // Click login button
+              const loginBtn = await page.$('input[type="button"][value*="Log"]');
+              if (loginBtn) {
+                await loginBtn.click();
+              } else {
+                await page.keyboard.press("Enter");
+              }
+              
+              await page.waitForTimeout(3000);
+              await page.waitForLoadState("networkidle");
+
+              const content = await page.content();
+              if (content.toLowerCase().includes("logout")) {
+                console.log("    ✅ Login successful!");
+              } else {
+                console.log("    ⚠️ Login status uncertain");
+              }
+
+              // Step 3: Navigate to Tax Deed auction
+              console.log("\n[3] Navigating to Tax Deed auction...");
+              await page.goto("https://brevard.realforeclose.com/index.cfm?zaction=AUCTION&Zmethod=PREVIEW&ESSION=1&Aession=2", {
+                waitUntil: "networkidle",
+                timeout: 30000
+              });
+
+              // Take screenshot
+              await page.screenshot({ path: "auction_calendar.png", fullPage: true });
+              console.log("    Screenshot saved: auction_calendar.png");
+
+              // Step 4: Go to December 18 auction
+              console.log("\n[4] Loading December 18 auction...");
+              await page.goto("https://brevard.realforeclose.com/index.cfm?zaction=AUCTION&Zmethod=PREVIEW&ESSION=1&Aession=2&Selected=12/18/2025", {
+                waitUntil: "networkidle",
+                timeout: 30000
+              });
+
+              // MONITORING LOOP
+              let iteration = 0;
+              const maxIterations = 360; // 6 hours at 1 min intervals
+              const allItems = {};
+
+              while (iteration < maxIterations) {
+                iteration++;
+                const now = new Date().toISOString();
+                console.log(`\n--- Monitor #${iteration} at ${now} ---`);
+
+                // Refresh
+                await page.reload({ waitUntil: "networkidle" });
+                await page.waitForTimeout(2000);
+
+                const html = await page.content();
+
+                // Screenshot every 10 iterations
+                if (iteration % 10 === 1) {
+                  await page.screenshot({ path: `auction_state_${String(iteration).padStart(4, "0")}.png` });
+                }
+
+                // Extract data
+                const parcels = [...html.matchAll(/\d{7}/g)].map(m => m[0]);
+                const bids = [...html.matchAll(/\$[\d,]+(?:\.\d{2})?/g)].map(m => m[0]);
+                const uniqueParcels = [...new Set(parcels)];
+
+                console.log(`  Parcels found: ${uniqueParcels.length}`);
+                console.log(`  Bid amounts: ${bids.length}`);
+
+                // Check auction status
+                const isLive = html.toLowerCase().includes("bidding") || html.toLowerCase().includes("current bid");
+                const isEnded = html.toLowerCase().includes("auction has ended") || html.toLowerCase().includes("no cases");
+
+                if (isLive) console.log("  🔴 LIVE BIDDING DETECTED!");
+                if (isEnded) {
+                  console.log("  🏁 AUCTION ENDED");
+                  break;
+                }
+
+                // Extract rows with auction data
+                const rows = await page.$$("tr[id*='Area']");
+                for (const row of rows) {
+                  try {
+                    const rowHtml = await row.innerHTML();
+                    const caseMatch = rowHtml.match(/05-\d{4}-CA-\d+/);
+                    const parcelMatch = rowHtml.match(/(\d{7})/);
+                    const bidMatch = rowHtml.match(/\$[\d,]+/);
+
+                    if (caseMatch) {
+                      const caseNum = caseMatch[0];
+                      if (!allItems[caseNum]) {
+                        allItems[caseNum] = {
+                          case: caseNum,
+                          parcel: parcelMatch ? parcelMatch[0] : null,
+                          bid: bidMatch ? bidMatch[0] : null,
+                          firstSeen: now
+                        };
+                        console.log(`  NEW: ${caseNum}`);
+                      } else if (bidMatch && allItems[caseNum].bid !== bidMatch[0]) {
+                        console.log(`  BID CHANGE: ${caseNum} ${allItems[caseNum].bid} -> ${bidMatch[0]}`);
+                        allItems[caseNum].bid = bidMatch[0];
+                        allItems[caseNum].lastUpdate = now;
+                      }
+                    }
+                  } catch (e) {}
+                }
+
+                // Save JSON every iteration
+                const fs = require("fs");
+                fs.writeFileSync("auction_live_data.json", JSON.stringify({
+                  lastUpdate: now,
+                  auctionDate: "2025-12-18",
+                  iterations: iteration,
+                  items: allItems
+                }, null, 2));
+
+                // Wait 1 minute before next check
+                console.log("  Waiting 60 seconds...");
+                await page.waitForTimeout(60000);
+              }
+
+              // Final summary
+              console.log("\n" + "=".repeat(60));
+              console.log("FINAL SUMMARY");
+              console.log("=".repeat(60));
+              console.log(`Total iterations: ${iteration}`);
+              console.log(`Items tracked: ${Object.keys(allItems).length}`);
+              
+              for (const [caseNum, data] of Object.entries(allItems)) {
+                console.log(`  ${caseNum}: ${data.bid || "N/A"}`);
+              }
+
+            } catch (error) {
+              console.error("Error:", error.message);
+              await page.screenshot({ path: "error_screenshot.png" });
+            } finally {
+              await browser.close();
+            }
+          })();
+          NODEOF
+
+      - name: Upload Artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: tax-deed-live-dec18
+          path: |
+            *.png
+            auction_live_data.json
+          retention-days: 30
