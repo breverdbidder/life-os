@@ -1,0 +1,237 @@
+name: Skill Validation & Deployment
+
+on:
+  push:
+    paths:
+      - '.claude/skills/**'
+      - 'skills/**'
+  pull_request:
+    paths:
+      - '.claude/skills/**'
+      - 'skills/**'
+  workflow_dispatch:
+    inputs:
+      skill_path:
+        description: 'Path to skill directory to validate'
+        required: false
+        default: ''
+
+jobs:
+  validate-skills:
+    runs-on: ubuntu-latest
+    name: Validate Skills
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          
+      - name: Install dependencies
+        run: |
+          pip install pyyaml
+          
+      - name: Create validation script
+        run: |
+          cat > validate_skill.py << 'EOF'
+          #!/usr/bin/env python3
+          """
+          Skill Validator for Shapira Ecosystem
+          Validates SKILL.md structure and content.
+          """
+          import os
+          import re
+          import sys
+          import yaml
+          from pathlib import Path
+          
+          def validate_frontmatter(content: str) -> tuple[bool, list]:
+              """Validate YAML frontmatter."""
+              errors = []
+              
+              # Check frontmatter exists
+              if not content.startswith('---'):
+                  errors.append("Missing YAML frontmatter (must start with ---)")
+                  return False, errors
+              
+              # Extract frontmatter
+              parts = content.split('---', 2)
+              if len(parts) < 3:
+                  errors.append("Invalid frontmatter format (must have opening and closing ---)")
+                  return False, errors
+              
+              try:
+                  frontmatter = yaml.safe_load(parts[1])
+              except yaml.YAMLError as e:
+                  errors.append(f"Invalid YAML: {e}")
+                  return False, errors
+              
+              # Check required fields
+              if not frontmatter.get('name'):
+                  errors.append("Missing required field: name")
+              if not frontmatter.get('description'):
+                  errors.append("Missing required field: description")
+              
+              # Check description quality
+              desc = frontmatter.get('description', '')
+              if len(desc) < 50:
+                  errors.append("Description too short (min 50 chars). Include WHAT it does and WHEN to use it.")
+              if 'use when' not in desc.lower() and 'when to use' not in desc.lower():
+                  errors.append("Description should include trigger scenarios (e.g., 'Use when...')")
+              
+              return len(errors) == 0, errors
+          
+          def validate_body(content: str) -> tuple[bool, list]:
+              """Validate markdown body."""
+              errors = []
+              warnings = []
+              
+              # Extract body (after frontmatter)
+              parts = content.split('---', 2)
+              body = parts[2] if len(parts) >= 3 else content
+              
+              # Check for overview section
+              if '## overview' not in body.lower():
+                  warnings.append("Consider adding ## Overview section")
+              
+              # Check line count
+              lines = body.strip().split('\n')
+              if len(lines) > 500:
+                  errors.append(f"SKILL.md too long ({len(lines)} lines). Max 500. Split into references/")
+              
+              # Check for TODO items
+              if '[TODO' in body:
+                  errors.append("Contains unresolved [TODO] items")
+              
+              return len(errors) == 0, errors + warnings
+          
+          def validate_structure(skill_path: Path) -> tuple[bool, list]:
+              """Validate directory structure."""
+              errors = []
+              
+              skill_md = skill_path / 'SKILL.md'
+              if not skill_md.exists():
+                  errors.append("Missing required SKILL.md file")
+                  return False, errors
+              
+              # Check for forbidden files
+              forbidden = ['README.md', 'INSTALLATION_GUIDE.md', 'QUICK_REFERENCE.md', 'CHANGELOG.md']
+              for fname in forbidden:
+                  if (skill_path / fname).exists():
+                      errors.append(f"Forbidden file found: {fname}. Skills should only contain SKILL.md and resources.")
+              
+              return len(errors) == 0, errors
+          
+          def validate_skill(skill_path: str) -> bool:
+              """Run all validations on a skill."""
+              path = Path(skill_path)
+              all_valid = True
+              all_messages = []
+              
+              print(f"\n🔍 Validating: {path.name}")
+              print("=" * 50)
+              
+              # Structure validation
+              valid, messages = validate_structure(path)
+              if not valid:
+                  all_valid = False
+              all_messages.extend(messages)
+              
+              # If SKILL.md exists, validate content
+              skill_md = path / 'SKILL.md'
+              if skill_md.exists():
+                  content = skill_md.read_text()
+                  
+                  # Frontmatter validation
+                  valid, messages = validate_frontmatter(content)
+                  if not valid:
+                      all_valid = False
+                  all_messages.extend(messages)
+                  
+                  # Body validation
+                  valid, messages = validate_body(content)
+                  if not valid:
+                      all_valid = False
+                  all_messages.extend(messages)
+              
+              # Print results
+              for msg in all_messages:
+                  if msg.startswith("Consider"):
+                      print(f"⚠️  {msg}")
+                  else:
+                      print(f"❌ {msg}")
+              
+              if all_valid:
+                  print("✅ Validation passed!")
+              else:
+                  print("❌ Validation failed!")
+              
+              return all_valid
+          
+          def main():
+              if len(sys.argv) < 2:
+                  # Find all skills
+                  skill_dirs = []
+                  for pattern in ['.claude/skills/*/', 'skills/*/']:
+                      skill_dirs.extend(Path('.').glob(pattern))
+                  
+                  if not skill_dirs:
+                      print("No skills found to validate")
+                      sys.exit(0)
+                  
+                  all_valid = True
+                  for skill_dir in skill_dirs:
+                      if skill_dir.is_dir():
+                          if not validate_skill(str(skill_dir)):
+                              all_valid = False
+                  
+                  sys.exit(0 if all_valid else 1)
+              else:
+                  skill_path = sys.argv[1]
+                  valid = validate_skill(skill_path)
+                  sys.exit(0 if valid else 1)
+          
+          if __name__ == "__main__":
+              main()
+          EOF
+          chmod +x validate_skill.py
+          
+      - name: Run validation
+        run: |
+          if [ -n "${{ github.event.inputs.skill_path }}" ]; then
+            python validate_skill.py "${{ github.event.inputs.skill_path }}"
+          else
+            python validate_skill.py
+          fi
+          
+  deploy-skills:
+    runs-on: ubuntu-latest
+    needs: validate-skills
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    name: Deploy Skills
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        
+      - name: Log deployment
+        run: |
+          echo "✅ Skills deployed successfully"
+          echo "Deployed at: $(date -u)"
+          echo "Commit: ${{ github.sha }}"
+          
+      - name: Notify Supabase
+        if: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          curl -X POST "${{ secrets.SUPABASE_URL }}/rest/v1/insights" \
+            -H "apikey: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}" \
+            -H "Authorization: Bearer ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}" \
+            -H "Content-Type: application/json" \
+            -d '{
+              "category": "deployment",
+              "content": "Skills deployed: ${{ github.sha }}",
+              "tags": ["skills", "deployment", "github_actions"]
+            }'
