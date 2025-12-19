@@ -4,331 +4,576 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <meta name="apple-mobile-web-app-capable" content="yes">
-    <title>BidDeed.AI Chat</title>
+    <title>Life OS Chat</title>
+    
+    <!-- Fonts: Plus Jakarta Sans + JetBrains Mono -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    
     <style>
-        * { box-sizing: border-box; margin: 0; padding: 0; }
+        /* ═══════════════════════════════════════════════════════════════
+           SHADCN NEW-YORK PRESET - Life OS Variant
+           Unified design system across BidDeed.AI & Life OS
+           ═══════════════════════════════════════════════════════════════ */
+        
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+        
         :root {
-            --bg-primary: #0f172a;
-            --bg-secondary: #1e293b;
-            --accent: #3b82f6;
-            --text-primary: #f0f0f5;
-            --text-secondary: #94a3b8;
-            --user-bubble: #3b82f6;
-            --claude-bubble: #334155;
-            --success: #22c55e;
-            --warning: #eab308;
-            --gemini: #8b5cf6;
+            /* Slate Base (matches Shadcn new-york) */
+            --slate-950: #020617;
+            --slate-900: #0f172a;
+            --slate-800: #1e293b;
+            --slate-700: #334155;
+            --slate-600: #475569;
+            --slate-500: #64748b;
+            --slate-400: #94a3b8;
+            --slate-300: #cbd5e1;
+            --slate-200: #e2e8f0;
+            
+            /* Life OS Accent: Emerald */
+            --emerald-500: #10b981;
+            --emerald-600: #059669;
+            --teal-600: #0d9488;
+            
+            /* Typography */
+            --font-display: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+            --font-mono: 'JetBrains Mono', monospace;
+            
+            /* Shadows */
+            --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+            --shadow-emerald: 0 10px 30px -5px rgba(16, 185, 129, 0.2);
         }
-        html, body { height: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--bg-primary); color: var(--text-primary); overflow: hidden; }
-        .app { display: flex; flex-direction: column; height: 100%; max-width: 900px; margin: 0 auto; }
-        header { padding: 12px 16px; background: var(--bg-secondary); border-bottom: 1px solid rgba(59,130,246,0.2); display: flex; justify-content: space-between; align-items: center; }
-        .logo { display: flex; align-items: center; gap: 10px; }
-        .logo h1 { font-size: 1.1rem; font-weight: 600; }
-        .status { font-size: 0.75rem; padding: 4px 10px; border-radius: 12px; display: flex; align-items: center; gap: 6px; }
-        .status.ready { background: rgba(34,197,94,0.2); color: var(--success); }
-        .status.working { background: rgba(59,130,246,0.2); color: var(--accent); }
-        .status.gemini { background: rgba(139,92,246,0.2); color: var(--gemini); }
-        .status-dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
-        .status.working .status-dot { animation: pulse 1s infinite; }
-        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
-        .messages { flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 12px; -webkit-overflow-scrolling: touch; }
-        .message { max-width: 88%; animation: fadeIn 0.2s ease; }
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+        
+        html { 
+            height: 100%; 
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+        
+        body { 
+            height: 100%; 
+            font-family: var(--font-display);
+            background: linear-gradient(135deg, var(--slate-950), var(--slate-900), var(--slate-950));
+            color: var(--slate-200);
+            overflow: hidden;
+        }
+        
+        /* ═══════════════════════════════════════════════════════════════
+           LAYOUT
+           ═══════════════════════════════════════════════════════════════ */
+        
+        .app {
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+            max-width: 900px;
+            margin: 0 auto;
+        }
+        
+        /* Header */
+        header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 12px 16px;
+            background: rgba(15, 23, 42, 0.8);
+            backdrop-filter: blur(20px);
+            border-bottom: 1px solid rgba(51, 65, 85, 0.5);
+        }
+        
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        
+        .logo-icon {
+            width: 36px;
+            height: 36px;
+            border-radius: 12px;
+            background: linear-gradient(135deg, var(--emerald-500), var(--teal-600));
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: var(--shadow-emerald);
+        }
+        
+        .logo-icon svg {
+            width: 20px;
+            height: 20px;
+            color: white;
+        }
+        
+        .logo-text h1 {
+            font-size: 1rem;
+            font-weight: 600;
+            color: white;
+            letter-spacing: -0.02em;
+        }
+        
+        .logo-text span {
+            font-size: 0.75rem;
+            color: var(--slate-500);
+        }
+        
+        .status {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 12px;
+            border-radius: 8px;
+            font-size: 0.75rem;
+            font-weight: 500;
+            background: rgba(30, 41, 59, 0.5);
+        }
+        
+        .status.ready { color: var(--emerald-500); }
+        .status.working { color: var(--emerald-500); }
+        
+        .status-dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: currentColor;
+        }
+        
+        .status.working .status-dot {
+            animation: pulse 1.5s ease-in-out infinite;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.5; transform: scale(0.8); }
+        }
+        
+        /* ═══════════════════════════════════════════════════════════════
+           MESSAGES
+           ═══════════════════════════════════════════════════════════════ */
+        
+        .messages {
+            flex: 1;
+            overflow-y: auto;
+            padding: 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            -webkit-overflow-scrolling: touch;
+        }
+        
+        .message {
+            max-width: 85%;
+            animation: fadeIn 0.2s ease-out;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(8px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
         .message.user { align-self: flex-end; }
         .message.assistant { align-self: flex-start; }
-        .bubble { padding: 12px 16px; border-radius: 18px; line-height: 1.5; font-size: 0.9375rem; word-wrap: break-word; }
-        .message.user .bubble { background: var(--user-bubble); color: white; border-bottom-right-radius: 4px; }
-        .message.assistant .bubble { background: var(--claude-bubble); border-bottom-left-radius: 4px; }
-        .bubble pre { background: var(--bg-primary); padding: 10px; border-radius: 8px; overflow-x: auto; margin: 8px 0; font-size: 0.8rem; }
-        .bubble code { font-family: 'SF Mono', Monaco, monospace; background: rgba(0,0,0,0.2); padding: 2px 6px; border-radius: 4px; font-size: 0.85em; }
-        .bubble pre code { background: none; padding: 0; }
-        .bubble strong { color: #60a5fa; }
-        .meta { font-size: 0.7rem; color: var(--text-secondary); margin-top: 4px; padding: 0 4px; display: flex; gap: 8px; align-items: center; }
-        .meta .model-tag { padding: 2px 6px; border-radius: 4px; font-weight: 500; }
-        .meta .model-tag.local { background: rgba(34,197,94,0.2); color: var(--success); }
-        .typing { display: none; align-self: flex-start; padding: 12px 16px; background: var(--claude-bubble); border-radius: 18px; border-bottom-left-radius: 4px; }
-        .typing.visible { display: flex; gap: 4px; }
-        .typing span { width: 8px; height: 8px; background: var(--text-secondary); border-radius: 50%; animation: bounce 1.4s ease-in-out infinite; }
+        
+        .bubble {
+            padding: 12px 16px;
+            border-radius: 16px;
+            line-height: 1.6;
+            font-size: 0.9375rem;
+        }
+        
+        .message.user .bubble {
+            background: linear-gradient(135deg, var(--emerald-500), var(--teal-600));
+            color: white;
+            border-bottom-right-radius: 4px;
+            box-shadow: var(--shadow-emerald);
+        }
+        
+        .message.assistant .bubble {
+            background: rgba(30, 41, 59, 0.8);
+            border: 1px solid rgba(51, 65, 85, 0.5);
+            color: var(--slate-200);
+            border-bottom-left-radius: 4px;
+        }
+        
+        .bubble strong { color: white; font-weight: 600; }
+        .bubble code {
+            font-family: var(--font-mono);
+            background: rgba(0, 0, 0, 0.2);
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 0.85em;
+        }
+        
+        .bubble pre {
+            background: rgba(0, 0, 0, 0.3);
+            padding: 12px;
+            border-radius: 8px;
+            overflow-x: auto;
+            margin: 8px 0;
+            font-family: var(--font-mono);
+            font-size: 0.8rem;
+        }
+        
+        .bubble pre code {
+            background: none;
+            padding: 0;
+        }
+        
+        .meta {
+            font-size: 0.7rem;
+            color: var(--slate-500);
+            margin-top: 4px;
+            padding: 0 4px;
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+        
+        .model-tag {
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-weight: 500;
+            background: rgba(16, 185, 129, 0.15);
+            color: var(--emerald-500);
+        }
+        
+        /* Typing Indicator */
+        .typing {
+            display: none;
+            align-self: flex-start;
+            padding: 12px 16px;
+            background: rgba(30, 41, 59, 0.8);
+            border: 1px solid rgba(51, 65, 85, 0.5);
+            border-radius: 16px;
+            border-bottom-left-radius: 4px;
+        }
+        
+        .typing.visible { display: flex; gap: 4px; align-items: center; }
+        
+        .typing span {
+            width: 8px;
+            height: 8px;
+            background: var(--emerald-500);
+            border-radius: 50%;
+            animation: bounce 1.4s ease-in-out infinite;
+        }
+        
         .typing span:nth-child(2) { animation-delay: 0.16s; }
         .typing span:nth-child(3) { animation-delay: 0.32s; }
-        @keyframes bounce { 0%, 80%, 100% { transform: translateY(0); } 40% { transform: translateY(-6px); } }
-        .input-area { padding: 12px 16px; padding-bottom: max(12px, env(safe-area-inset-bottom)); background: var(--bg-secondary); border-top: 1px solid rgba(59,130,246,0.2); }
-        .quick-actions { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 10px; -webkit-overflow-scrolling: touch; }
-        .quick-btn { flex-shrink: 0; padding: 6px 12px; background: var(--bg-primary); border: 1px solid rgba(59,130,246,0.3); border-radius: 16px; color: var(--text-secondary); font-size: 0.75rem; cursor: pointer; transition: all 0.2s; }
-        .quick-btn:hover { background: var(--accent); color: white; border-color: var(--accent); }
-        .input-row { display: flex; gap: 10px; align-items: flex-end; }
-        .input-wrapper { flex: 1; background: var(--bg-primary); border: 1px solid rgba(59,130,246,0.3); border-radius: 24px; padding: 8px 16px; }
-        .input-wrapper:focus-within { border-color: var(--accent); }
-        #message-input { width: 100%; background: transparent; border: none; color: var(--text-primary); font-size: 16px; line-height: 1.4; resize: none; max-height: 120px; min-height: 24px; outline: none; }
-        .send-btn { width: 44px; height: 44px; border-radius: 50%; background: var(--accent); border: none; color: white; font-size: 18px; cursor: pointer; }
-        .send-btn:disabled { opacity: 0.5; }
-        .router-info { text-align: center; font-size: 0.7rem; color: var(--text-secondary); padding: 4px 0; }
+        
+        @keyframes bounce {
+            0%, 80%, 100% { transform: translateY(0); }
+            40% { transform: translateY(-6px); }
+        }
+        
+        /* ═══════════════════════════════════════════════════════════════
+           WELCOME SCREEN
+           ═══════════════════════════════════════════════════════════════ */
+        
+        .welcome {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            padding: 24px;
+            text-align: center;
+        }
+        
+        .welcome-icon {
+            width: 80px;
+            height: 80px;
+            border-radius: 20px;
+            background: linear-gradient(135deg, var(--emerald-500), var(--teal-600));
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 24px;
+            box-shadow: var(--shadow-emerald);
+        }
+        
+        .welcome-icon svg {
+            width: 40px;
+            height: 40px;
+            color: white;
+        }
+        
+        .welcome h2 {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: white;
+            margin-bottom: 4px;
+            letter-spacing: -0.02em;
+        }
+        
+        .welcome .subtitle {
+            font-size: 0.875rem;
+            color: var(--slate-500);
+            margin-bottom: 24px;
+        }
+        
+        .welcome-card {
+            max-width: 400px;
+            background: rgba(30, 41, 59, 0.5);
+            border: 1px solid rgba(51, 65, 85, 0.5);
+            border-radius: 16px;
+            padding: 16px;
+            text-align: left;
+            margin-bottom: 24px;
+        }
+        
+        .welcome-card p {
+            font-size: 0.875rem;
+            color: var(--slate-300);
+            line-height: 1.6;
+        }
+        
+        /* ═══════════════════════════════════════════════════════════════
+           INPUT AREA
+           ═══════════════════════════════════════════════════════════════ */
+        
+        .input-area {
+            padding: 16px;
+            padding-bottom: max(16px, env(safe-area-inset-bottom));
+            background: rgba(15, 23, 42, 0.8);
+            backdrop-filter: blur(20px);
+            border-top: 1px solid rgba(51, 65, 85, 0.5);
+        }
+        
+        .quick-actions {
+            display: flex;
+            gap: 8px;
+            overflow-x: auto;
+            padding-bottom: 12px;
+            -webkit-overflow-scrolling: touch;
+            scrollbar-width: none;
+        }
+        
+        .quick-actions::-webkit-scrollbar { display: none; }
+        
+        .quick-btn {
+            flex-shrink: 0;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 8px 14px;
+            background: rgba(30, 41, 59, 0.8);
+            border: 1px solid rgba(51, 65, 85, 0.5);
+            border-radius: 20px;
+            color: var(--slate-300);
+            font-size: 0.8125rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        .quick-btn:hover {
+            background: var(--emerald-500);
+            color: white;
+            border-color: var(--emerald-500);
+            transform: translateY(-1px);
+        }
+        
+        .input-row {
+            display: flex;
+            gap: 12px;
+            align-items: center;
+        }
+        
+        .input-wrapper {
+            flex: 1;
+            background: rgba(30, 41, 59, 0.8);
+            border: 1px solid rgba(51, 65, 85, 0.5);
+            border-radius: 16px;
+            padding: 0 16px;
+            transition: all 0.2s;
+        }
+        
+        .input-wrapper:focus-within {
+            border-color: var(--emerald-500);
+            box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.15);
+        }
+        
+        #message-input {
+            width: 100%;
+            background: transparent;
+            border: none;
+            color: white;
+            font-family: var(--font-display);
+            font-size: 0.9375rem;
+            line-height: 1.4;
+            padding: 12px 0;
+            resize: none;
+            max-height: 120px;
+            min-height: 24px;
+            outline: none;
+        }
+        
+        #message-input::placeholder {
+            color: var(--slate-500);
+        }
+        
+        .send-btn {
+            width: 48px;
+            height: 48px;
+            border-radius: 16px;
+            background: linear-gradient(135deg, var(--emerald-500), var(--teal-600));
+            border: none;
+            color: white;
+            font-size: 18px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: var(--shadow-emerald);
+            transition: all 0.2s;
+        }
+        
+        .send-btn:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 15px 35px -5px rgba(16, 185, 129, 0.3);
+        }
+        
+        .send-btn:active:not(:disabled) {
+            transform: scale(0.95);
+        }
+        
+        .send-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        
+        .footer-text {
+            text-align: center;
+            font-size: 0.7rem;
+            color: var(--slate-600);
+            margin-top: 12px;
+        }
     </style>
 </head>
 <body>
-    <div id="app" class="app">
+    <div class="app">
         <header>
-            <div class="logo"><span>🏠</span><h1>BidDeed.AI V18</h1></div>
-            <div id="status" class="status ready"><span class="status-dot"></span><span id="status-text">Ready</span></div>
+            <div class="logo">
+                <div class="logo-icon">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
+                        <polyline points="9 22 9 12 15 12 15 22"/>
+                    </svg>
+                </div>
+                <div class="logo-text">
+                    <h1>Life OS</h1>
+                    <span>ADHD-Optimized Productivity</span>
+                </div>
+            </div>
+            <div id="status" class="status ready">
+                <span class="status-dot"></span>
+                <span id="status-text">Ready</span>
+            </div>
         </header>
-        <div class="router-info">🚀 Everest Summit Edition — Intelligent NLP Engine</div>
+        
         <div id="messages" class="messages">
-            <div class="message assistant">
-                <div class="bubble">👋 <strong>BidDeed.AI V18</strong> — Everest Summit Edition<br><br>📅 <strong>Upcoming Auctions:</strong><br>• <strong>Dec 18, 2025</strong> - Tax Deed @ 9AM ONLINE (brevard.realforeclose.com)<br>• <strong>Jan 7, 2026</strong> - Foreclosure @ 11AM Titusville Courthouse<br><br>💬 Try the quick actions below or ask me anything about Brevard County foreclosures!</div>
+            <div class="welcome" id="welcome">
+                <div class="welcome-icon">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
+                        <polyline points="9 22 9 12 15 12 15 22"/>
+                    </svg>
+                </div>
+                <h2>Life OS</h2>
+                <p class="subtitle">ADHD-Optimized Productivity</p>
+                <div class="welcome-card">
+                    <p>
+                        <strong>🏠 Your Command Center</strong><br><br>
+                        • Track tasks, goals, and habits<br>
+                        • Michael D1 swimming analytics<br>
+                        • ADHD-friendly accountability<br><br>
+                        What would you like to accomplish?
+                    </p>
+                </div>
             </div>
         </div>
-        <div id="typing" class="typing"><span></span><span></span><span></span></div>
+        
+        <div id="typing" class="typing">
+            <span></span><span></span><span></span>
+        </div>
+        
         <div class="input-area">
             <div class="quick-actions">
-                <button class="quick-btn" onclick="sendQuick('What auctions are on Dec 18?')">📅 Dec 18 Auction</button>
-                <button class="quick-btn" onclick="sendQuick('Explain max bid formula')">💰 Max Bid Formula</button>
-                <button class="quick-btn" onclick="sendQuick('Show auction calendar')">📆 Calendar</button>
-                <button class="quick-btn" onclick="sendQuick('How do liens work?')">⚖️ Lien Priority</button>
+                <button class="quick-btn" onclick="sendQuick('What are my tasks for today?')">📋 Today's Tasks</button>
+                <button class="quick-btn" onclick="sendQuick('Log a new task')">⚡ Quick Capture</button>
+                <button class="quick-btn" onclick="sendQuick('Show Michael swim progress')">🏊 Michael D1</button>
+                <button class="quick-btn" onclick="sendQuick('What can you help me with?')">❓ Help</button>
             </div>
             <div class="input-row">
-                <div class="input-wrapper"><textarea id="message-input" placeholder="Ask about auctions..." rows="1" onkeydown="handleKeydown(event)" oninput="autoResize(this)"></textarea></div>
-                <button id="send-btn" class="send-btn" onclick="sendMessage()">➤</button>
+                <div class="input-wrapper">
+                    <textarea id="message-input" placeholder="What would you like to accomplish?" rows="1" onkeydown="handleKeydown(event)" oninput="autoResize(this)"></textarea>
+                </div>
+                <button id="send-btn" class="send-btn" onclick="sendMessage()">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/>
+                    </svg>
+                </button>
             </div>
+            <p class="footer-text">Powered by Smart Router V5 • Gemini 2.5 Flash (FREE)</p>
         </div>
     </div>
 
     <script>
-        // BidDeed.AI V18 - Intelligent NLP Response Engine
-        // Works offline with smart pattern matching
+        // ═══════════════════════════════════════════════════════════════
+        // LIFE OS CHAT - Smart Router Integration
+        // Unified design system with BidDeed.AI
+        // ═══════════════════════════════════════════════════════════════
+        
+        const API_ENDPOINT = '/api/chat';
+        let conversationHistory = [];
         
         function setStatus(status, text) {
             const el = document.getElementById('status');
             el.className = 'status ' + status;
             document.getElementById('status-text').textContent = text;
         }
-
-        function renderMessage(role, content, meta = null) {
+        
+        function hideWelcome() {
+            const welcome = document.getElementById('welcome');
+            if (welcome) welcome.style.display = 'none';
+        }
+        
+        function renderMessage(role, content) {
+            hideWelcome();
             const container = document.getElementById('messages');
             const div = document.createElement('div');
             div.className = 'message ' + (role === 'user' ? 'user' : 'assistant');
             
             const time = new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+            
             let html = content
                 .replace(/```(\w*)\n([\s\S]*?)```/g, '<pre><code>$2</code></pre>')
                 .replace(/`([^`]+)`/g, '<code>$1</code>')
                 .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
-                .replace(/##\s+(.+)/g, '<strong style="display:block;margin:12px 0 8px;font-size:1.05em">$1</strong>')
-                .replace(/- \*\*([^*]+)\*\*/g, '• <strong>$1</strong>')
                 .replace(/^- (.+)$/gm, '• $1')
                 .replace(/\n/g, '<br>');
             
-            let metaHtml = `<span>${time}</span>`;
-            if (meta) {
-                metaHtml += `<span class="model-tag local">⚡ BidDeed AI</span>`;
-            }
+            const metaHtml = role === 'assistant' 
+                ? `<span>${time}</span><span class="model-tag">⚡ Life OS</span>`
+                : `<span>${time}</span>`;
             
             div.innerHTML = `<div class="bubble">${html}</div><div class="meta">${metaHtml}</div>`;
             container.appendChild(div);
             container.scrollTop = container.scrollHeight;
+            
+            return div;
         }
-
-        // Intelligent Response Generator
-        function generateResponse(message) {
-            const lower = message.toLowerCase();
-            
-            // December 18 / Tax Deed queries
-            if (/dec\s*18|december\s*18|tax\s*deed|tomorrow/.test(lower)) {
-                return `📅 **December 18, 2025 — Tax Deed Auction**
-
-**Details:**
-• **Time:** 9:00 AM EST
-• **Location:** ONLINE at brevard.realforeclose.com
-• **Type:** Tax Deed Sale
-
-**How to Participate:**
-1. Go to brevard.realforeclose.com
-2. Create an account (if you haven't already)
-3. Deposit required funds
-4. Look for "BID NOW" links starting at 9:00 AM
-
-**Key Differences from Foreclosure:**
-• Tax deeds wipe out ALL liens (except government)
-• You get the property, not just the lien
-• Due diligence period is shorter
-
-⚠️ **Tip:** Properties with "BID NOW" buttons are active. Research parcels beforehand using BCPAO.us!`;
-            }
-            
-            // Calendar / Schedule queries
-            if (/calendar|schedule|when|next|upcoming|auction/.test(lower) && !/dec\s*18/.test(lower)) {
-                return `📆 **Brevard County Auction Calendar**
-
-**Upcoming Auctions:**
-
-📍 **December 18, 2025** (Thursday)
-• Type: Tax Deed Auction
-• Time: 9:00 AM
-• Location: ONLINE — brevard.realforeclose.com
-
-📍 **January 7, 2026** (Tuesday)
-• Type: Foreclosure Auction
-• Time: 11:00 AM
-• Location: IN-PERSON — Titusville Courthouse
-
-**Auction Types:**
-• **Foreclosure:** In-person at courthouse, highest bidder wins property
-• **Tax Deed:** Online bidding, wipes most liens
-
-💡 Foreclosure auctions happen 1st & 3rd Tuesdays (typically). Tax deed auctions are scheduled monthly.`;
-            }
-            
-            // Max bid formula
-            if (/max\s*bid|formula|calculate|how\s*much/.test(lower)) {
-                return `💰 **BidDeed.AI Max Bid Formula**
-
-\`\`\`
-Max Bid = (ARV × 70%) - Repairs - $10K - MIN($25K, 15% × ARV)
-\`\`\`
-
-**Components Explained:**
-
-• **ARV** = After Repair Value (comparable sales from BCPAO)
-• **70%** = Safety margin for profit & unexpected costs
-• **Repairs** = Estimated rehab costs
-• **$10K** = Fixed costs (closing, holding, utilities)
-• **MIN($25K, 15% ARV)** = Wholesale profit cap
-
-**Example:**
-- ARV: $300,000
-- Repairs: $40,000
-- Max Bid = ($300K × 70%) - $40K - $10K - $25K
-- Max Bid = $210K - $40K - $10K - $25K = **$135,000**
-
-**Bid/Judgment Ratio Guide:**
-• 🟢 ≥75% → **BID** (strong opportunity)
-• 🟡 60-74% → **REVIEW** (proceed with caution)
-• 🔴 <60% → **SKIP** (too risky)`;
-            }
-            
-            // Lien priority
-            if (/lien|survive|priority|hoa|mortgage|title/.test(lower)) {
-                return `⚖️ **Lien Priority in Florida Foreclosures**
-
-**The Golden Rule:** Senior liens SURVIVE junior foreclosures.
-
-**Lien Priority (Typical Order):**
-1. Property Taxes (always first)
-2. First Mortgage (original purchase loan)
-3. Second Mortgage / HELOC
-4. HOA/Condo Liens
-5. Judgment Liens
-6. Mechanics Liens
-
-**Critical Scenarios:**
-
-🏦 **Bank Foreclosure (Mortgage):**
-• Wipes: HOA liens, junior mortgages, judgments
-• You get: Clean title (usually)
-
-🏘️ **HOA Foreclosure:**
-• ⚠️ **DANGER:** Senior mortgage SURVIVES
-• You inherit: The entire first mortgage!
-• Always check: Who is the plaintiff?
-
-🏛️ **Tax Deed Sale:**
-• Wipes: Almost everything
-• Survives: Some government liens, EPA liens
-
-**BidDeed.AI Protection:**
-Our Lien Discovery Agent searches AcclaimWeb to find ALL recorded liens before you bid. Never guess — we check actual records.`;
-            }
-            
-            // Properties / recommendations
-            if (/properties|recommend|best|bid|invest|opportunities/.test(lower)) {
-                return `⭐ **Investment Opportunities**
-
-BidDeed.AI uses the **Everest Ascent™** 12-stage pipeline to analyze properties:
-
-**Our Process:**
-1. Discovery — Find auction listings
-2. Scraping — Pull property data from BCPAO
-3. Title Search — Check ownership history
-4. Lien Priority — Identify surviving liens
-5. Tax Certs — Check for outstanding taxes
-6. Demographics — Analyze neighborhood
-7. CMA — Run comparable market analysis
-8. ML Score — Apply 64.4% accuracy model
-9. Max Bid — Calculate optimal bid price
-10. Decision — Generate BID/REVIEW/SKIP
-11. Report — Create investment summary
-12. Archive — Store for future reference
-
-**Current Recommendations:**
-To see live BID recommendations for upcoming auctions, check our full analysis reports or ask about a specific property address.
-
-📊 **ML Model Stats:**
-• 64.4% accuracy on third-party predictions
-• 28 plaintiff patterns tracked
-• Historical data from 1,393+ auctions`;
-            }
-            
-            // Help / general
-            if (/help|what\s*can|how\s*to|commands/.test(lower)) {
-                return `🤖 **BidDeed.AI V18 — Help**
-
-**I can help you with:**
-
-📅 **Auction Info**
-• "What auctions are on Dec 18?"
-• "Show the auction calendar"
-• "When is the next foreclosure?"
-
-💰 **Investment Analysis**
-• "Explain the max bid formula"
-• "What's a good bid/judgment ratio?"
-• "How do I calculate repairs?"
-
-⚖️ **Title & Liens**
-• "How do liens work?"
-• "What survives an HOA foreclosure?"
-• "Explain lien priority"
-
-🏠 **Properties**
-• "Show best opportunities"
-• "Analyze [property address]"
-
-📊 **Market Data**
-• "Demographics for Melbourne"
-• "Market trends in Brevard"
-
-Just type your question naturally — I understand context!`;
-            }
-            
-            // Hello / greeting
-            if (/^(hi|hello|hey|good\s*(morning|afternoon|evening)|greetings)/i.test(lower)) {
-                return `👋 Hello! I'm **BidDeed.AI V18**, your foreclosure auction assistant.
-
-**Quick Info:**
-📅 Next auction: **Dec 18** (Tax Deed) @ 9AM ONLINE
-🏛️ After that: **Jan 7** (Foreclosure) @ 11AM Titusville
-
-What would you like to know about Brevard County auctions?`;
-            }
-            
-            // Default response
-            return `🤔 I understand you're asking about: "${message.substring(0, 50)}${message.length > 50 ? '...' : ''}"
-
-Here's what I can help with:
-
-📅 **Auctions:** "What's on Dec 18?" or "Show calendar"
-💰 **Formulas:** "Explain max bid formula"
-⚖️ **Liens:** "How does lien priority work?"
-🏠 **Analysis:** "Show best opportunities"
-
-Try one of the quick action buttons below, or rephrase your question!`;
-        }
-
-        function sendMessage() {
+        
+        async function sendMessage() {
             const input = document.getElementById('message-input');
             const content = input.value.trim();
             if (!content) return;
-
+            
+            // Render user message
             renderMessage('user', content);
+            conversationHistory.push({ role: 'user', content });
+            
             input.value = '';
             autoResize(input);
             
@@ -336,32 +581,75 @@ Try one of the quick action buttons below, or rephrase your question!`;
             document.getElementById('typing').classList.add('visible');
             document.getElementById('send-btn').disabled = true;
             
-            // Simulate brief processing time
-            setTimeout(() => {
-                const response = generateResponse(content);
-                renderMessage('assistant', response, { local: true });
-                setStatus('ready', 'Ready');
+            try {
+                const response = await fetch(API_ENDPOINT, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        messages: conversationHistory,
+                        model: 'gemini-2.5-flash'
+                    })
+                });
+                
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                
+                const reader = response.body?.getReader();
+                const decoder = new TextDecoder();
+                
                 document.getElementById('typing').classList.remove('visible');
+                const msgDiv = renderMessage('assistant', '');
+                const bubble = msgDiv.querySelector('.bubble');
+                
+                let fullContent = '';
+                
+                if (reader) {
+                    while (true) {
+                        const { done, value } = await reader.read();
+                        if (done) break;
+                        
+                        fullContent += decoder.decode(value);
+                        bubble.innerHTML = fullContent
+                            .replace(/```(\w*)\n([\s\S]*?)```/g, '<pre><code>$2</code></pre>')
+                            .replace(/`([^`]+)`/g, '<code>$1</code>')
+                            .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+                            .replace(/^- (.+)$/gm, '• $1')
+                            .replace(/\n/g, '<br>');
+                        
+                        document.getElementById('messages').scrollTop = document.getElementById('messages').scrollHeight;
+                    }
+                }
+                
+                conversationHistory.push({ role: 'assistant', content: fullContent });
+                
+            } catch (error) {
+                console.error('Chat error:', error);
+                document.getElementById('typing').classList.remove('visible');
+                renderMessage('assistant', '⚠️ Connection error. Please try again.');
+            } finally {
+                setStatus('ready', 'Ready');
                 document.getElementById('send-btn').disabled = false;
-            }, 400 + Math.random() * 400);
-        }
-
-        function sendQuick(text) { 
-            document.getElementById('message-input').value = text; 
-            sendMessage(); 
+            }
         }
         
-        function handleKeydown(e) { 
-            if (e.key === 'Enter' && !e.shiftKey) { 
-                e.preventDefault(); 
-                sendMessage(); 
-            } 
+        function sendQuick(text) {
+            document.getElementById('message-input').value = text;
+            sendMessage();
         }
         
-        function autoResize(el) { 
-            el.style.height = 'auto'; 
-            el.style.height = Math.min(el.scrollHeight, 120) + 'px'; 
+        function handleKeydown(e) {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                sendMessage();
+            }
         }
+        
+        function autoResize(el) {
+            el.style.height = 'auto';
+            el.style.height = Math.min(el.scrollHeight, 120) + 'px';
+        }
+        
+        // Focus input on load
+        document.getElementById('message-input').focus();
     </script>
 </body>
 </html>
