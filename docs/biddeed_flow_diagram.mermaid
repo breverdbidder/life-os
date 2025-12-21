@@ -1,0 +1,50 @@
+graph TD
+    A[User Input: Analyze Jan 7, 2026 Auction] --> B[Smart Router V5]
+    
+    B --> C1[FREE: Gemini 2.5 Flash<br/>1M context]
+    B --> C2[CHEAP: DeepSeek V3.2<br/>$0.28/1M]
+    B --> C3[SMART: Claude Sonnet 4.5<br/>1M context]
+    B --> C4[PREMIUM: Claude Opus 4.5<br/>200K context]
+    
+    C1 --> D[LangGraph Orchestrator]
+    C2 --> D
+    C3 --> D
+    C4 --> D
+    
+    D --> E[Stage 0: Discovery Agent<br/>Auction.com/RealtyTrac]
+    E --> F[Stage 1: Scraping Agent<br/>BCPAO + Census API]
+    F --> G[Stage 2: Title Search<br/>AcclaimWeb 12 regex]
+    G --> H[Stage 3: Lien Priority<br/>DeepSeek V3.2-thinking]
+    H --> I[Stage 4: Tax Certificates<br/>RealTDM scraper]
+    I --> J[Stage 5: Demographics<br/>Census API scoring]
+    J --> K[Stage 6: ML Score<br/>XGBoost 64.4% accuracy]
+    K --> L[Stage 7: Max Bid<br/>ARV×70% - Repairs - Fees]
+    L --> M[Stage 8: Decision Logic<br/>Bid/Judgment ratio]
+    M --> N[Stage 9: Report Generation<br/>DOCX with photos]
+    N --> O[Stage 10: Disposition<br/>Track outcomes]
+    O --> P[Stage 11: Archive<br/>Supabase + GitHub]
+    
+    P --> Q{Recommendation}
+    Q -->|≥75%| R[BID ✅<br/>Green badge]
+    Q -->|60-74%| S[REVIEW ⚠️<br/>Yellow badge]
+    Q -->|<60%| T[SKIP ❌<br/>Red badge]
+    Q -->|HOA Senior| U[DO NOT BID 🚫<br/>Senior mortgage survives]
+    
+    R --> V[DOCX Report]
+    S --> V
+    T --> V
+    U --> V
+    
+    V --> W[GitHub: reports/ folder]
+    V --> X[Chat Interface Response]
+    V --> Y[Supabase: audit trail]
+    
+    style A fill:#1E3A5F,color:#fff
+    style B fill:#E3F2FD,color:#000
+    style D fill:#FFF3E0,color:#000
+    style K fill:#F3E5F5,color:#000
+    style R fill:#E8F5E9,color:#000
+    style S fill:#FFF9C4,color:#000
+    style T fill:#FFEBEE,color:#000
+    style U fill:#B71C1C,color:#fff
+    style V fill:#1E3A5F,color:#fff
