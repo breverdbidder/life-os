@@ -291,3 +291,98 @@ VALUES (
 ---
 
 **Updated:** December 18, 2025 | **Version:** V18.1.0
+## 📹 VIDEO & TRANSCRIPTION APIs
+
+### FREE Options (Recommended)
+
+| Tool | Description | Priority |
+|------|-------------|----------|
+| **yt-dlp** | Download videos/audio from YouTube + 1000s of sites | HIGH - Primary |
+| **OpenAI Whisper** | Local speech-to-text, 95%+ accuracy, auto language detect | HIGH - Primary |
+| **YouTube Captions** | Built-in captions via yt-dlp (when available) | HIGH - First try |
+
+### Apify Transcription Actors (Paid Fallback)
+
+| API | Platforms | Cost |
+|-----|-----------|------|
+| [YouTube Transcript Scraper](https://apify.com/topaz_sharingan/youtube-transcript-scraper) | YouTube videos + shorts | ~$0.01/video |
+| [Video Transcript Scraper](https://apify.com/invideoiq/video-transcript-scraper) | YouTube, TikTok, Facebook, Loom | ~$0.02/video |
+| [YouTube Full Channel Transcripts](https://apify.com/karamelo/youtube-full-channel-transcripts-extractor) | Entire YouTube channels | ~$0.01/video |
+| [Video Transcript Multi-Platform](https://apify.com/agentx/video-transcript) | Instagram Reels, FB Reels, YouTube Shorts, TikTok | ~$0.02/video |
+| [Best YouTube Transcripts](https://apify.com/scrape-creators/best-youtube-transcripts-scraper) | YouTube with bulk support | ~$0.01/video |
+
+### Life OS YouTube Transcript Agent
+
+**Location:** `agents/youtube_transcript/youtube_transcript_agent.py`
+**Workflow:** `.github/workflows/youtube_transcript_agent.yml`
+
+**Features:**
+- ✅ Shorts, regular videos, ended livestreams
+- ✅ Cost-optimized: FREE backends first (captions → Whisper)
+- ✅ Apify paid fallback for problematic videos
+- ✅ Auto language detection
+- ✅ Timestamps when available
+- ✅ Supabase logging with categories
+- ✅ LangGraph orchestration compatible
+
+**Usage:**
+```bash
+# Via GitHub Actions (recommended)
+gh workflow run youtube_transcript_agent.yml \
+  -f video_url="https://youtube.com/shorts/C2Dl6P7diHw" \
+  -f whisper_model="base" \
+  -f category="learning"
+
+# Via Python
+python youtube_transcript_agent.py "https://youtube.com/watch?v=VIDEO_ID" base learning
+```
+
+**Supported URL Formats:**
+- `youtube.com/watch?v=VIDEO_ID`
+- `youtube.com/shorts/VIDEO_ID`
+- `youtube.com/live/VIDEO_ID`
+- `youtu.be/VIDEO_ID`
+- `m.youtube.com/watch?v=VIDEO_ID`
+
+### Whisper Model Selection
+
+| Model | Size | Speed | Accuracy | Use Case |
+|-------|------|-------|----------|----------|
+| tiny | 39MB | ~10x | ~80% | Quick tests |
+| base | 74MB | ~7x | ~85% | **DEFAULT - balanced** |
+| small | 244MB | ~4x | ~90% | Better accuracy |
+| medium | 769MB | ~2x | ~95% | High quality |
+| large | 1.5GB | 1x | ~97% | Best quality |
+
+### Integration Examples
+
+```python
+# Quick transcription in Python
+from agents.youtube_transcript.youtube_transcript_agent import YouTubeTranscriptAgent
+
+agent = YouTubeTranscriptAgent()
+result = await agent.transcribe("https://youtube.com/shorts/C2Dl6P7diHw")
+print(result.transcript)
+```
+
+```javascript
+// Trigger via GitHub API
+const response = await fetch(
+  'https://api.github.com/repos/breverdbidder/life-os/actions/workflows/youtube_transcript_agent.yml/dispatches',
+  {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${GITHUB_TOKEN}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      ref: 'main',
+      inputs: {
+        video_url: 'https://youtube.com/shorts/C2Dl6P7diHw',
+        whisper_model: 'base',
+        category: 'learning'
+      }
+    })
+  }
+);
+```
