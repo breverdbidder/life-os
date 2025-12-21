@@ -1,0 +1,395 @@
+name: 📺 YouTube Transcript Agent V2
+
+on:
+  workflow_dispatch:
+    inputs:
+      video_url:
+        description: 'YouTube URL (shorts, regular, live, playlist)'
+        required: true
+        default: 'https://youtube.com/shorts/C2Dl6P7diHw'
+      whisper_model:
+        description: 'Whisper model (if needed)'
+        required: false
+        default: 'base'
+        type: choice
+        options:
+          - tiny
+          - base
+          - small
+          - medium
+      category:
+        description: 'Category for Supabase'
+        required: false
+        default: 'learning'
+        type: choice
+        options:
+          - learning
+          - michael_swim
+          - business
+          - personal
+          - research
+      log_to_supabase:
+        description: 'Save to Supabase'
+        required: false
+        default: 'true'
+        type: boolean
+      use_whisper:
+        description: 'Use Whisper fallback if captions fail'
+        required: false
+        default: 'true'
+        type: boolean
+
+env:
+  SUPABASE_URL: https://mocerqjnksmhcjzxrewo.supabase.co
+
+jobs:
+  transcribe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    
+    steps:
+      - name: 🔄 Checkout
+        uses: actions/checkout@v4
+        
+      - name: 🐍 Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+          
+      - name: 🎬 Setup FFmpeg
+        uses: FedericoCarboni/setup-ffmpeg@v3
+        
+      - name: 📦 Install dependencies
+        run: |
+          pip install --upgrade pip
+          pip install yt-dlp httpx youtube-transcript-api requests
+          
+          # Only install Whisper if enabled
+          if [[ "${{ github.event.inputs.use_whisper }}" == "true" ]]; then
+            pip install openai-whisper torch
+          fi
+          
+      - name: 📺 Extract Video Info
+        id: video_info
+        env:
+          VIDEO_URL: ${{ github.event.inputs.video_url }}
+        run: |
+          echo "🔍 Analyzing: $VIDEO_URL"
+          
+          # Extract video ID
+          VIDEO_ID=$(echo "$VIDEO_URL" | grep -oP '(?:v=|shorts/|live/|youtu\.be/)([a-zA-Z0-9_-]{11})' | grep -oP '[a-zA-Z0-9_-]{11}$' || echo "unknown")
+          echo "video_id=$VIDEO_ID" >> $GITHUB_OUTPUT
+          
+          # Detect video type
+          if [[ "$VIDEO_URL" == *"/shorts/"* ]]; then
+            echo "video_type=short" >> $GITHUB_OUTPUT
+          elif [[ "$VIDEO_URL" == *"/live/"* ]]; then
+            echo "video_type=live" >> $GITHUB_OUTPUT
+          else
+            echo "video_type=regular" >> $GITHUB_OUTPUT
+          fi
+          
+          echo "📺 Video ID: $VIDEO_ID"
+          
+      - name: 🎤 Transcribe with Agent V2
+        id: transcribe
+        env:
+          VIDEO_URL: ${{ github.event.inputs.video_url }}
+          VIDEO_ID: ${{ steps.video_info.outputs.video_id }}
+          VIDEO_TYPE: ${{ steps.video_info.outputs.video_type }}
+          WHISPER_MODEL: ${{ github.event.inputs.whisper_model }}
+          CATEGORY: ${{ github.event.inputs.category }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+          LOG_TO_SUPABASE: ${{ github.event.inputs.log_to_supabase }}
+          USE_WHISPER: ${{ github.event.inputs.use_whisper }}
+        run: |
+          python3 << 'PYEOF'
+          import os
+          import re
+          import json
+          import subprocess
+          import glob
+          import requests
+          from datetime import datetime, timezone
+
+          video_url = os.environ.get('VIDEO_URL', '')
+          video_id = os.environ.get('VIDEO_ID', 'unknown')
+          video_type = os.environ.get('VIDEO_TYPE', 'regular')
+          whisper_model = os.environ.get('WHISPER_MODEL', 'base')
+          category = os.environ.get('CATEGORY', 'learning')
+          supabase_url = os.environ.get('SUPABASE_URL', '')
+          supabase_key = os.environ.get('SUPABASE_KEY', '')
+          log_to_supabase = os.environ.get('LOG_TO_SUPABASE', 'true') == 'true'
+          use_whisper = os.environ.get('USE_WHISPER', 'true') == 'true'
+
+          print(f"{'='*60}")
+          print(f"📺 YOUTUBE TRANSCRIPT AGENT V2.0")
+          print(f"{'='*60}")
+          print(f"URL: {video_url}")
+          print(f"Video ID: {video_id}")
+          print(f"Type: {video_type}")
+          print(f"Category: {category}")
+          print(f"Whisper Enabled: {use_whisper}")
+
+          # Get metadata
+          print(f"\n🔍 Getting video metadata...")
+          metadata = {"title": "Unknown", "channel": "Unknown", "duration": 0}
+          try:
+              result = subprocess.run(
+                  ['yt-dlp', '--dump-json', '--no-download', '--no-warnings', video_url],
+                  capture_output=True, text=True, timeout=30
+              )
+              if result.returncode == 0 and result.stdout.strip():
+                  data = json.loads(result.stdout.strip())
+                  metadata = {
+                      "title": data.get('title', 'Unknown'),
+                      "channel": data.get('channel', data.get('uploader', 'Unknown')),
+                      "duration": int(data.get('duration', 0)),
+                      "view_count": int(data.get('view_count', 0)),
+                      "upload_date": data.get('upload_date', '')
+                  }
+          except Exception as e:
+              print(f"⚠️ Metadata error: {e}")
+
+          print(f"📝 Title: {metadata['title']}")
+          print(f"👤 Channel: {metadata['channel']}")
+          print(f"⏱️ Duration: {metadata['duration']}s")
+
+          transcript = None
+          transcript_source = "none"
+          language = "unknown"
+          segments = None
+
+          # =================================================================
+          # STRATEGY 1: youtube-transcript-api (PRIMARY FREE)
+          # =================================================================
+          print(f"\n🎯 STRATEGY 1: youtube-transcript-api (FREE)")
+          try:
+              from youtube_transcript_api import YouTubeTranscriptApi
+              from youtube_transcript_api._errors import TranscriptsDisabled, NoTranscriptFound, VideoUnavailable
+              
+              languages = ['en', 'en-US', 'en-GB', 'es', 'fr', 'de', 'pt', 'it', 'ru', 'ja', 'ko', 'zh-Hans']
+              
+              try:
+                  transcript_list = YouTubeTranscriptApi.get_transcript(video_id, languages=languages)
+                  
+                  full_text_parts = []
+                  segments = []
+                  
+                  for entry in transcript_list:
+                      text = entry.get('text', '').strip()
+                      if text:
+                          full_text_parts.append(text)
+                          segments.append({
+                              'start': entry.get('start', 0),
+                              'duration': entry.get('duration', 0),
+                              'text': text
+                          })
+                  
+                  if full_text_parts:
+                      transcript = ' '.join(full_text_parts)
+                      transcript_source = "youtube_transcript_api"
+                      
+                      # Detect language
+                      try:
+                          transcript_info = YouTubeTranscriptApi.list_transcripts(video_id)
+                          for tr in transcript_info:
+                              language = tr.language_code
+                              break
+                      except:
+                          language = "en"
+                      
+                      print(f"✅ youtube-transcript-api SUCCESS: {len(transcript)} chars, lang={language}")
+                      
+              except (TranscriptsDisabled, NoTranscriptFound, VideoUnavailable) as e:
+                  print(f"⚠️ {type(e).__name__}: {e}")
+              except Exception as e:
+                  print(f"⚠️ youtube-transcript-api error: {e}")
+                  
+          except ImportError:
+              print("⚠️ youtube-transcript-api not installed")
+
+          # =================================================================
+          # STRATEGY 2: yt-dlp captions (SECONDARY FREE)
+          # =================================================================
+          if not transcript or len(transcript) < 20:
+              print(f"\n🎯 STRATEGY 2: yt-dlp captions (FREE)")
+              try:
+                  cmd = [
+                      'yt-dlp',
+                      '--skip-download',
+                      '--write-auto-sub',
+                      '--write-sub',
+                      '--sub-lang', 'en,en-US,en-GB',
+                      '--sub-format', 'json3',
+                      '-o', f'/tmp/{video_id}',
+                      video_url
+                  ]
+                  result = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
+                  
+                  sub_files = glob.glob(f'/tmp/{video_id}*.json3')
+                  if sub_files:
+                      with open(sub_files[0], 'r', encoding='utf-8') as f:
+                          subs_data = json.load(f)
+                      
+                      full_text = []
+                      for event in subs_data.get('events', []):
+                          if 'segs' in event:
+                              text = ''.join(seg.get('utf8', '') for seg in event['segs'])
+                              if text.strip():
+                                  full_text.append(text.strip())
+                      
+                      if full_text:
+                          transcript = ' '.join(full_text)
+                          transcript_source = "youtube_captions"
+                          language = "en"
+                          print(f"✅ yt-dlp captions SUCCESS: {len(transcript)} chars")
+                      
+                      for f in sub_files:
+                          os.remove(f)
+              except Exception as e:
+                  print(f"⚠️ yt-dlp captions error: {e}")
+
+          # =================================================================
+          # STRATEGY 3: Whisper (FALLBACK - compute intensive)
+          # =================================================================
+          if (not transcript or len(transcript) < 20) and use_whisper:
+              print(f"\n🎯 STRATEGY 3: Whisper transcription ({whisper_model})")
+              try:
+                  import whisper
+                  
+                  print("🔊 Downloading audio...")
+                  audio_cmd = [
+                      'yt-dlp', '-x',
+                      '--audio-format', 'mp3',
+                      '--audio-quality', '0',
+                      '-o', '/tmp/audio.%(ext)s',
+                      '--no-warnings',
+                      video_url
+                  ]
+                  subprocess.run(audio_cmd, capture_output=True, timeout=300)
+                  
+                  audio_files = glob.glob('/tmp/audio.*')
+                  if audio_files:
+                      audio_file = audio_files[0]
+                      print(f"✅ Audio downloaded: {audio_file}")
+                      
+                      print(f"🎤 Loading Whisper model: {whisper_model}...")
+                      model = whisper.load_model(whisper_model)
+                      result = model.transcribe(audio_file)
+                      
+                      transcript = result['text']
+                      transcript_source = f"whisper_{whisper_model}"
+                      language = result.get('language', 'unknown')
+                      print(f"✅ Whisper complete: {len(transcript)} chars, lang: {language}")
+                      
+                      os.remove(audio_file)
+              except Exception as e:
+                  print(f"❌ Whisper failed: {e}")
+
+          # Output
+          if not transcript:
+              transcript = "Transcript unavailable"
+              transcript_source = "failed"
+
+          print(f"\n{'='*60}")
+          print(f"TRANSCRIPT ({transcript_source})")
+          print(f"{'='*60}")
+          print(transcript[:5000])
+
+          # Build output
+          output = {
+              "video_id": video_id,
+              "video_url": video_url,
+              "video_type": video_type,
+              "title": metadata['title'],
+              "channel": metadata['channel'],
+              "duration_seconds": metadata['duration'],
+              "transcript": transcript[:100000],
+              "transcript_length": len(transcript),
+              "transcript_source": transcript_source,
+              "language": language,
+              "word_count": len(transcript.split()) if transcript else 0,
+              "category": category,
+              "segments": segments[:100] if segments else None,
+              "extracted_at": datetime.now(timezone.utc).isoformat()
+          }
+
+          with open('transcript.json', 'w', encoding='utf-8') as f:
+              json.dump(output, f, indent=2, ensure_ascii=False)
+          print(f"\n💾 Saved to transcript.json")
+
+          # Log to Supabase
+          if log_to_supabase and supabase_key and len(transcript) > 50 and transcript != "Transcript unavailable":
+              print(f"\n📤 Logging to Supabase...")
+              try:
+                  headers = {
+                      "apikey": supabase_key,
+                      "Authorization": f"Bearer {supabase_key}",
+                      "Content-Type": "application/json"
+                  }
+                  
+                  insight_data = {
+                      "user_id": 1,
+                      "insight_type": "youtube_transcript",
+                      "title": f"📺 {metadata['title'][:80]}",
+                      "description": json.dumps({
+                          "video_id": video_id,
+                          "video_type": video_type,
+                          "video_url": video_url,
+                          "channel": metadata['channel'],
+                          "duration_min": metadata['duration'] // 60,
+                          "transcript_chars": len(transcript),
+                          "transcript_words": len(transcript.split()),
+                          "source": transcript_source,
+                          "language": language,
+                          "category": category,
+                          "transcript_preview": transcript[:3000]
+                      }, ensure_ascii=False),
+                      "source": "youtube_transcript_agent_v2",
+                      "priority": 2,
+                      "status": "Active"
+                  }
+                  
+                  response = requests.post(
+                      f"{supabase_url}/rest/v1/insights",
+                      headers=headers,
+                      json=insight_data,
+                      timeout=30
+                  )
+                  print(f"✅ Logged to Supabase: {response.status_code}")
+              except Exception as e:
+                  print(f"⚠️ Supabase logging failed: {e}")
+
+          # GitHub outputs
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
+              f.write(f"transcript_length={len(transcript)}\n")
+              f.write(f"transcript_source={transcript_source}\n")
+              f.write(f"language={language}\n")
+              f.write(f"word_count={len(transcript.split())}\n")
+
+          PYEOF
+
+      - name: 📤 Upload Transcript Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: transcript-${{ steps.video_info.outputs.video_id }}
+          path: transcript.json
+          retention-days: 90
+          
+      - name: 📊 Summary
+        run: |
+          echo "## 📺 YouTube Transcript Agent V2 Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Field | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "|-------|-------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Video ID | \`${{ steps.video_info.outputs.video_id }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| Video Type | ${{ steps.video_info.outputs.video_type }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Transcript Source | ${{ steps.transcribe.outputs.transcript_source }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Language | ${{ steps.transcribe.outputs.language }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Word Count | ${{ steps.transcribe.outputs.word_count }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Transcript Length | ${{ steps.transcribe.outputs.transcript_length }} chars |" >> $GITHUB_STEP_SUMMARY
+          echo "| Category | ${{ github.event.inputs.category }} |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "✅ Transcript saved to artifacts and Supabase" >> $GITHUB_STEP_SUMMARY
