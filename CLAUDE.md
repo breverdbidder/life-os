@@ -196,4 +196,26 @@ INITIATED → SOLUTION_PROVIDED → IN_PROGRESS → COMPLETED/ABANDONED/BLOCKED/
 | `/undo` | Revert last change | After mistakes |
 | `/stats` | Token usage | Check limits |
 | `/model` | Switch model | Confirm on Opus 4.5 |
+| `/security-review` | Security audit | Before deploy |
+| `/security-review` | Security audit | Before deploy |
+
+
+
+## 🛡️ PRE-DEPLOY CHECKLIST
+
+Before ANY deployment to production:
+
+1. **`/security-review`** - Run Claude's security audit agent
+2. **No hardcoded secrets** - All keys in GitHub Secrets / Cloudflare env
+3. **Input validation** - All user inputs sanitized
+4. **Error handling** - Try/catch on all external API calls
+5. **Rate limiting** - Circuit breakers on external services
+6. **Test locally** - `npm run build` / `python -m pytest` passes
+7. **Git status clean** - All changes committed
+
+### Security Review Triggers
+- Before Cloudflare Pages deploy
+- Before GitHub Actions workflow changes
+- After adding new external API integrations
+- After auth/payment code changes
 
