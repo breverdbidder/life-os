@@ -1,4 +1,4 @@
-name: 📺 YouTube Transcript Agent V4 (Whisper)
+name: 📺 YouTube Transcript Agent V4 (With Whisper)
 
 on:
   workflow_dispatch:
@@ -8,7 +8,7 @@ on:
         required: true
         default: 'https://youtube.com/shorts/C2Dl6P7diHw'
       whisper_model:
-        description: 'Whisper model for audio fallback'
+        description: 'Whisper model'
         required: false
         default: 'base'
         type: choice
@@ -40,7 +40,7 @@ jobs:
   transcribe:
     name: 🎬 Extract YouTube Transcript
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 25
     
     steps:
       - name: 🔄 Checkout
@@ -104,7 +104,7 @@ jobs:
           video_type = "short" if '/shorts/' in video_url else "regular"
           print(f"📺 Video ID: {video_id} ({video_type})")
           
-          # Get metadata
+          # Get metadata via yt-dlp
           metadata = {"title": "Unknown", "channel": "Unknown", "duration": 0}
           try:
               r = subprocess.run(['yt-dlp', '--dump-json', '--no-download', f"https://www.youtube.com/watch?v={video_id}"],
@@ -112,14 +112,16 @@ jobs:
               if r.returncode == 0:
                   d = json.loads(r.stdout)
                   metadata = {"title": d.get('title','Unknown'), "channel": d.get('channel','Unknown'), "duration": d.get('duration',0)}
-                  print(f"📝 {metadata['title'][:50]}")
-          except:
-              pass
+                  print(f"📝 Title: {metadata['title'][:60]}")
+                  print(f"📺 Channel: {metadata['channel']}")
+                  print(f"⏱️ Duration: {metadata['duration']}s")
+          except Exception as e:
+              print(f"⚠️ Metadata error: {e}")
           
           transcript = None
           transcript_source = "none"
           
-          # STRATEGY 1: youtube-transcript-api
+          # STRATEGY 1: youtube-transcript-api (FREE)
           print(f"\n🎯 STRATEGY 1: YouTube Transcript API")
           try:
               from youtube_transcript_api import YouTubeTranscriptApi
@@ -127,49 +129,80 @@ jobs:
               fetched = api.fetch(video_id)
               transcript = ' '.join([e.text for e in fetched])
               transcript_source = "youtube_api"
-              print(f"✅ {len(transcript)} chars")
+              print(f"✅ Got {len(transcript)} chars")
           except Exception as e:
-              print(f"⚠️ {type(e).__name__}")
+              print(f"⚠️ {type(e).__name__}: {e}")
           
-          # STRATEGY 2: yt-dlp subtitles
+          # STRATEGY 2: yt-dlp subtitles (FREE)
           if not transcript or len(transcript) < 20:
               print(f"\n🎯 STRATEGY 2: yt-dlp Subtitles")
               try:
                   subprocess.run(['yt-dlp', '--skip-download', '--write-auto-sub', '--sub-lang', 'en',
                                  '-o', f'/tmp/{video_id}', f"https://www.youtube.com/watch?v={video_id}"],
                                 capture_output=True, timeout=60)
-                  vtt = glob.glob(f'/tmp/{video_id}*.vtt')
-                  if vtt:
-                      with open(vtt[0]) as f:
-                          lines = [l.strip() for l in f if l.strip() and 'WEBVTT' not in l and '-->' not in l and not re.match(r'^\d{2}:\d{2}', l)]
-                      # Deduplicate (VTT often has repeated lines)
-                      seen = set()
-                      unique = []
-                      for l in lines:
-                          if l not in seen:
-                              seen.add(l)
-                              unique.append(l)
-                      transcript = ' '.join(unique)
-                      transcript_source = "yt-dlp"
-                      print(f"✅ {len(transcript)} chars")
+                  vtt_files = glob.glob(f'/tmp/{video_id}*.vtt')
+                  if vtt_files:
+                      with open(vtt_files[0]) as f:
+                          lines = [l.strip() for l in f if l.strip() and 'WEBVTT' not in l and '-->' not in l and not l.strip().startswith('<')]
+                      transcript = ' '.join(lines)
+                      transcript_source = "yt-dlp_subs"
+                      print(f"✅ Got {len(transcript)} chars")
                   else:
-                      print("⚠️ No subs found")
+                      print("⚠️ No subtitle files found")
               except Exception as e:
                   print(f"⚠️ {e}")
           
-          # STRATEGY 3: APIFY (handles bot detection)
-          if (not transcript or len(transcript) < 20) and apify_token:
-              print(f"\n🎯 STRATEGY 3: Apify Transcript Scraper")
+          # STRATEGY 3: Whisper audio transcription (FREE, local)
+          if not transcript or len(transcript) < 20:
+              print(f"\n🎯 STRATEGY 3: Whisper Audio Transcription")
               try:
-                  run_url = f"https://api.apify.com/v2/acts/pintostudio~youtube-transcript-scraper/runs?token={apify_token}"
-                  payload = {"startUrls": [{"url": f"https://www.youtube.com/watch?v={video_id}"}], "maxResults": 1}
+                  # Download audio
+                  audio_path = f"/tmp/{video_id}.mp3"
+                  dl_result = subprocess.run([
+                      'yt-dlp', '-x', '--audio-format', 'mp3', '--audio-quality', '0',
+                      '-o', audio_path.replace('.mp3', '.%(ext)s'),
+                      f"https://www.youtube.com/watch?v={video_id}"
+                  ], capture_output=True, text=True, timeout=120)
+                  
+                  # Find the downloaded file
+                  audio_files = glob.glob(f"/tmp/{video_id}.*")
+                  if audio_files:
+                      audio_file = audio_files[0]
+                      print(f"   📥 Downloaded: {audio_file}")
+                      
+                      # Run Whisper
+                      import whisper
+                      print(f"   🎤 Loading Whisper model: {whisper_model}")
+                      model = whisper.load_model(whisper_model)
+                      print(f"   🎤 Transcribing...")
+                      result = model.transcribe(audio_file)
+                      transcript = result['text']
+                      transcript_source = f"whisper_{whisper_model}"
+                      print(f"✅ Got {len(transcript)} chars via Whisper")
+                  else:
+                      print("⚠️ Audio download failed")
+                      print(f"   stdout: {dl_result.stdout[:500]}")
+                      print(f"   stderr: {dl_result.stderr[:500]}")
+              except Exception as e:
+                  print(f"⚠️ Whisper error: {e}")
+                  import traceback
+                  traceback.print_exc()
+          
+          # STRATEGY 4: Apify (PAID fallback)
+          if (not transcript or len(transcript) < 20) and apify_token:
+              print(f"\n🎯 STRATEGY 4: Apify Transcript Scraper")
+              try:
+                  run_url = "https://api.apify.com/v2/acts/pintostudio~youtube-transcript-scraper/runs?token=" + apify_token
+                  payload = {"startUrls": [f"https://www.youtube.com/watch?v={video_id}"], "maxResults": 1}
+                  
+                  print("   Starting Apify actor...")
                   resp = requests.post(run_url, json=payload, timeout=30)
-                  print(f"   Starting Apify actor...")
                   
                   if resp.status_code == 201:
                       run_data = resp.json()
                       run_id = run_data['data']['id']
                       dataset_id = run_data['data']['defaultDatasetId']
+                      print(f"   Run ID: {run_id}")
                       
                       for i in range(12):
                           time.sleep(5)
@@ -189,56 +222,20 @@ jobs:
                                       transcript_source = "apify"
                                       metadata['title'] = item.get('videoTitle', metadata['title'])
                                       metadata['channel'] = item.get('channelName', metadata['channel'])
-                                      print(f"✅ {len(transcript)} chars")
+                                      print(f"✅ Got {len(transcript)} chars via Apify")
                               break
                           elif status in ['FAILED', 'ABORTED', 'TIMED-OUT']:
                               print(f"⚠️ Apify run {status}")
                               break
                   else:
                       print(f"⚠️ Apify API error: {resp.status_code}")
+                      
               except Exception as e:
                   print(f"⚠️ Apify error: {e}")
           
-          # STRATEGY 4: WHISPER AUDIO TRANSCRIPTION (for videos without captions)
-          if not transcript or len(transcript) < 20:
-              print(f"\n🎯 STRATEGY 4: Whisper Audio Transcription (model: {whisper_model})")
-              try:
-                  audio_path = f"/tmp/{video_id}.mp3"
-                  
-                  # Download audio with yt-dlp
-                  print("   Downloading audio...")
-                  dl_result = subprocess.run([
-                      'yt-dlp', '-x', '--audio-format', 'mp3',
-                      '--audio-quality', '5',
-                      '-o', audio_path,
-                      f"https://www.youtube.com/watch?v={video_id}"
-                  ], capture_output=True, text=True, timeout=120)
-                  
-                  # Find the actual output file (yt-dlp might add extension)
-                  audio_files = glob.glob(f"/tmp/{video_id}*.mp3") + glob.glob(f"/tmp/{video_id}*.m4a")
-                  
-                  if audio_files:
-                      audio_file = audio_files[0]
-                      print(f"   Audio: {audio_file}")
-                      
-                      # Transcribe with Whisper
-                      print(f"   Transcribing with Whisper {whisper_model}...")
-                      import whisper
-                      model = whisper.load_model(whisper_model)
-                      result = model.transcribe(audio_file)
-                      transcript = result["text"].strip()
-                      transcript_source = f"whisper_{whisper_model}"
-                      print(f"✅ {len(transcript)} chars")
-                  else:
-                      print("⚠️ Audio download failed")
-                      print(f"   stdout: {dl_result.stdout[:200]}")
-                      print(f"   stderr: {dl_result.stderr[:200]}")
-              except Exception as e:
-                  print(f"⚠️ Whisper error: {e}")
-          
           # Final result
           if not transcript or len(transcript) < 20:
-              transcript = "Transcript unavailable - video may not have audio or captions"
+              transcript = "Transcript unavailable - video may not have captions and audio transcription failed"
               transcript_source = "failed"
           
           print(f"\n{'='*70}")
@@ -247,7 +244,7 @@ jobs:
           print(f"\n📝 TRANSCRIPT:\n{'-'*50}")
           print(transcript[:3000])
           
-          # Save
+          # Save output
           output = {
               "video_id": video_id,
               "video_url": video_url,
@@ -266,24 +263,32 @@ jobs:
           with open('transcript.json', 'w') as f:
               json.dump(output, f, indent=2)
           
-          # Supabase
+          # Log to Supabase
           if log_to_supabase and supabase_key and transcript_source != "failed":
               try:
-                  headers = {"apikey": supabase_key, "Authorization": f"Bearer {supabase_key}", "Content-Type": "application/json"}
-                  insight = {"user_id": 1, "insight_type": "youtube_transcript", "title": f"📺 {metadata['title'][:80]}",
-                            "content": transcript[:10000], "category": category, "source": "youtube_v4", "priority": 2, "status": "Active"}
-                  requests.post(f"{supabase_url}/rest/v1/insights", headers=headers, json=insight, timeout=10)
-                  print("✅ Saved to Supabase")
+                  headers = {"apikey": supabase_key, "Authorization": f"Bearer {supabase_key}", "Content-Type": "application/json", "Prefer": "return=minimal"}
+                  insight = {
+                      "user_id": 1, 
+                      "insight_type": "youtube_transcript", 
+                      "title": f"📺 {metadata['title'][:80]}",
+                      "content": transcript[:10000], 
+                      "category": category, 
+                      "source": "youtube_v4", 
+                      "priority": 2, 
+                      "status": "Active"
+                  }
+                  r = requests.post(f"{supabase_url}/rest/v1/insights", headers=headers, json=insight, timeout=10)
+                  print(f"\n📤 Supabase: {r.status_code}")
               except Exception as e:
-                  print(f"⚠️ Supabase: {e}")
+                  print(f"⚠️ Supabase error: {e}")
           
-          # Outputs
+          # GitHub outputs
           with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
               f.write(f"video_id={video_id}\n")
               f.write(f"transcript_source={transcript_source}\n")
               f.write(f"transcript_length={len(transcript)}\n")
           
-          print(f"\n✅ Done!")
+          print(f"\n✅ Complete!")
           PYEOF
           
       - name: 📤 Upload Artifact
@@ -295,7 +300,6 @@ jobs:
           
       - name: 📊 Summary
         run: |
-          echo "## 📺 Transcript Result" >> $GITHUB_STEP_SUMMARY
-          echo "- **Video:** ${{ github.event.inputs.video_url }}" >> $GITHUB_STEP_SUMMARY
+          echo "## 📺 Transcript Extracted" >> $GITHUB_STEP_SUMMARY
           echo "- **Source:** ${{ steps.transcribe.outputs.transcript_source }}" >> $GITHUB_STEP_SUMMARY
           echo "- **Length:** ${{ steps.transcribe.outputs.transcript_length }} chars" >> $GITHUB_STEP_SUMMARY
