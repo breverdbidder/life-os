@@ -1,0 +1,14 @@
+name: Test YouTube Dispatch
+on:
+  workflow_dispatch:
+    inputs:
+      video_url:
+        description: YouTube URL
+        required: true
+        type: string
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "Video URL: ${{ inputs.video_url }}"
+
