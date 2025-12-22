@@ -166,3 +166,34 @@ INITIATED → SOLUTION_PROVIDED → IN_PROGRESS → COMPLETED/ABANDONED/BLOCKED/
 - **Default Model**: gemini-2.5-flash (FREE, 1M context)
 - **Chat URL**: life-os-aiy.pages.dev/chat
 - **GOOGLE_API_KEY**: In Cloudflare env
+
+
+---
+
+## 🎯 PROMPTING & SESSION PATTERNS
+
+### From Claude Code Masterclass (2025-12-22)
+
+**Context Management**
+- ALWAYS `/clear` context between major features to keep Claude "snappy and fast"
+- Token bloat = slower responses + worse reasoning
+- Clear before: switching domains (BUSINESS → MICHAEL → FAMILY), after complex debugging
+
+**Question-Driven Development**
+- END prompts with: "Anything else you want to add?" or "What would you improve here?"
+- Opus 4.5 has better taste than other models - leverage proactive suggestions
+- Treat Claude as creative partner, not just executor
+
+**Plan Mode Protocol**
+- Use plan mode (shift+tab x2) before ANY big feature
+- Let Claude ask clarifying questions before building
+- Multiple choice responses = faster decision making for ADHD
+
+### Slash Commands Reference
+| Command | Purpose | When to Use |
+|---------|---------|-------------|
+| `/clear` | Reset context | Between domains |
+| `/undo` | Revert last change | After mistakes |
+| `/stats` | Token usage | Check limits |
+| `/model` | Switch model | Confirm on Opus 4.5 |
+
