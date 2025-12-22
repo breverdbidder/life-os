@@ -1,0 +1,97 @@
+name: 🎤 Whisper Audio Transcription
+
+on:
+  workflow_dispatch:
+    inputs:
+      video_url:
+        description: 'YouTube URL'
+        required: true
+        default: 'https://youtube.com/shorts/C2Dl6P7diHw'
+
+jobs:
+  transcribe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    
+    steps:
+      - name: 📦 Install Dependencies
+        run: |
+          pip install -q openai-whisper yt-dlp
+          sudo apt-get install -qq ffmpeg
+          
+      - name: 🎵 Download Audio & Transcribe
+        env:
+          VIDEO_URL: ${{ github.event.inputs.video_url }}
+        run: |
+          python3 << 'PYEOF'
+          import os, re, subprocess, json, whisper
+          from datetime import datetime, timezone
+          
+          url = os.environ.get('VIDEO_URL', '')
+          
+          # Extract video ID
+          patterns = [r'shorts/([a-zA-Z0-9_-]{11})', r'(?:v=|/v/)([a-zA-Z0-9_-]{11})', r'youtu\.be/([a-zA-Z0-9_-]{11})']
+          video_id = None
+          for p in patterns:
+              m = re.search(p, url)
+              if m:
+                  video_id = m.group(1)
+                  break
+          
+          print(f"📺 Video ID: {video_id}")
+          
+          # Download audio
+          print("🎵 Downloading audio...")
+          subprocess.run([
+              'yt-dlp', '-x', '--audio-format', 'mp3', '--audio-quality', '0',
+              '-o', f'{video_id}.%(ext)s', f'https://www.youtube.com/watch?v={video_id}'
+          ], check=True)
+          
+          # Get metadata
+          result = subprocess.run(['yt-dlp', '--dump-json', '--no-download', f'https://www.youtube.com/watch?v={video_id}'],
+                                  capture_output=True, text=True)
+          meta = json.loads(result.stdout) if result.returncode == 0 else {}
+          title = meta.get('title', 'Unknown')
+          channel = meta.get('channel', 'Unknown')
+          duration = meta.get('duration', 0)
+          
+          print(f"📝 Title: {title}")
+          print(f"📺 Channel: {channel}")
+          
+          # Transcribe with Whisper
+          print("🎤 Transcribing with Whisper...")
+          model = whisper.load_model("base")
+          result = model.transcribe(f"{video_id}.mp3")
+          transcript = result["text"]
+          
+          print(f"\n{'='*70}")
+          print("📝 TRANSCRIPT:")
+          print(f"{'='*70}")
+          print(transcript)
+          
+          # Save output
+          output = {
+              "video_id": video_id,
+              "video_url": url,
+              "title": title,
+              "channel": channel,
+              "duration_seconds": duration,
+              "transcript": transcript,
+              "transcript_length": len(transcript),
+              "word_count": len(transcript.split()),
+              "transcript_source": "whisper",
+              "extracted_at": datetime.now(timezone.utc).isoformat()
+          }
+          
+          with open('transcript.json', 'w') as f:
+              json.dump(output, f, indent=2)
+          
+          print(f"\n✅ Saved transcript.json ({len(transcript)} chars)")
+          PYEOF
+          
+      - name: 📤 Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: whisper-transcript
+          path: transcript.json
+          retention-days: 30
