@@ -1,0 +1,96 @@
+name: 🎤 Whisper Transcript (No Captions)
+
+on:
+  workflow_dispatch:
+    inputs:
+      video_url:
+        description: 'YouTube URL'
+        required: true
+        default: 'https://youtube.com/shorts/C2Dl6P7diHw'
+
+jobs:
+  whisper:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    
+    steps:
+      - name: 📦 Install
+        run: |
+          pip install yt-dlp openai-whisper requests
+          sudo apt-get update && sudo apt-get install -y ffmpeg
+          
+      - name: 🎤 Transcribe with Whisper
+        env:
+          VIDEO_URL: ${{ github.event.inputs.video_url }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+        run: |
+          python3 << 'PYEOF'
+          import os, re, json, subprocess
+          import whisper
+          from datetime import datetime, timezone
+          import requests
+          
+          url = os.environ['VIDEO_URL']
+          
+          # Extract video ID
+          m = re.search(r'shorts/([a-zA-Z0-9_-]{11})', url) or re.search(r'v=([a-zA-Z0-9_-]{11})', url)
+          video_id = m.group(1) if m else "unknown"
+          
+          print(f"📺 Video: {video_id}")
+          
+          # Download audio
+          print("⬇️ Downloading audio...")
+          subprocess.run([
+              'yt-dlp', '-x', '--audio-format', 'mp3',
+              '-o', '/tmp/audio.%(ext)s',
+              f'https://youtube.com/watch?v={video_id}'
+          ], check=True)
+          
+          # Whisper transcribe
+          print("🎤 Transcribing with Whisper base model...")
+          model = whisper.load_model("base")
+          result = model.transcribe("/tmp/audio.mp3")
+          transcript = result["text"].strip()
+          
+          print(f"\n{'='*60}")
+          print("📝 TRANSCRIPT:")
+          print(f"{'='*60}")
+          print(transcript)
+          print(f"{'='*60}")
+          print(f"✅ {len(transcript)} chars | {len(transcript.split())} words")
+          
+          # Save
+          output = {
+              "video_id": video_id,
+              "video_url": url,
+              "transcript": transcript,
+              "transcript_source": "whisper",
+              "extracted_at": datetime.now(timezone.utc).isoformat()
+          }
+          
+          with open('transcript.json', 'w') as f:
+              json.dump(output, f, indent=2)
+          
+          # Log to Supabase
+          supabase_key = os.environ.get('SUPABASE_KEY')
+          if supabase_key:
+              headers = {"apikey": supabase_key, "Authorization": f"Bearer {supabase_key}", "Content-Type": "application/json"}
+              insight = {
+                  "user_id": 1,
+                  "insight_type": "youtube_transcript",
+                  "title": f"📺 Whisper: {video_id}",
+                  "content": transcript,
+                  "category": "research",
+                  "source": "whisper",
+                  "priority": 2,
+                  "status": "Active"
+              }
+              requests.post("https://mocerqjnksmhcjzxrewo.supabase.co/rest/v1/insights", headers=headers, json=insight)
+          
+          PYEOF
+          
+      - name: 📤 Upload
+        uses: actions/upload-artifact@v4
+        with:
+          name: whisper-transcript
+          path: transcript.json
