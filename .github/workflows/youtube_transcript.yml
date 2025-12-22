@@ -384,3 +384,5 @@ jobs:
           name: transcript-${{ steps.transcribe.outputs.video_id }}
           path: transcript.json
           retention-days: 30
+
+# Last refresh: 2025-12-22T12:16:08Z
