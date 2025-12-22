@@ -1,6 +1,8 @@
 name: 📺 YouTube Transcript Agent (Production)
 
 on:
+  repository_dispatch:
+    types: [youtube_transcript]
   workflow_dispatch:
     inputs:
       video_url:
@@ -49,10 +51,10 @@ jobs:
       - name: 📺 Transcribe (4-Tier Strategy)
         id: transcribe
         env:
-          VIDEO_URL: ${{ github.event.inputs.video_url }}
-          WHISPER_MODEL: ${{ github.event.inputs.whisper_model }}
-          CATEGORY: ${{ github.event.inputs.category }}
-          SKIP_TO_APIFY: ${{ github.event.inputs.skip_to_apify }}
+          VIDEO_URL: ${{ github.event.inputs.video_url || github.event.client_payload.video_url }}
+          WHISPER_MODEL: ${{ github.event.inputs.whisper_model || 'base' }}
+          CATEGORY: ${{ github.event.inputs.category || github.event.client_payload.category || 'learning' }}
+          SKIP_TO_APIFY: ${{ github.event.inputs.skip_to_apify || 'false' }}
           SUPABASE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
           APIFY_API_TOKEN: ${{ secrets.APIFY_API_TOKEN }}
         run: |
