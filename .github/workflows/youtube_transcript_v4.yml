@@ -68,7 +68,7 @@ jobs:
           WHISPER_MODEL: ${{ github.event.inputs.whisper_model }}
           CATEGORY: ${{ github.event.inputs.category }}
           SUPABASE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
-          APIFY_TOKEN: ${{ secrets.APIFY_TOKEN }}
+          APIFY_TOKEN: ${{ secrets.APIFY_API_TOKEN }}
           LOG_TO_SUPABASE: ${{ github.event.inputs.log_to_supabase }}
         run: |
           python3 << 'PYEOF'
