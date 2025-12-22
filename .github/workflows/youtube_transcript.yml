@@ -52,9 +52,9 @@ jobs:
         id: transcribe
         env:
           VIDEO_URL: ${{ github.event.inputs.video_url || github.event.client_payload.video_url }}
-          WHISPER_MODEL: ${{ github.event.inputs.whisper_model || 'base' }}
+          WHISPER_MODEL: ${{ github.event.inputs.whisper_model }}
           CATEGORY: ${{ github.event.inputs.category || github.event.client_payload.category || 'learning' }}
-          SKIP_TO_APIFY: ${{ github.event.inputs.skip_to_apify || 'false' }}
+          SKIP_TO_APIFY: ${{ github.event.inputs.skip_to_apify }}
           SUPABASE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
           APIFY_API_TOKEN: ${{ secrets.APIFY_API_TOKEN }}
         run: |
