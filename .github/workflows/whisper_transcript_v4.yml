@@ -1,0 +1,191 @@
+name: 🎤 Whisper Transcription V4
+
+on:
+  workflow_dispatch:
+    inputs:
+      video_url:
+        description: 'YouTube URL'
+        required: true
+        default: 'https://youtube.com/shorts/C2Dl6P7diHw'
+      model:
+        description: 'Whisper model'
+        required: false
+        default: 'base'
+        type: choice
+        options:
+          - tiny
+          - base
+          - small
+
+env:
+  SUPABASE_URL: https://mocerqjnksmhcjzxrewo.supabase.co
+
+jobs:
+  transcribe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    
+    steps:
+      - name: 🐍 Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          
+      - name: 📦 Install Dependencies
+        run: |
+          pip install yt-dlp openai-whisper
+          sudo apt-get update && sudo apt-get install -y ffmpeg
+          
+      - name: 🎤 Download Audio & Transcribe with Whisper
+        id: transcribe
+        env:
+          VIDEO_URL: ${{ github.event.inputs.video_url }}
+          MODEL: ${{ github.event.inputs.model }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+        run: |
+          python3 << 'PYEOF'
+          import os, re, json, subprocess
+          import whisper
+          from datetime import datetime, timezone
+          
+          video_url = os.environ.get('VIDEO_URL', '')
+          model_name = os.environ.get('MODEL', 'base')
+          supabase_url = os.environ.get('SUPABASE_URL', '')
+          supabase_key = os.environ.get('SUPABASE_KEY', '')
+          
+          print(f"{'='*70}")
+          print(f"🎤 WHISPER TRANSCRIPTION V4")
+          print(f"{'='*70}")
+          print(f"URL: {video_url}")
+          print(f"Model: {model_name}")
+          
+          # Extract video ID
+          patterns = [
+              r'shorts/([a-zA-Z0-9_-]{11})',
+              r'(?:v=|/v/)([a-zA-Z0-9_-]{11})',
+              r'youtu\\.be/([a-zA-Z0-9_-]{11})',
+          ]
+          
+          video_id = None
+          for p in patterns:
+              m = re.search(p, video_url)
+              if m:
+                  video_id = m.group(1)
+                  break
+          
+          if not video_id:
+              print("❌ Invalid URL")
+              exit(1)
+          
+          print(f"📺 Video ID: {video_id}")
+          
+          # Download audio only
+          audio_file = f"/tmp/{video_id}.mp3"
+          print(f"\n📥 Downloading audio...")
+          
+          result = subprocess.run([
+              'yt-dlp',
+              '-x',  # Extract audio
+              '--audio-format', 'mp3',
+              '--audio-quality', '0',
+              '-o', audio_file.replace('.mp3', '.%(ext)s'),
+              f"https://www.youtube.com/watch?v={video_id}"
+          ], capture_output=True, text=True, timeout=120)
+          
+          if result.returncode != 0:
+              print(f"❌ Download failed: {result.stderr}")
+              exit(1)
+          
+          # Find the actual file (might have different extension before conversion)
+          import glob
+          audio_files = glob.glob(f"/tmp/{video_id}.*")
+          if audio_files:
+              audio_file = audio_files[0]
+              print(f"✅ Audio downloaded: {audio_file}")
+          else:
+              print("❌ No audio file found")
+              exit(1)
+          
+          # Get metadata
+          metadata = {"title": "Unknown", "channel": "Unknown", "duration": 0}
+          try:
+              r = subprocess.run(['yt-dlp', '--dump-json', '--no-download', f"https://www.youtube.com/watch?v={video_id}"],
+                                capture_output=True, text=True, timeout=30)
+              if r.returncode == 0:
+                  d = json.loads(r.stdout)
+                  metadata = {"title": d.get('title','Unknown'), "channel": d.get('channel','Unknown'), "duration": d.get('duration',0)}
+                  print(f"📝 Title: {metadata['title']}")
+                  print(f"📺 Channel: {metadata['channel']}")
+                  print(f"⏱️ Duration: {metadata['duration']}s")
+          except Exception as e:
+              print(f"⚠️ Metadata error: {e}")
+          
+          # Transcribe with Whisper
+          print(f"\n🎤 Loading Whisper model: {model_name}...")
+          model = whisper.load_model(model_name)
+          
+          print(f"🔊 Transcribing...")
+          result = model.transcribe(audio_file)
+          
+          transcript = result["text"].strip()
+          segments = result.get("segments", [])
+          
+          print(f"\n{'='*70}")
+          print(f"📊 RESULT: whisper_{model_name} | {len(transcript)} chars")
+          print(f"{'='*70}")
+          print(f"\n📝 TRANSCRIPT:\n{'-'*50}")
+          print(transcript)
+          
+          # Save with timestamps
+          output = {
+              "video_id": video_id,
+              "video_url": video_url,
+              "title": metadata['title'],
+              "channel": metadata['channel'],
+              "duration_seconds": metadata.get('duration', 0),
+              "transcript": transcript,
+              "transcript_length": len(transcript),
+              "word_count": len(transcript.split()),
+              "transcript_source": f"whisper_{model_name}",
+              "segments": [{"start": s["start"], "end": s["end"], "text": s["text"]} for s in segments],
+              "extracted_at": datetime.now(timezone.utc).isoformat()
+          }
+          
+          with open('transcript.json', 'w') as f:
+              json.dump(output, f, indent=2)
+          
+          # Supabase logging
+          if supabase_key and transcript:
+              try:
+                  import requests
+                  headers = {"apikey": supabase_key, "Authorization": f"Bearer {supabase_key}", "Content-Type": "application/json"}
+                  insight = {
+                      "user_id": 1,
+                      "insight_type": "youtube_transcript",
+                      "title": f"📺 {metadata['title'][:80]}",
+                      "content": transcript[:10000],
+                      "category": "research",
+                      "source": f"whisper_{model_name}",
+                      "priority": 2,
+                      "status": "Active"
+                  }
+                  requests.post(f"{supabase_url}/rest/v1/insights", headers=headers, json=insight, timeout=10)
+                  print("\n✅ Saved to Supabase")
+              except Exception as e:
+                  print(f"⚠️ Supabase error: {e}")
+          
+          # GitHub outputs
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
+              f.write(f"video_id={video_id}\n")
+              f.write(f"transcript_source=whisper_{model_name}\n")
+              f.write(f"transcript_length={len(transcript)}\n")
+          
+          print(f"\n✅ Done!")
+          PYEOF
+          
+      - name: 📤 Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: transcript-whisper-${{ steps.transcribe.outputs.video_id }}
+          path: transcript.json
+          retention-days: 30
