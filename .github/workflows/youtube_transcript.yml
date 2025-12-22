@@ -4,11 +4,11 @@ on:
   workflow_dispatch:
     inputs:
       video_url:
-        description: 'YouTube URL'
+        description: 'YouTube URL (full URL or just video ID)'
         required: true
         type: string
       category:
-        description: 'Category'
+        description: 'Category for Supabase'
         required: false
         default: 'learning'
         type: string
@@ -36,7 +36,7 @@ jobs:
       - name: Transcribe Video
         id: transcribe
         env:
-          VIDEO_URL: ${{ github.event.inputs.video_url }}
+          VIDEO_INPUT: ${{ github.event.inputs.video_url }}
           CATEGORY: ${{ github.event.inputs.category }}
           SUPABASE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
           APIFY_API_TOKEN: ${{ secrets.APIFY_API_TOKEN }}
@@ -45,38 +45,50 @@ jobs:
           import os, re, json, subprocess, glob, requests, time
           from datetime import datetime, timezone
           
-          video_url = os.environ.get('VIDEO_URL', '')
+          video_input = os.environ.get('VIDEO_INPUT', '').strip()
           category = os.environ.get('CATEGORY', 'learning')
           supabase_url = os.environ.get('SUPABASE_URL', '')
           supabase_key = os.environ.get('SUPABASE_KEY', '')
           apify_token = os.environ.get('APIFY_API_TOKEN', '')
           
           print(f"{'='*60}")
-          print(f"YOUTUBE TRANSCRIPT V7 (4-Tier)")
+          print(f"YOUTUBE TRANSCRIPT V7.1 (4-Tier + Flexible Input)")
           print(f"{'='*60}")
           
-          # Extract video ID
+          # FLEXIBLE INPUT: Accept video_id OR full URL
           video_id = None
-          patterns = [
-              r'shorts/([a-zA-Z0-9_-]{11})',
-              r'(?:v=|/v/)([a-zA-Z0-9_-]{11})',
-              r'youtu\.be/([a-zA-Z0-9_-]{11})',
-              r'embed/([a-zA-Z0-9_-]{11})',
-              r'/live/([a-zA-Z0-9_-]{11})',
-              r'watch\?.*v=([a-zA-Z0-9_-]{11})'
-          ]
-          for p in patterns:
-              m = re.search(p, video_url)
-              if m:
-                  video_id = m.group(1)
-                  break
+          video_url = video_input
+          
+          # Check if input is just a video ID (11 chars, alphanumeric with - and _)
+          if re.match(r'^[a-zA-Z0-9_-]{11}$', video_input):
+              video_id = video_input
+              video_url = f"https://www.youtube.com/watch?v={video_id}"
+              print(f"Input detected as VIDEO ID: {video_id}")
+          else:
+              # Extract video ID from URL
+              patterns = [
+                  r'shorts/([a-zA-Z0-9_-]{11})',
+                  r'(?:v=|/v/)([a-zA-Z0-9_-]{11})',
+                  r'youtu\.be/([a-zA-Z0-9_-]{11})',
+                  r'embed/([a-zA-Z0-9_-]{11})',
+                  r'/live/([a-zA-Z0-9_-]{11})',
+                  r'watch\?.*v=([a-zA-Z0-9_-]{11})'
+              ]
+              for p in patterns:
+                  m = re.search(p, video_input)
+                  if m:
+                      video_id = m.group(1)
+                      break
+              print(f"Input detected as URL")
           
           if not video_id:
-              print("Invalid YouTube URL")
+              print(f"ERROR: Could not extract video ID from: {video_input}")
               exit(1)
           
           video_type = "short" if '/shorts/' in video_url else "regular"
-          print(f"Video: {video_id} ({video_type})")
+          print(f"Video ID: {video_id}")
+          print(f"Video URL: {video_url}")
+          print(f"Type: {video_type}")
           
           # Get metadata
           metadata = {"title": "Unknown", "channel": "Unknown", "duration": 0}
