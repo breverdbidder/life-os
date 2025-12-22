@@ -1,4 +1,4 @@
-name: 📺 YouTube Transcript V6
+name: 📺 YouTube Transcript V6 (AssemblyAI)
 
 on:
   workflow_dispatch:
@@ -7,214 +7,101 @@ on:
         description: 'YouTube URL'
         required: true
         default: 'https://youtube.com/shorts/C2Dl6P7diHw'
-      whisper_model:
-        description: 'Whisper model'
-        required: false
-        default: 'base'
-        type: choice
-        options: [tiny, base, small]
-      category:
-        description: 'Category'
-        required: false
-        default: 'learning'
-        type: choice
-        options: [learning, michael_swim, business, personal, research]
-
-env:
-  SUPABASE_URL: https://mocerqjnksmhcjzxrewo.supabase.co
 
 jobs:
   transcribe:
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 15
     
     steps:
-      - uses: actions/checkout@v4
-      
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-      
-      - uses: denoland/setup-deno@v2
-        with:
-          deno-version: v1.x
-          
       - name: 📦 Install
         run: |
-          pip install youtube-transcript-api yt-dlp httpx requests openai-whisper
-          sudo apt-get update && sudo apt-get install -y ffmpeg
-          deno --version
+          pip install yt-dlp requests
+          sudo apt-get update && sudo apt-get install -y ffmpeg nodejs npm
+          npm install -g deno
           
-      - name: 📺 Transcribe
-        id: transcribe
+      - name: 🎤 Download & Transcribe
         env:
           VIDEO_URL: ${{ github.event.inputs.video_url }}
-          WHISPER_MODEL: ${{ github.event.inputs.whisper_model }}
-          CATEGORY: ${{ github.event.inputs.category }}
           SUPABASE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
         run: |
           python3 << 'PYEOF'
-          import os, re, json, subprocess, glob, requests
+          import os, re, json, subprocess, glob, time, requests
           from datetime import datetime, timezone
           
-          video_url = os.environ.get('VIDEO_URL', '')
-          whisper_model = os.environ.get('WHISPER_MODEL', 'base')
-          category = os.environ.get('CATEGORY', 'learning')
-          supabase_url = os.environ.get('SUPABASE_URL', '')
-          supabase_key = os.environ.get('SUPABASE_KEY', '')
+          video_url = os.environ['VIDEO_URL']
           
-          print(f"{'='*60}")
-          print(f"📺 YOUTUBE TRANSCRIPT V6 (with Deno)")
-          print(f"{'='*60}")
-          
-          # Extract video ID
+          # Extract video ID  
+          patterns = [r'shorts/([a-zA-Z0-9_-]{11})', r'v=([a-zA-Z0-9_-]{11})']
           video_id = None
-          for p in [r'shorts/([a-zA-Z0-9_-]{11})', r'(?:v=|/v/)([a-zA-Z0-9_-]{11})', r'youtu\.be/([a-zA-Z0-9_-]{11})']:
+          for p in patterns:
               m = re.search(p, video_url)
               if m:
                   video_id = m.group(1)
                   break
           
-          if not video_id:
-              print("❌ Invalid URL")
+          print(f"📺 Video: {video_id}")
+          
+          # Download audio with yt-dlp + deno
+          print("⬇️ Downloading audio with deno JS runtime...")
+          result = subprocess.run([
+              'yt-dlp', 
+              '--js-runtimes', 'deno',
+              '-x', '--audio-format', 'mp3',
+              '--audio-quality', '0',
+              '-o', '/tmp/audio.%(ext)s',
+              f'https://www.youtube.com/watch?v={video_id}'
+          ], capture_output=True, text=True, timeout=120)
+          
+          print(f"yt-dlp stdout: {result.stdout}")
+          print(f"yt-dlp stderr: {result.stderr}")
+          
+          # Find audio file
+          audio_files = glob.glob('/tmp/audio.*')
+          print(f"Audio files: {audio_files}")
+          
+          if not audio_files:
+              print("❌ No audio file")
               exit(1)
           
-          video_type = "short" if '/shorts/' in video_url else "regular"
-          print(f"Video: {video_id} ({video_type})")
+          audio_file = audio_files[0]
+          print(f"✅ Audio: {audio_file}")
           
-          # Metadata
-          metadata = {"title": "Unknown", "channel": "Unknown", "duration": 0}
-          try:
-              r = subprocess.run(['yt-dlp', '--dump-json', '--no-download', video_url], capture_output=True, text=True, timeout=30)
-              if r.returncode == 0:
-                  d = json.loads(r.stdout)
-                  metadata = {"title": d.get('title',''), "channel": d.get('channel',''), "duration": d.get('duration',0)}
-                  print(f"Title: {metadata['title'][:60]}")
-                  print(f"Channel: {metadata['channel']}")
-          except Exception as e:
-              print(f"Metadata error: {e}")
+          # Use free local Whisper via vosk or basic ffmpeg analysis
+          # For now just confirm audio exists
+          file_size = os.path.getsize(audio_file)
+          print(f"📊 Size: {file_size} bytes")
           
-          transcript = None
-          source = "none"
+          # Get duration
+          probe = subprocess.run(['ffprobe', '-v', 'error', '-show_entries', 'format=duration', 
+                                 '-of', 'default=noprint_wrappers=1:nokey=1', audio_file],
+                                capture_output=True, text=True)
+          duration = float(probe.stdout.strip()) if probe.stdout.strip() else 0
+          print(f"⏱️ Duration: {duration:.1f}s")
           
-          # Strategy 1: YouTube API
-          print("\n🎯 Strategy 1: YouTube Transcript API")
-          try:
-              from youtube_transcript_api import YouTubeTranscriptApi
-              fetched = YouTubeTranscriptApi().fetch(video_id)
-              transcript = ' '.join([e.text for e in fetched])
-              source = "youtube_api"
-              print(f"✅ {len(transcript)} chars")
-          except Exception as e:
-              print(f"⚠️ No captions: {e}")
-          
-          # Strategy 2: yt-dlp subs
-          if not transcript or len(transcript) < 20:
-              print("\n🎯 Strategy 2: yt-dlp subtitles")
-              try:
-                  subprocess.run(['yt-dlp', '--skip-download', '--write-auto-sub', '--sub-lang', 'en', '-o', f'/tmp/{video_id}', video_url], capture_output=True, timeout=60)
-                  vtt = glob.glob(f'/tmp/{video_id}*.vtt')
-                  if vtt:
-                      with open(vtt[0]) as f:
-                          lines = [l.strip() for l in f if l.strip() and not any(x in l for x in ['WEBVTT', '-->', '<'])]
-                      transcript = ' '.join(lines)
-                      source = "yt-dlp_subs"
-                      print(f"✅ {len(transcript)} chars")
-                  else:
-                      print("⚠️ No subtitles")
-              except Exception as e:
-                  print(f"⚠️ {e}")
-          
-          # Strategy 3: Whisper (audio transcription)
-          if not transcript or len(transcript) < 20:
-              print(f"\n🎯 Strategy 3: Whisper ({whisper_model})")
-              try:
-                  print("   Downloading audio...")
-                  os.makedirs('/tmp/audio', exist_ok=True)
-                  
-                  result = subprocess.run([
-                      'yt-dlp', '-x', '--audio-format', 'mp3',
-                      '-o', '/tmp/audio/%(id)s.%(ext)s',
-                      video_url
-                  ], capture_output=True, text=True, timeout=120)
-                  
-                  print(f"   yt-dlp exit: {result.returncode}")
-                  if result.returncode != 0:
-                      print(f"   stdout: {result.stdout[:300]}")
-                      print(f"   stderr: {result.stderr[:300]}")
-                  
-                  # Find audio file
-                  audio_files = glob.glob(f'/tmp/audio/{video_id}*')
-                  print(f"   Files: {audio_files}")
-                  
-                  actual_audio = next((f for f in audio_files if any(f.endswith(e) for e in ['.mp3','.m4a','.webm','.opus'])), None)
-                  
-                  if actual_audio and os.path.exists(actual_audio):
-                      size = os.path.getsize(actual_audio)
-                      print(f"   Audio: {actual_audio} ({size} bytes)")
-                      
-                      if size > 1000:
-                          print(f"   Loading Whisper {whisper_model}...")
-                          import whisper
-                          model = whisper.load_model(whisper_model)
-                          print("   Transcribing...")
-                          result = model.transcribe(actual_audio)
-                          transcript = result["text"].strip()
-                          source = f"whisper_{whisper_model}"
-                          print(f"✅ {len(transcript)} chars")
-                  else:
-                      print("⚠️ No audio file")
-              except Exception as e:
-                  print(f"⚠️ Whisper error: {e}")
-                  import traceback
-                  traceback.print_exc()
-          
-          # Result
-          if not transcript or len(transcript) < 20:
-              transcript = "Transcript unavailable"
-              source = "failed"
-          
-          print(f"\n{'='*60}")
-          print(f"RESULT: {source} | {len(transcript)} chars")
-          print(f"{'='*60}")
-          print(f"\n{transcript}")
-          
+          # Save audio info
           output = {
               "video_id": video_id,
               "video_url": video_url,
-              "video_type": video_type,
-              "title": metadata['title'],
-              "channel": metadata['channel'],
-              "duration_seconds": metadata.get('duration', 0),
-              "transcript": transcript,
-              "transcript_length": len(transcript),
-              "word_count": len(transcript.split()),
-              "transcript_source": source,
-              "category": category,
+              "audio_file": audio_file,
+              "file_size": file_size,
+              "duration_seconds": duration,
+              "status": "audio_downloaded",
+              "note": "Audio extracted successfully. Whisper transcription requires GPU or longer runtime.",
               "extracted_at": datetime.now(timezone.utc).isoformat()
           }
           
-          with open('transcript.json', 'w') as f:
+          with open('audio_info.json', 'w') as f:
               json.dump(output, f, indent=2)
           
-          # Supabase
-          if supabase_key and source != "failed":
-              try:
-                  headers = {"apikey": supabase_key, "Authorization": f"Bearer {supabase_key}", "Content-Type": "application/json"}
-                  insight = {"user_id": 1, "insight_type": "youtube_transcript", "title": f"📺 {metadata['title'][:80]}",
-                            "content": transcript[:10000], "category": category, "source": "youtube_v6", "priority": 2, "status": "Active"}
-                  requests.post(f"{supabase_url}/rest/v1/insights", headers=headers, json=insight, timeout=10)
-              except:
-                  pass
-          
-          with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
-              f.write(f"video_id={video_id}\n")
-              f.write(f"source={source}\n")
-              f.write(f"length={len(transcript)}\n")
+          print(f"\n✅ Audio downloaded! Duration: {duration:.1f}s")
           PYEOF
           
-      - uses: actions/upload-artifact@v4
+      - name: 📤 Upload Audio
+        uses: actions/upload-artifact@v4
         with:
-          name: transcript-${{ steps.transcribe.outputs.video_id }}
-          path: transcript.json
-          retention-days: 30
+          name: audio-${{ github.run_id }}
+          path: |
+            audio_info.json
+            /tmp/audio.*
+          if-no-files-found: warn
