@@ -1,4 +1,4 @@
-name: 🎬 Apify YouTube Transcript
+name: 🎬 Apify YouTube Transcript V2
 
 on:
   workflow_dispatch:
@@ -37,16 +37,16 @@ jobs:
           print(f"📺 Video ID: {video_id}")
           print(f"🔑 Token: {'SET' if apify_token else 'MISSING'}")
           
-          # Use Apify YouTube Transcript Scraper
-          run_url = f"https://api.apify.com/v2/acts/streamers~youtube-transcript-scraper/runs?token={apify_token}"
+          # Use karamelo/youtube-transcripts - most reliable
+          run_url = f"https://api.apify.com/v2/acts/karamelo~youtube-transcripts/runs?token={apify_token}"
           
           payload = {
-              "startUrls": [{"url": f"https://www.youtube.com/watch?v={video_id}"}],
-              "outputFormat": "singleStringText",
+              "startUrls": [f"https://www.youtube.com/watch?v={video_id}"],
+              "outputFormat": "captions array with text only",
               "maxRetries": 3
           }
           
-          print("🚀 Starting Apify actor...")
+          print("🚀 Starting Apify actor (karamelo/youtube-transcripts)...")
           resp = requests.post(run_url, json=payload, timeout=30)
           print(f"Response: {resp.status_code}")
           
@@ -69,14 +69,26 @@ jobs:
                       dataset_url = f"https://api.apify.com/v2/datasets/{dataset_id}/items?token={apify_token}"
                       results = requests.get(dataset_url, timeout=30).json()
                       
+                      print(f"Results: {json.dumps(results, indent=2)[:2000]}")
+                      
                       if results:
                           item = results[0]
-                          transcript = item.get('text', '') or item.get('transcript', '') or item.get('captions', '')
-                          title = item.get('title', 'Unknown')
-                          channel = item.get('channelName', 'Unknown')
+                          # Try different field names
+                          transcript = (item.get('captions', '') or 
+                                       item.get('transcript', '') or 
+                                       item.get('text', '') or
+                                       item.get('captionsText', '') or
+                                       str(item.get('captionsArray', '')))
+                          
+                          # If captions is a list, join it
+                          if isinstance(transcript, list):
+                              transcript = ' '.join([c.get('text', str(c)) for c in transcript])
+                          
+                          title = item.get('title', item.get('videoTitle', 'Unknown'))
+                          channel = item.get('channelName', item.get('channel', 'Unknown'))
                           
                           print(f"\n{'='*70}")
-                          print(f"📝 TRANSCRIPT ({len(transcript)} chars):")
+                          print(f"📝 TRANSCRIPT ({len(str(transcript))} chars):")
                           print(f"{'='*70}")
                           print(transcript)
                           
@@ -86,9 +98,10 @@ jobs:
                               "title": title,
                               "channel": channel,
                               "transcript": transcript,
-                              "transcript_length": len(transcript),
-                              "word_count": len(transcript.split()),
-                              "transcript_source": "apify",
+                              "transcript_length": len(str(transcript)),
+                              "word_count": len(str(transcript).split()),
+                              "transcript_source": "apify_karamelo",
+                              "raw_result": item,
                               "extracted_at": datetime.now(timezone.utc).isoformat()
                           }
                           
@@ -108,7 +121,7 @@ jobs:
         uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: apify-transcript
+          name: apify-transcript-v2
           path: transcript.json
           retention-days: 30
           if-no-files-found: ignore
