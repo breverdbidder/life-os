@@ -1,0 +1,222 @@
+name: 📺 YouTube Transcript Agent V6 (Apify)
+
+on:
+  workflow_dispatch:
+    inputs:
+      video_url:
+        description: 'YouTube URL'
+        required: true
+        default: 'https://youtube.com/shorts/C2Dl6P7diHw'
+      category:
+        description: 'Category'
+        required: false
+        default: 'learning'
+        type: choice
+        options:
+          - learning
+          - michael_swim
+          - business
+          - personal
+          - research
+      log_to_supabase:
+        description: 'Log to Supabase'
+        required: false
+        default: true
+        type: boolean
+
+env:
+  SUPABASE_URL: https://mocerqjnksmhcjzxrewo.supabase.co
+
+jobs:
+  transcribe:
+    name: 🎬 Extract YouTube Transcript
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    
+    steps:
+      - name: 🔄 Checkout
+        uses: actions/checkout@v4
+        
+      - name: 📺 Extract via Apify
+        id: transcribe
+        env:
+          VIDEO_URL: ${{ github.event.inputs.video_url }}
+          CATEGORY: ${{ github.event.inputs.category }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+          APIFY_TOKEN: ${{ secrets.APIFY_API_TOKEN }}
+          LOG_TO_SUPABASE: ${{ github.event.inputs.log_to_supabase }}
+        run: |
+          python3 << 'PYEOF'
+          import os, re, json, requests, time
+          from datetime import datetime, timezone
+          
+          video_url = os.environ.get('VIDEO_URL', '')
+          category = os.environ.get('CATEGORY', 'learning')
+          supabase_url = os.environ.get('SUPABASE_URL', '')
+          supabase_key = os.environ.get('SUPABASE_KEY', '')
+          apify_token = os.environ.get('APIFY_TOKEN', '')
+          log_to_supabase = os.environ.get('LOG_TO_SUPABASE', 'true').lower() == 'true'
+          
+          print(f"{'='*70}")
+          print(f"📺 YOUTUBE TRANSCRIPT AGENT V6 (APIFY)")
+          print(f"{'='*70}")
+          print(f"URL: {video_url}")
+          
+          # Extract video ID
+          patterns = [
+              r'shorts/([a-zA-Z0-9_-]{11})',
+              r'(?:v=|/v/)([a-zA-Z0-9_-]{11})',
+              r'youtu\.be/([a-zA-Z0-9_-]{11})',
+          ]
+          
+          video_id = None
+          for p in patterns:
+              m = re.search(p, video_url)
+              if m:
+                  video_id = m.group(1)
+                  break
+          
+          if not video_id:
+              print("❌ Invalid URL")
+              exit(1)
+          
+          video_type = "short" if '/shorts/' in video_url else "regular"
+          print(f"📺 Video ID: {video_id} ({video_type})")
+          
+          transcript = None
+          transcript_source = "none"
+          metadata = {"title": "Unknown", "channel": "Unknown", "duration": 0}
+          
+          # Use karamelo/youtube-transcripts actor (most reliable)
+          actors = [
+              ("karamelo~youtube-transcripts", {"urls": [f"https://www.youtube.com/watch?v={video_id}"], "outputFormat": "text"}),
+              ("topaz_sharingan~youtube-transcript-scraper", {"startUrls": [{"url": f"https://www.youtube.com/watch?v={video_id}"}]}),
+              ("naz_here~youtube-transcript-scraper", {"video_urls": [f"https://www.youtube.com/watch?v={video_id}"]}),
+          ]
+          
+          for actor_id, payload in actors:
+              if transcript and len(transcript) > 20:
+                  break
+                  
+              print(f"\n🎯 Trying Apify actor: {actor_id}")
+              try:
+                  # Start the actor run
+                  run_url = f"https://api.apify.com/v2/acts/{actor_id}/runs?token={apify_token}"
+                  resp = requests.post(run_url, json=payload, timeout=30)
+                  print(f"   Response: {resp.status_code}")
+                  
+                  if resp.status_code == 201:
+                      run_data = resp.json()
+                      run_id = run_data['data']['id']
+                      dataset_id = run_data['data']['defaultDatasetId']
+                      print(f"   Run ID: {run_id}")
+                      
+                      # Wait for completion
+                      for i in range(24):  # Max 2 minutes
+                          time.sleep(5)
+                          status_url = f"https://api.apify.com/v2/actor-runs/{run_id}?token={apify_token}"
+                          status_resp = requests.get(status_url, timeout=10)
+                          status = status_resp.json()['data']['status']
+                          print(f"   Status ({i+1}): {status}")
+                          
+                          if status == 'SUCCEEDED':
+                              # Get results
+                              dataset_url = f"https://api.apify.com/v2/datasets/{dataset_id}/items?token={apify_token}"
+                              results = requests.get(dataset_url, timeout=30).json()
+                              print(f"   Results: {len(results)} items")
+                              
+                              if results and len(results) > 0:
+                                  item = results[0]
+                                  # Try different field names
+                                  transcript = item.get('transcript') or item.get('captions') or item.get('text') or item.get('content', '')
+                                  
+                                  # Handle array of captions
+                                  if isinstance(transcript, list):
+                                      transcript = ' '.join([c.get('text', str(c)) for c in transcript])
+                                  
+                                  if transcript:
+                                      transcript_source = f"apify_{actor_id.split('~')[0]}"
+                                      metadata['title'] = item.get('title') or item.get('videoTitle') or metadata['title']
+                                      metadata['channel'] = item.get('channel') or item.get('channelName') or metadata['channel']
+                                      print(f"✅ Got {len(transcript)} chars from {actor_id}")
+                                      print(f"   Title: {metadata['title'][:60]}")
+                              break
+                          elif status in ['FAILED', 'ABORTED', 'TIMED-OUT']:
+                              print(f"⚠️ Actor {status}")
+                              break
+                  else:
+                      print(f"⚠️ API error: {resp.status_code} - {resp.text[:200]}")
+                      
+              except Exception as e:
+                  print(f"⚠️ Error: {e}")
+          
+          # Final result
+          if not transcript or len(transcript) < 20:
+              transcript = "Transcript unavailable - video may not have captions"
+              transcript_source = "failed"
+          
+          print(f"\n{'='*70}")
+          print(f"📊 RESULT: {transcript_source} | {len(transcript)} chars")
+          print(f"{'='*70}")
+          print(f"\n📝 TRANSCRIPT:\n{'-'*50}")
+          print(transcript[:2000])
+          
+          # Save output
+          output = {
+              "video_id": video_id,
+              "video_url": video_url,
+              "video_type": video_type,
+              "title": metadata['title'],
+              "channel": metadata['channel'],
+              "duration_seconds": metadata.get('duration', 0),
+              "transcript": transcript,
+              "transcript_length": len(transcript),
+              "word_count": len(transcript.split()),
+              "transcript_source": transcript_source,
+              "category": category,
+              "extracted_at": datetime.now(timezone.utc).isoformat()
+          }
+          
+          with open('transcript.json', 'w') as f:
+              json.dump(output, f, indent=2)
+          
+          # Log to Supabase
+          if log_to_supabase and supabase_key and transcript_source != "failed":
+              try:
+                  headers = {"apikey": supabase_key, "Authorization": f"Bearer {supabase_key}", "Content-Type": "application/json", "Prefer": "return=minimal"}
+                  insight = {
+                      "user_id": 1, 
+                      "insight_type": "youtube_transcript", 
+                      "title": f"📺 {metadata['title'][:80]}",
+                      "content": transcript[:10000], 
+                      "category": category, 
+                      "source": "youtube_v6", 
+                      "priority": 2, 
+                      "status": "Active"
+                  }
+                  r = requests.post(f"{supabase_url}/rest/v1/insights", headers=headers, json=insight, timeout=10)
+                  print(f"\n📤 Supabase: {r.status_code}")
+              except Exception as e:
+                  print(f"⚠️ Supabase error: {e}")
+          
+          # GitHub outputs
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
+              f.write(f"video_id={video_id}\n")
+              f.write(f"transcript_source={transcript_source}\n")
+              f.write(f"transcript_length={len(transcript)}\n")
+          
+          print(f"\n✅ Complete!")
+          PYEOF
+          
+      - name: 📤 Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: transcript-${{ steps.transcribe.outputs.video_id }}
+          path: transcript.json
+          retention-days: 30
+          
+      - name: 📊 Summary
+        run: |
+          echo "## 📺 Transcript Extracted" >> $GITHUB_STEP_SUMMARY
+          echo "- **Source:** ${{ steps.transcribe.outputs.transcript_source }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Length:** ${{ steps.transcribe.outputs.transcript_length }} chars" >> $GITHUB_STEP_SUMMARY
