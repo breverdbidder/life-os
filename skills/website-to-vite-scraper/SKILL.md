@@ -1,129 +1,185 @@
 ---
 name: website-to-vite-scraper
-description: Scrape any website and convert it to a deployable Vite project with proper asset handling, CSS processing, and GitHub/Cloudflare deployment. Triggers on requests to clone, reverse-engineer, or convert websites to modern frameworks.
+description: Multi-provider website scraper that converts any website (including CSR/SPA) to deployable static sites. Uses Playwright, Apify RAG Browser, Crawl4AI, and Firecrawl for comprehensive scraping. Triggers on requests to clone, reverse-engineer, or convert websites.
+version: "2.0"
 ---
 
-# Website-to-Vite Scraper Skill
+# Website-to-Vite Scraper V2
 
-Converts any website into a clean, deployable Vite project with proper asset organization.
+Multi-provider website scraper with AI-powered extraction for any website type.
 
-## When to Use
+## Scraping Methods
 
-- Reverse engineering website designs
-- Converting legacy sites to modern frameworks
-- Creating templates from existing sites
-- Backing up website assets and structure
+| Method | Best For | Anti-Bot | JS Rendering | Cost |
+|--------|----------|----------|--------------|------|
+| **Playwright** | General sites, Next.js/React apps | ❌ | ✅ Full | FREE |
+| **Apify RAG Browser** | LLM/RAG-optimized content | ✅ | ✅ Adaptive | Credits |
+| **Crawl4AI** | AI training data, clean extraction | ✅ | ✅ | Credits |
+| **Firecrawl** | Protected sites, anti-bot bypass | ✅✅ | ✅ | $16/mo |
 
 ## Quick Start
 
-```python
-from website_scraper import WebsiteToViteScraper
+### GitHub Actions (Recommended)
 
-scraper = WebsiteToViteScraper("https://example.com", "my-project")
-scraper.scrape()
+```bash
+# Go to: Actions → Website Scraper V2 → Run workflow
+# Options:
+#   - URL: https://www.reventure.app/
+#   - Project name: reventure-clone
+#   - Method: all (tries all providers)
+#   - Deploy: true
 ```
+
+### API MEGA LIBRARY Integration
+
+The following APIs from our library enhance this scraper:
+
+| API | Purpose | Status |
+|-----|---------|--------|
+| `APIFY_API_TOKEN` | RAG Browser, Crawl4AI, Web Scraper | ✅ Configured |
+| `FIRECRAWL_API_KEY` | Anti-bot bypass, stealth mode | ✅ Configured |
+| `BROWSERLESS_API_KEY` | Alternative headless browser | 🔄 Available |
+
+### MCP Server Integration
+
+Connect Claude Desktop/Cursor to Apify MCP for AI-powered scraping:
+
+```json
+{
+  "mcpServers": {
+    "apify": {
+      "command": "npx",
+      "args": ["@apify/actors-mcp-server"],
+      "env": {
+        "APIFY_TOKEN": "your-apify-api-token"
+      }
+    }
+  }
+}
+```
+
+Or use hosted: `https://mcp.apify.com?token=YOUR_TOKEN`
+
+## Apify Actors Used
+
+### apify/rag-web-browser
+- **Purpose:** LLM-optimized web content extraction
+- **Output:** Markdown, HTML, text
+- **Features:** 
+  - Playwright adaptive (handles JS)
+  - Clean content extraction
+  - Link following
+  - Metadata extraction
+
+### raizen/ai-web-scraper (Crawl4AI)
+- **Purpose:** AI training data collection
+- **Output:** Cleaned markdown, structured links
+- **Features:**
+  - Excludes boilerplate (headers, footers, nav)
+  - Word count thresholding
+  - External link filtering
+
+### Firecrawl
+- **Purpose:** Anti-bot protected sites
+- **Output:** Markdown, HTML, screenshots
+- **Features:**
+  - Anti-detection technology
+  - JavaScript rendering
+  - Main content extraction
+  - 5-second wait for dynamic content
 
 ## Output Structure
 
 ```
-my-project/
-├── index.html           # Main entry point
-├── package.json         # npm dependencies
-├── vite.config.js       # Vite configuration
-├── .gitignore
-├── README.md
-└── src/
-    ├── main.js          # Entry script
-    ├── style.css        # Compiled styles
-    ├── pages/           # Scraped HTML pages
-    │   ├── index.html
-    │   ├── about.html
-    │   └── contact.html
-    └── assets/
-        ├── images/      # Downloaded images
-        ├── css/         # External stylesheets
-        ├── js/          # External scripts
-        └── fonts/       # Web fonts
+project-name/
+├── dist/
+│   ├── index.html      # Best merged HTML
+│   ├── screenshot.png  # Full page capture
+│   ├── meta.json       # Scrape metadata
+│   └── assets/
+│       ├── images/     # Downloaded images
+│       ├── css/        # Stylesheets
+│       └── js/         # Scripts
+└── results/
+    ├── playwright/     # Raw Playwright output
+    ├── apify-rag/      # RAG Browser output
+    ├── crawl4ai/       # Crawl4AI output
+    └── firecrawl/      # Firecrawl output
 ```
 
-## Full Implementation
+## Handling CSR/SPA Sites
 
-See `website_scraper.py` in this skill folder for the complete implementation.
+Sites like Next.js, React, Vue that render client-side require JavaScript execution:
 
-## Features
+1. **Playwright** waits for `networkidle` + 5 seconds
+2. **Apify RAG** uses adaptive crawler (Playwright when needed)
+3. **Firecrawl** has built-in JS rendering
 
-- **Smart Asset Detection**: Identifies and downloads images, CSS, JS, fonts
-- **CSS Processing**: Resolves and downloads assets referenced in stylesheets
-- **Relative Path Fixing**: Converts all paths to work in Vite structure
-- **Rate Limiting**: Respectful crawling with configurable delays
-- **Error Recovery**: Continues on individual asset failures
-- **Parallel Downloads**: ThreadPoolExecutor for faster asset retrieval
+For `__NEXT_DATA__` extraction (Next.js sites):
+- Playwright automatically extracts and saves to `next_data.json`
+- Can be parsed to reconstruct static pages
 
-## Deployment Automation
+## Workflow Parameters
 
-```bash
-# After scraping, deploy to Cloudflare Pages
-cd my-project
-npm install
-npm run build
-npx wrangler pages deploy dist --project-name=my-project
-```
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `url` | string | required | Website URL to scrape |
+| `project_name` | string | required | Output folder/Cloudflare project name |
+| `scrape_method` | choice | playwright | Method to use |
+| `extract_assets` | boolean | true | Download images/CSS/JS |
+| `deploy_cloudflare` | boolean | true | Deploy to Cloudflare Pages |
 
-## GitHub Actions Workflow
+## Cost Optimization
 
-```yaml
-name: Deploy Scraped Site
-on:
-  push:
-    branches: [main]
-jobs:
-  deploy:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-      - run: npm install
-      - run: npm run build
-      - uses: cloudflare/pages-action@v1
-        with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          projectName: my-project
-          directory: dist
-```
+| Scenario | Recommended Method |
+|----------|-------------------|
+| Simple static site | Playwright (FREE) |
+| JS-heavy SPA | Playwright → Apify RAG fallback |
+| Protected site (Cloudflare) | Firecrawl |
+| AI/RAG pipeline | Apify RAG or Crawl4AI |
+| Maximum coverage | `all` method |
 
-## Configuration Options
+## Security Assessment
 
-| Option | Default | Description |
-|--------|---------|-------------|
-| `timeout` | 10s | Request timeout |
-| `max_workers` | 5 | Parallel download threads |
-| `rate_limit` | 0.5s | Delay between requests |
-| `user_agent` | Chrome | Browser identification |
-| `verify_ssl` | True | SSL certificate validation |
+Per API_MEGA_LIBRARY guidelines:
+
+| API | Security Score | Recommendation |
+|-----|----------------|----------------|
+| Apify | 85/100 | ✅ ADOPT |
+| Firecrawl | 82/100 | ✅ ADOPT |
+| Playwright | 90/100 | ✅ ADOPT (local) |
 
 ## Troubleshooting
 
-### SSL Errors
-```python
-# Disable SSL verification (not recommended for production)
-response = requests.get(url, verify=False)
-```
+### Site returns blank page
+1. Try `scrape_method: all` to use multiple providers
+2. Increase wait time in Playwright
+3. Check if site blocks datacenter IPs → use Firecrawl
 
-### Blocked by WAF
-```python
-headers = {
-    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-    'Accept': 'text/html,application/xhtml+xml',
-    'Accept-Language': 'en-US,en;q=0.9',
-}
-```
+### Assets not downloading
+1. Some sites block direct asset requests
+2. Use relative paths from original HTML
+3. Check for CORS restrictions
 
-### Large Files
-```python
-# Skip files larger than 10MB
-if int(response.headers.get('content-length', 0)) > 10_000_000:
-    return url  # Keep original URL
-```
+### Cloudflare protection detected
+1. Use Firecrawl (has anti-bot bypass)
+2. Or use Apify with residential proxies
+
+## Related Skills
+
+- `auction-results` - Uses similar scraping for auction data
+- `bcpao-scraper` - BCPAO property data extraction
+- `youtube-transcript` - Video content extraction
+
+## Changelog
+
+### V2.0 (Dec 2025)
+- Added multi-provider support (Playwright, Apify, Firecrawl)
+- MCP server integration
+- Automatic provider fallback
+- Asset downloading
+- Cloudflare Pages deployment
+
+### V1.0 (Dec 2025)
+- Initial Playwright-only scraper
+- Basic HTML/CSS/JS extraction
