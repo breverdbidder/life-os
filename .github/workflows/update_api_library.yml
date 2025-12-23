@@ -2,7 +2,7 @@ name: Update API Mega Library
 
 on:
   schedule:
-    - cron: '0 11 * * 0'
+    - cron: '0 11 * * 0'  # Sundays 6 AM EST
   workflow_dispatch:
     inputs:
       source:
@@ -18,31 +18,115 @@ on:
 jobs:
   discover-new-apis:
     runs-on: ubuntu-latest
-    outputs:
-      has_updates: ${{ steps.check.outputs.has_updates }}
+    permissions:
+      contents: write
     
     steps:
       - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GH_PAT }}
+      
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
       
       - name: Install dependencies
-        run: pip install httpx beautifulsoup4 anthropic
+        run: pip install httpx beautifulsoup4
 
-      - name: Discover MCP servers
-        run: python scripts/discover_mcp_servers.py > mcp_discoveries.json
+      - name: Discover MCP servers from awesome-mcp-servers
+        run: |
+          python3 << 'PYSCRIPT'
+          import httpx
+          import json
+          import re
+          
+          # Fetch awesome-mcp-servers
+          resp = httpx.get("https://raw.githubusercontent.com/punkpeye/awesome-mcp-servers/main/README.md")
+          content = resp.text
+          
+          # Parse MCP server entries
+          pattern = r'\[([^\]]+)\]\((https://github\.com/[^\)\s]+)\)\s*[-–]?\s*([^\n]*)'
+          matches = re.findall(pattern, content)
+          
+          # Load existing library
+          with open('docs/API_MEGA_LIBRARY.md', 'r') as f:
+              library = f.read()
+          existing_urls = set(re.findall(r'https://github\.com/[^\s\)\]]+', library))
+          
+          # Priority keywords
+          PRIORITY = ["google", "supabase", "database", "shopping", "e-commerce", "real-estate", "automation"]
+          
+          new_servers = []
+          for name, url, desc in matches[:200]:  # Limit to first 200
+              url_clean = url.rstrip('/')
+              if url_clean not in existing_urls and 'awesome-mcp' not in url_clean:
+                  text = (name + desc).lower()
+                  is_priority = any(p in text for p in PRIORITY)
+                  new_servers.append({
+                      "name": name.replace('|', '-')[:50],
+                      "url": url_clean,
+                      "description": desc.replace('|', '-').replace('\n', ' ')[:100],
+                      "priority": "HIGH" if is_priority else "NORMAL"
+                  })
+          
+          # Sort by priority
+          new_servers.sort(key=lambda x: (x['priority'] == "NORMAL", x['name']))
+          
+          with open('mcp_discoveries.json', 'w') as f:
+              json.dump(new_servers[:50], f, indent=2)  # Top 50
+          
+          print(f"Found {len(new_servers)} new MCP servers")
+          PYSCRIPT
 
       - name: Discover Apify actors
-        run: python scripts/discover_apify_actors.py > apify_discoveries.json
+        run: |
+          python3 << 'PYSCRIPT'
+          import httpx
+          import json
+          
+          # Search Apify for relevant actors
+          KEYWORDS = ["real-estate", "zillow", "costco", "grocery", "foreclosure"]
+          actors = []
+          
+          for keyword in KEYWORDS:
+              try:
+                  resp = httpx.get(f"https://api.apify.com/v2/store?search={keyword}&limit=10")
+                  if resp.status_code == 200:
+                      data = resp.json()
+                      for item in data.get("data", {}).get("items", []):
+                          actors.append({
+                              "id": item.get("username", "") + "/" + item.get("name", ""),
+                              "description": (item.get("description") or "")[:100].replace('|', '-'),
+                              "url": f"https://apify.com/{item.get('username')}/{item.get('name')}"
+                          })
+              except:
+                  pass
+          
+          # Dedupe by URL
+          seen = set()
+          unique = []
+          for a in actors:
+              if a['url'] not in seen:
+                  seen.add(a['url'])
+                  unique.append(a)
+          
+          with open('apify_discoveries.json', 'w') as f:
+              json.dump(unique[:20], f, indent=2)
+          
+          print(f"Found {len(unique)} Apify actors")
+          PYSCRIPT
 
       - name: Check for updates
         id: check
         run: |
           MCP=$(cat mcp_discoveries.json | python3 -c "import sys,json; print(len(json.load(sys.stdin)))")
           APIFY=$(cat apify_discoveries.json | python3 -c "import sys,json; print(len(json.load(sys.stdin)))")
+          echo "MCP servers found: $MCP"
+          echo "Apify actors found: $APIFY"
           if [ "$MCP" -gt 0 ] || [ "$APIFY" -gt 0 ]; then
             echo "has_updates=true" >> $GITHUB_OUTPUT
+            echo "mcp_count=$MCP" >> $GITHUB_OUTPUT
+            echo "apify_count=$APIFY" >> $GITHUB_OUTPUT
           else
             echo "has_updates=false" >> $GITHUB_OUTPUT
           fi
@@ -52,32 +136,65 @@ jobs:
         run: |
           python3 << 'PYSCRIPT'
           import json
+          from datetime import date
+          
           mcp = json.load(open('mcp_discoveries.json'))
           apify = json.load(open('apify_discoveries.json'))
           
-          lines = ["", "---", "", f"## Auto-discovered APIs ({__import__('datetime').date.today()})", ""]
+          lines = ["", "---", "", f"## 🤖 Auto-discovered APIs ({date.today()})", ""]
           
           if mcp:
-            lines.extend(["### New MCP Servers", "", "| Name | Description | URL |", "|------|-------------|-----|"])
-            for s in mcp[:10]:
-              lines.append(f"| {s['name']} | {s.get('description','')} | {s.get('url','')} |")
-            lines.append("")
+            # High priority first
+            high = [s for s in mcp if s.get('priority') == 'HIGH'][:10]
+            normal = [s for s in mcp if s.get('priority') != 'HIGH'][:10]
+            
+            if high:
+              lines.extend(["### ⭐ High Priority MCP Servers", "", "| Name | Description | URL |", "|------|-------------|-----|"])
+              for s in high:
+                lines.append(f"| {s['name']} | {s['description']} | {s['url']} |")
+              lines.append("")
+            
+            if normal:
+              lines.extend(["### 🔌 New MCP Servers", "", "| Name | Description | URL |", "|------|-------------|-----|"])
+              for s in normal:
+                lines.append(f"| {s['name']} | {s['description']} | {s['url']} |")
+              lines.append("")
           
           if apify:
-            lines.extend(["### New Apify Actors", "", "| Actor | Description | URL |", "|-------|-------------|-----|"])
+            lines.extend(["### 🕷️ New Apify Actors", "", "| Actor | Description | URL |", "|-------|-------------|-----|"])
             for a in apify[:10]:
-              lines.append(f"| {a['id']} | {a.get('description','')} | {a.get('url','')} |")
+              lines.append(f"| {a['id']} | {a['description']} | {a['url']} |")
           
           with open('library_additions.md', 'w') as f:
             f.write('\n'.join(lines))
+          
+          print(f"Generated updates: {len(mcp)} MCP, {len(apify)} Apify")
           PYSCRIPT
+          
           cat library_additions.md >> docs/API_MEGA_LIBRARY.md
 
-      - name: Commit changes
+      - name: Commit and push changes
         if: steps.check.outputs.has_updates == 'true'
         run: |
           git config user.name "Claude AI Architect"
           git config user.email "claude@biddeed.ai"
           git add docs/API_MEGA_LIBRARY.md
-          git commit -m "Auto-update API_MEGA_LIBRARY" || exit 0
+          git diff --staged --quiet || git commit -m "Auto-update API_MEGA_LIBRARY: +${{ steps.check.outputs.mcp_count }} MCP, +${{ steps.check.outputs.apify_count }} Apify"
           git push
+
+      - name: Log to Supabase
+        if: always()
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+        run: |
+          curl -X POST "$SUPABASE_URL/rest/v1/insights" \
+            -H "apikey: $SUPABASE_KEY" \
+            -H "Authorization: Bearer $SUPABASE_KEY" \
+            -H "Content-Type: application/json" \
+            -d "{
+              \"title\": \"API Library Auto-Update\",
+              \"description\": \"MCP: ${{ steps.check.outputs.mcp_count || 0 }}, Apify: ${{ steps.check.outputs.apify_count || 0 }}\",
+              \"insight_type\": \"mcp_reference\",
+              \"source\": \"github_actions\"
+            }" || true
