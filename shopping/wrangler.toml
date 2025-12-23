@@ -1,0 +1,33 @@
+name = "life-os-shopping"
+main = "src/worker.ts"
+compatibility_date = "2024-01-01"
+
+# Production environment
+[env.production]
+name = "life-os-shopping"
+routes = [
+  { pattern = "life-os-aiy.pages.dev/api/shopping/*", zone_name = "pages.dev" }
+]
+
+[env.production.vars]
+INSTACART_DEV_MODE = "false"
+
+# Development environment
+[env.development]
+name = "life-os-shopping-dev"
+
+[env.development.vars]
+INSTACART_DEV_MODE = "true"
+
+# Secrets (set via wrangler secret put)
+# INSTACART_API_KEY
+# SUPABASE_URL
+# SUPABASE_KEY
+
+# Build configuration
+[build]
+command = "npm run build"
+
+[build.upload]
+format = "modules"
+main = "./dist/worker.js"
