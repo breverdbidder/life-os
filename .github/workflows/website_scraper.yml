@@ -1,0 +1,129 @@
+name: Website to Vite Scraper
+
+on:
+  workflow_dispatch:
+    inputs:
+      url:
+        description: 'Website URL to scrape'
+        required: true
+        type: string
+      output_repo:
+        description: 'Output repository name (will be created if not exists)'
+        required: true
+        type: string
+        default: 'scraped-site'
+      additional_pages:
+        description: 'Additional pages to scrape (comma-separated relative URLs)'
+        required: false
+        type: string
+      deploy_cloudflare:
+        description: 'Deploy to Cloudflare Pages'
+        required: false
+        type: boolean
+        default: true
+
+env:
+  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+jobs:
+  scrape-and-deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout life-os repo
+        uses: actions/checkout@v4
+        
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          
+      - name: Install dependencies
+        run: |
+          pip install requests beautifulsoup4 lxml
+          
+      - name: Run Website Scraper
+        id: scrape
+        run: |
+          # Parse additional pages
+          PAGES_ARG=""
+          if [ -n "${{ inputs.additional_pages }}" ]; then
+            IFS=',' read -ra PAGES <<< "${{ inputs.additional_pages }}"
+            for page in "${PAGES[@]}"; do
+              PAGES_ARG="$PAGES_ARG -p $page"
+            done
+          fi
+          
+          # Run scraper
+          python tools/website_to_vite_scraper.py \
+            "${{ inputs.url }}" \
+            -o scraped-output \
+            $PAGES_ARG
+          
+          # Output stats
+          echo "pages=$(find scraped-output -name '*.html' | wc -l)" >> $GITHUB_OUTPUT
+          echo "images=$(find scraped-output/src/assets/images -type f 2>/dev/null | wc -l)" >> $GITHUB_OUTPUT
+          
+      - name: Create/Update target repository
+        run: |
+          # Configure git
+          git config --global user.name "BidDeed AI Bot"
+          git config --global user.email "bot@biddeed.ai"
+          
+          # Check if repo exists
+          REPO_EXISTS=$(curl -s -o /dev/null -w "%{http_code}" \
+            -H "Authorization: token ${{ secrets.GH_PAT }}" \
+            "https://api.github.com/repos/${{ github.repository_owner }}/${{ inputs.output_repo }}")
+          
+          if [ "$REPO_EXISTS" != "200" ]; then
+            # Create new repo
+            curl -X POST \
+              -H "Authorization: token ${{ secrets.GH_PAT }}" \
+              -H "Accept: application/vnd.github.v3+json" \
+              https://api.github.com/user/repos \
+              -d '{"name":"${{ inputs.output_repo }}","private":false,"auto_init":false}'
+            sleep 3
+          fi
+          
+          # Initialize git in scraped output
+          cd scraped-output
+          git init
+          git add .
+          git commit -m "Scraped from ${{ inputs.url }} - $(date +%Y-%m-%d)"
+          git branch -M main
+          git remote add origin https://x-access-token:${{ secrets.GH_PAT }}@github.com/${{ github.repository_owner }}/${{ inputs.output_repo }}.git
+          git push -f origin main
+          
+      - name: Deploy to Cloudflare Pages
+        if: ${{ inputs.deploy_cloudflare }}
+        run: |
+          # Install wrangler
+          npm install -g wrangler
+          
+          # Build the Vite project
+          cd scraped-output
+          npm install
+          npm run build
+          
+          # Deploy to Cloudflare Pages
+          wrangler pages deploy dist \
+            --project-name="${{ inputs.output_repo }}" \
+            --branch=main \
+            --commit-dirty=true
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          
+      - name: Summary
+        run: |
+          echo "## 🎉 Scraping Complete!" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Source:** ${{ inputs.url }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Pages scraped:** ${{ steps.scrape.outputs.pages }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Images downloaded:** ${{ steps.scrape.outputs.images }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Links" >> $GITHUB_STEP_SUMMARY
+          echo "- **GitHub:** https://github.com/${{ github.repository_owner }}/${{ inputs.output_repo }}" >> $GITHUB_STEP_SUMMARY
+          if [ "${{ inputs.deploy_cloudflare }}" == "true" ]; then
+            echo "- **Live Site:** https://${{ inputs.output_repo }}.pages.dev" >> $GITHUB_STEP_SUMMARY
+          fi
