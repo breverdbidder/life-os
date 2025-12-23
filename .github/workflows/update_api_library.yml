@@ -1,0 +1,83 @@
+name: Update API Mega Library
+
+on:
+  schedule:
+    - cron: '0 11 * * 0'
+  workflow_dispatch:
+    inputs:
+      source:
+        description: 'Source to check'
+        required: false
+        default: 'all'
+        type: choice
+        options:
+          - all
+          - mcp_servers
+          - apify_actors
+
+jobs:
+  discover-new-apis:
+    runs-on: ubuntu-latest
+    outputs:
+      has_updates: ${{ steps.check.outputs.has_updates }}
+    
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      
+      - name: Install dependencies
+        run: pip install httpx beautifulsoup4 anthropic
+
+      - name: Discover MCP servers
+        run: python scripts/discover_mcp_servers.py > mcp_discoveries.json
+
+      - name: Discover Apify actors
+        run: python scripts/discover_apify_actors.py > apify_discoveries.json
+
+      - name: Check for updates
+        id: check
+        run: |
+          MCP=$(cat mcp_discoveries.json | python3 -c "import sys,json; print(len(json.load(sys.stdin)))")
+          APIFY=$(cat apify_discoveries.json | python3 -c "import sys,json; print(len(json.load(sys.stdin)))")
+          if [ "$MCP" -gt 0 ] || [ "$APIFY" -gt 0 ]; then
+            echo "has_updates=true" >> $GITHUB_OUTPUT
+          else
+            echo "has_updates=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Generate update
+        if: steps.check.outputs.has_updates == 'true'
+        run: |
+          python3 << 'PYSCRIPT'
+          import json
+          mcp = json.load(open('mcp_discoveries.json'))
+          apify = json.load(open('apify_discoveries.json'))
+          
+          lines = ["", "---", "", f"## Auto-discovered APIs ({__import__('datetime').date.today()})", ""]
+          
+          if mcp:
+            lines.extend(["### New MCP Servers", "", "| Name | Description | URL |", "|------|-------------|-----|"])
+            for s in mcp[:10]:
+              lines.append(f"| {s['name']} | {s.get('description','')} | {s.get('url','')} |")
+            lines.append("")
+          
+          if apify:
+            lines.extend(["### New Apify Actors", "", "| Actor | Description | URL |", "|-------|-------------|-----|"])
+            for a in apify[:10]:
+              lines.append(f"| {a['id']} | {a.get('description','')} | {a.get('url','')} |")
+          
+          with open('library_additions.md', 'w') as f:
+            f.write('\n'.join(lines))
+          PYSCRIPT
+          cat library_additions.md >> docs/API_MEGA_LIBRARY.md
+
+      - name: Commit changes
+        if: steps.check.outputs.has_updates == 'true'
+        run: |
+          git config user.name "Claude AI Architect"
+          git config user.email "claude@biddeed.ai"
+          git add docs/API_MEGA_LIBRARY.md
+          git commit -m "Auto-update API_MEGA_LIBRARY" || exit 0
+          git push
