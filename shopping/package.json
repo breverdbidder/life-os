@@ -1,0 +1,31 @@
+{
+  "name": "life-os-shopping",
+  "version": "1.0.0",
+  "description": "Life OS Shopping Integration - Instacart API",
+  "main": "src/worker.ts",
+  "scripts": {
+    "dev": "wrangler dev",
+    "build": "tsc",
+    "deploy": "wrangler deploy",
+    "deploy:dev": "wrangler deploy --env development",
+    "deploy:prod": "wrangler deploy --env production",
+    "test": "vitest"
+  },
+  "keywords": [
+    "instacart",
+    "shopping",
+    "cloudflare-workers",
+    "life-os"
+  ],
+  "author": "Ariel Shapira",
+  "license": "MIT",
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20241205.0",
+    "typescript": "^5.3.0",
+    "vitest": "^1.0.0",
+    "wrangler": "^3.91.0"
+  },
+  "dependencies": {
+    "react": "^18.2.0"
+  }
+}
