@@ -1,0 +1,34 @@
+name: Setup Browser QA Table
+
+on:
+  workflow_dispatch:
+
+jobs:
+  setup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Create browser_qa_results table
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+        run: |
+          pip install supabase
+          
+          python << 'PYTHON'
+          import os
+          from supabase import create_client
+          
+          supabase = create_client(
+              os.environ["SUPABASE_URL"],
+              os.environ["SUPABASE_KEY"]
+          )
+          
+          # Insert a test record to verify connectivity
+          # The insights table already exists, we'll use it with category="browser_qa"
+          result = supabase.table("insights").insert({
+              "category": "browser_qa_setup",
+              "content": '{"status": "Browser QA system initialized", "version": "1.0.0"}',
+          }).execute()
+          
+          print(f"✅ Setup complete. Record ID: {result.data[0]['id'] if result.data else 'unknown'}")
+          PYTHON
