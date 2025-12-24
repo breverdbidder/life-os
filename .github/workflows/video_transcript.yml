@@ -1,0 +1,77 @@
+name: Video Transcript Agent V8
+
+on:
+  workflow_dispatch:
+    inputs:
+      video_url:
+        description: 'Video URL (YouTube or Facebook)'
+        required: true
+        type: string
+      save_to_supabase:
+        description: 'Save results to Supabase'
+        required: false
+        type: boolean
+        default: true
+
+jobs:
+  extract_transcript:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      
+      - name: Install dependencies
+        run: |
+          pip install anthropic httpx yt-dlp langdetect
+      
+      - name: Extract and translate transcript
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          YOUTUBE_API_KEY: ${{ secrets.YOUTUBE_API_KEY }}
+          APIFY_API_TOKEN: ${{ secrets.APIFY_API_TOKEN }}
+          SUPABASE_URL: https://mocerqjnksmhcjzxrewo.supabase.co
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+        run: |
+          python agents/video_transcript/video_transcript_node.py "${{ inputs.video_url }}" > transcript_result.json
+      
+      - name: Save to Supabase
+        if: ${{ inputs.save_to_supabase }}
+        env:
+          SUPABASE_URL: https://mocerqjnksmhcjzxrewo.supabase.co
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+        run: |
+          # Extract results
+          RESULT=$(cat transcript_result.json)
+          
+          # Insert to insights table
+          curl -X POST \
+            "$SUPABASE_URL/rest/v1/insights" \
+            -H "apikey: $SUPABASE_KEY" \
+            -H "Authorization: Bearer $SUPABASE_KEY" \
+            -H "Content-Type: application/json" \
+            -H "Prefer: return=minimal" \
+            -d '{
+              "category": "video_transcript",
+              "insight": "Video transcript extracted and translated",
+              "metadata": '"$RESULT"'
+            }'
+      
+      - name: Upload transcript as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: video-transcript
+          path: transcript_result.json
+          retention-days: 30
+      
+      - name: Display results
+        run: |
+          echo "=========================================="
+          echo "TRANSCRIPT EXTRACTION COMPLETE"
+          echo "=========================================="
+          cat transcript_result.json | python -m json.tool
