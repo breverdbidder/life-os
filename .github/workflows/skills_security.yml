@@ -1,0 +1,110 @@
+name: Skills Security Check
+
+on:
+  pull_request:
+    paths:
+      - '.claude/skills/**'
+      - '/mnt/skills/**'
+  push:
+    paths:
+      - '.claude/skills/**'
+      - '/mnt/skills/**'
+
+jobs:
+  validate-skills-integrity:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+      
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      
+      - name: Check Skills Directory Modifications
+        run: |
+          echo "=== Skills Security Validation ==="
+          
+          # Get changed files
+          CHANGED_FILES=$(git diff --name-only HEAD~1 HEAD || echo "")
+          
+          # Check if any changed files are in locked skills directories
+          VIOLATIONS=""
+          
+          for file in $CHANGED_FILES; do
+            if [[ $file == .claude/skills/* ]] || [[ $file == /mnt/skills/* ]]; then
+              VIOLATIONS="$VIOLATIONS\n  - $file"
+            fi
+          done
+          
+          if [ -n "$VIOLATIONS" ]; then
+            echo "❌ SECURITY VIOLATION DETECTED"
+            echo "The following files in locked skills directories were modified:"
+            echo -e "$VIOLATIONS"
+            echo ""
+            echo "Skills directories are READ-ONLY for automated processes."
+            echo "To add/modify skills:"
+            echo "  1. Create in /tmp/new_skills/ or outputs/new_skills/"
+            echo "  2. Get manual review and approval"
+            echo "  3. Human manually moves to .claude/skills/"
+            exit 1
+          else
+            echo "✓ No skills directory violations detected"
+          fi
+      
+      - name: Run Skills Security Validator
+        if: always()
+        run: |
+          python tools/validate_skills_security.py --banner
+      
+      - name: Audit Skills Changes
+        if: always()
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+        run: |
+          python3 << 'PYEOF'
+          import os
+          import json
+          import requests
+          from datetime import datetime, timezone
+          
+          SUPABASE_URL = os.getenv('SUPABASE_URL', '')
+          SUPABASE_KEY = os.getenv('SUPABASE_KEY', '')
+          
+          if SUPABASE_URL and SUPABASE_KEY:
+              headers = {
+                  'apikey': SUPABASE_KEY,
+                  'Authorization': f'Bearer {SUPABASE_KEY}',
+                  'Content-Type': 'application/json',
+                  'Prefer': 'return=minimal'
+              }
+              
+              data = {
+                  'category': 'security',
+                  'subcategory': 'skills_audit',
+                  'insight': json.dumps({
+                      'event': 'skills_security_check',
+                      'workflow': 'github_actions',
+                      'timestamp': datetime.now(timezone.utc).isoformat(),
+                      'result': 'completed'
+                  }),
+                  'metadata': {'automated': True}
+              }
+              
+              try:
+                  response = requests.post(
+                      f"{SUPABASE_URL}/rest/v1/insights",
+                      headers=headers,
+                      json=data,
+                      timeout=10
+                  )
+                  print(f"Audit logged: {response.status_code}")
+              except Exception as e:
+                  print(f"Audit logging failed: {e}")
+          else:
+              print("Skipping audit logging (no credentials)")
+          PYEOF
