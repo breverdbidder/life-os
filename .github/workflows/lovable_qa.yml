@@ -1,0 +1,273 @@
+name: Lovable Preview QA - Autonomous Browser Control
+
+on:
+  workflow_dispatch:
+    inputs:
+      preview_url:
+        description: 'Lovable preview URL to test'
+        required: true
+        type: string
+      checkpoint_config:
+        description: 'JSON array of checkpoint definitions'
+        required: false
+        default: '[]'
+        type: string
+  repository_dispatch:
+    types: [lovable-preview-ready]
+
+env:
+  ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+  SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+  SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+
+jobs:
+  browser-qa:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install Dependencies
+        run: |
+          pip install playwright mcp anthropic supabase httpx
+          playwright install chromium
+          playwright install-deps
+
+      - name: Create QA Agent Script
+        run: |
+          cat << 'EOF' > qa_agent.py
+          """
+          Autonomous Browser QA Agent
+          - Connects to Lovable preview
+          - Navigates via accessibility tree (no screenshots)
+          - Creates/verifies checkpoints
+          - Reports to Supabase
+          """
+          import asyncio
+          import json
+          import os
+          from datetime import datetime
+          from playwright.async_api import async_playwright
+          from supabase import create_client
+          import anthropic
+
+          PREVIEW_URL = os.environ.get("PREVIEW_URL", "${{ inputs.preview_url }}")
+          CHECKPOINTS = json.loads(os.environ.get("CHECKPOINTS", '${{ inputs.checkpoint_config }}'))
+
+          # Supabase client
+          supabase = create_client(
+              os.environ["SUPABASE_URL"],
+              os.environ["SUPABASE_KEY"]
+          )
+
+          async def get_accessibility_tree(page):
+              """Get structured accessibility tree - this is the 'vision' without screenshots"""
+              return await page.accessibility.snapshot()
+
+          async def get_interactive_elements(page):
+              """Extract all interactive elements with their properties"""
+              return await page.evaluate("""
+                  () => {
+                      const interactive = ['a', 'button', 'input', 'select', 'textarea', '[role="button"]', '[onclick]'];
+                      const elements = [];
+                      
+                      interactive.forEach(sel => {
+                          document.querySelectorAll(sel).forEach(el => {
+                              const rect = el.getBoundingClientRect();
+                              if (rect.width > 0 && rect.height > 0) {
+                                  elements.push({
+                                      tag: el.tagName.toLowerCase(),
+                                      id: el.id || null,
+                                      text: el.textContent?.trim().slice(0, 50) || null,
+                                      type: el.type || null,
+                                      role: el.getAttribute('role') || null,
+                                      ariaLabel: el.getAttribute('aria-label') || null,
+                                      testId: el.getAttribute('data-testid') || null,
+                                      visible: true,
+                                      enabled: !el.disabled,
+                                      position: { x: rect.x, y: rect.y, width: rect.width, height: rect.height }
+                                  });
+                              }
+                          });
+                      });
+                      return elements;
+                  }
+              """)
+
+          async def check_console_errors(page):
+              """Check for JavaScript errors"""
+              errors = []
+              page.on("console", lambda msg: errors.append({"type": msg.type, "text": msg.text}) if msg.type == "error" else None)
+              return errors
+
+          async def run_checkpoint(page, checkpoint):
+              """Verify a single checkpoint"""
+              results = {
+                  "name": checkpoint["name"],
+                  "timestamp": datetime.utcnow().isoformat(),
+                  "passed": True,
+                  "assertions": []
+              }
+              
+              for assertion in checkpoint.get("assertions", []):
+                  selector = assertion["selector"]
+                  try:
+                      locator = page.locator(selector)
+                      is_visible = await locator.is_visible()
+                      
+                      result = {
+                          "selector": selector,
+                          "expected_visible": assertion.get("visible", True),
+                          "actual_visible": is_visible,
+                          "passed": is_visible == assertion.get("visible", True)
+                      }
+                      
+                      if assertion.get("text"):
+                          text = await locator.text_content() or ""
+                          result["expected_text"] = assertion["text"]
+                          result["actual_text"] = text[:100]
+                          result["passed"] = result["passed"] and assertion["text"] in text
+                      
+                      results["assertions"].append(result)
+                      if not result["passed"]:
+                          results["passed"] = False
+                          
+                  except Exception as e:
+                      results["assertions"].append({
+                          "selector": selector,
+                          "error": str(e),
+                          "passed": False
+                      })
+                      results["passed"] = False
+              
+              return results
+
+          async def ask_claude_for_analysis(a11y_tree, elements, console_errors):
+              """Ask Claude to analyze the page state"""
+              client = anthropic.Anthropic()
+              
+              prompt = f"""Analyze this Lovable preview page state and identify any issues:
+
+          ACCESSIBILITY TREE:
+          {json.dumps(a11y_tree, indent=2)[:3000]}
+
+          INTERACTIVE ELEMENTS:
+          {json.dumps(elements, indent=2)[:2000]}
+
+          CONSOLE ERRORS:
+          {json.dumps(console_errors, indent=2)}
+
+          Respond with JSON:
+          {{
+              "overall_health": "good|warning|critical",
+              "issues": [
+                  {{"severity": "error|warning|info", "element": "selector", "issue": "description", "fix": "suggestion"}}
+              ],
+              "accessibility_score": 0-100,
+              "missing_elements": ["list of expected but missing elements"],
+              "recommendations": ["list of UX improvements"]
+          }}"""
+
+              response = client.messages.create(
+                  model="claude-sonnet-4-5-20250514",
+                  max_tokens=1000,
+                  messages=[{"role": "user", "content": prompt}]
+              )
+              
+              return json.loads(response.content[0].text)
+
+          async def main():
+              print(f"🚀 Starting QA for: {PREVIEW_URL}")
+              
+              async with async_playwright() as pw:
+                  browser = await pw.chromium.launch(headless=True)
+                  page = await browser.new_page()
+                  
+                  # Capture console errors
+                  console_errors = []
+                  page.on("console", lambda msg: console_errors.append({
+                      "type": msg.type, "text": msg.text
+                  }) if msg.type == "error" else None)
+                  
+                  # Navigate
+                  await page.goto(PREVIEW_URL)
+                  await page.wait_for_load_state("networkidle")
+                  print(f"✅ Page loaded: {await page.title()}")
+                  
+                  # Get page state via accessibility tree (NOT screenshots)
+                  a11y_tree = await get_accessibility_tree(page)
+                  elements = await get_interactive_elements(page)
+                  
+                  print(f"📊 Found {len(elements)} interactive elements")
+                  print(f"🔴 Console errors: {len(console_errors)}")
+                  
+                  # Run checkpoints if defined
+                  checkpoint_results = []
+                  for checkpoint in CHECKPOINTS:
+                      result = await run_checkpoint(page, checkpoint)
+                      checkpoint_results.append(result)
+                      status = "✅" if result["passed"] else "❌"
+                      print(f"{status} Checkpoint: {checkpoint['name']}")
+                  
+                  # AI analysis
+                  print("🤖 Running Claude analysis...")
+                  analysis = await ask_claude_for_analysis(a11y_tree, elements, console_errors)
+                  
+                  # Save to Supabase
+                  report = {
+                      "url": PREVIEW_URL,
+                      "timestamp": datetime.utcnow().isoformat(),
+                      "title": await page.title(),
+                      "interactive_elements_count": len(elements),
+                      "console_errors_count": len(console_errors),
+                      "console_errors": console_errors[:10],
+                      "checkpoints": checkpoint_results,
+                      "ai_analysis": analysis,
+                      "overall_status": "pass" if all(c["passed"] for c in checkpoint_results) and analysis["overall_health"] != "critical" else "fail"
+                  }
+                  
+                  supabase.table("insights").insert({
+                      "category": "lovable_qa",
+                      "content": json.dumps(report),
+                      "created_at": datetime.utcnow().isoformat()
+                  }).execute()
+                  
+                  print(f"\n📋 QA REPORT")
+                  print(f"   Health: {analysis['overall_health']}")
+                  print(f"   A11y Score: {analysis['accessibility_score']}/100")
+                  print(f"   Issues: {len(analysis['issues'])}")
+                  
+                  for issue in analysis['issues']:
+                      print(f"   [{issue['severity']}] {issue['issue']}")
+                  
+                  await browser.close()
+                  
+                  # Exit with error if critical issues
+                  if analysis["overall_health"] == "critical" or any(not c["passed"] for c in checkpoint_results):
+                      exit(1)
+
+          if __name__ == "__main__":
+              asyncio.run(main())
+          EOF
+
+      - name: Run QA Agent
+        env:
+          PREVIEW_URL: ${{ inputs.preview_url || github.event.client_payload.preview_url }}
+          CHECKPOINTS: ${{ inputs.checkpoint_config }}
+        run: python qa_agent.py
+
+      - name: Upload Results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: qa-results
+          path: |
+            qa_report.json
+            console_errors.json
