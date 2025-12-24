@@ -1,199 +1,150 @@
 #!/usr/bin/env python3
 """
-Skill Discovery Tool for AI Agents
-Scans .claude/skills/ directory and returns available skills with metadata
+Discover Skills Tool
+Allows agents to discover and select appropriate skills before executing workflows.
 """
 import os
-import json
+import re
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import List, Dict, Optional
+import json
 
-
-def parse_skill_md(skill_path: Path) -> Dict[str, str]:
-    """Parse SKILL.md file to extract name and description"""
-    skill_md = skill_path / "SKILL.md"
+class SkillDiscovery:
+    """Tool for discovering available skills in /mnt/skills/"""
     
-    if not skill_md.exists():
-        return {
-            "name": skill_path.name,
-            "description": "No SKILL.md found",
-            "path": str(skill_path)
-        }
+    SKILLS_BASE = Path("/mnt/skills")
     
-    try:
-        content = skill_md.read_text(encoding='utf-8')
-        lines = content.split('\n')
+    def __init__(self):
+        self.skills = []
+        self._scan_skills()
+    
+    def _scan_skills(self):
+        """Scan all skill directories and extract metadata"""
+        if not self.SKILLS_BASE.exists():
+            return
         
-        name = skill_path.name
-        description = ""
-        
-        # Parse markdown headers
-        for i, line in enumerate(lines[:20]):  # Check first 20 lines
-            if line.startswith('# '):
-                name = line.replace('# ', '').strip()
-            elif line.startswith('## Description') or line.startswith('**Description'):
-                # Get next non-empty line
-                for j in range(i+1, min(i+10, len(lines))):
-                    if lines[j].strip():
-                        description = lines[j].strip()
-                        break
-            elif i == 0 and not line.startswith('#'):
-                # First line might be description
-                description = line.strip()
-        
-        # If no description found, use first paragraph
-        if not description:
-            for line in lines:
-                if line.strip() and not line.startswith('#'):
-                    description = line.strip()[:200]  # Max 200 chars
-                    break
-        
-        return {
-            "name": name,
-            "description": description or "No description available",
-            "path": str(skill_path)
-        }
-    
-    except Exception as e:
-        return {
-            "name": skill_path.name,
-            "description": f"Error parsing: {e}",
-            "path": str(skill_path)
-        }
-
-
-def discover_skills(
-    skills_dir: str = ".claude/skills",
-    filter_name: Optional[str] = None,
-    format: str = "json"
-) -> str:
-    """
-    Discover available skills in the skills directory
-    
-    Args:
-        skills_dir: Path to skills directory (default: .claude/skills)
-        filter_name: Optional filter to search for specific skill names
-        format: Output format - 'json', 'list', or 'detailed'
-    
-    Returns:
-        Formatted string with skill information
-    """
-    skills_path = Path(skills_dir)
-    
-    if not skills_path.exists():
-        return json.dumps({
-            "error": f"Skills directory not found: {skills_dir}",
-            "available_skills": []
-        })
-    
-    # Scan for skills
-    skills = []
-    for item in skills_path.iterdir():
-        if item.is_dir() and not item.name.startswith('.'):
-            skill_info = parse_skill_md(item)
-            
-            # Apply filter if specified
-            if filter_name and filter_name.lower() not in skill_info['name'].lower():
+        # Scan public, examples, and user skills
+        for category in ['public', 'examples', 'user', 'private']:
+            category_path = self.SKILLS_BASE / category
+            if not category_path.exists():
                 continue
             
-            # Check for additional files
-            skill_info['has_scripts'] = any(
-                f.suffix in ['.py', '.js', '.sh'] 
-                for f in item.glob('*')
-            )
-            skill_info['files'] = [f.name for f in item.glob('*') if f.is_file()]
+            for skill_dir in category_path.iterdir():
+                if not skill_dir.is_dir():
+                    continue
+                
+                skill_md = skill_dir / "SKILL.md"
+                if skill_md.exists():
+                    metadata = self._parse_skill_metadata(skill_md, category, skill_dir.name)
+                    if metadata:
+                        self.skills.append(metadata)
+    
+    def _parse_skill_metadata(self, skill_file: Path, category: str, skill_name: str) -> Optional[Dict]:
+        """Parse SKILL.md to extract name and description"""
+        try:
+            with open(skill_file, 'r', encoding='utf-8') as f:
+                content = f.read()
             
-            skills.append(skill_info)
+            # Extract name (first # heading)
+            name_match = re.search(r'^#\s+(.+)$', content, re.MULTILINE)
+            name = name_match.group(1).strip() if name_match else skill_name
+            
+            # Extract description (content between name and first ##)
+            desc_match = re.search(r'^#\s+.+\n\n(.+?)(?=\n##|\Z)', content, re.MULTILINE | re.DOTALL)
+            description = desc_match.group(1).strip() if desc_match else "No description available"
+            
+            # Clean up description (first 200 chars)
+            description = ' '.join(description.split())[:200]
+            
+            return {
+                'name': name,
+                'skill_id': skill_name,
+                'category': category,
+                'description': description,
+                'path': str(skill_file.parent),
+                'skill_file': str(skill_file)
+            }
+        except Exception as e:
+            print(f"Warning: Failed to parse {skill_file}: {e}")
+            return None
     
-    # Sort by name
-    skills.sort(key=lambda x: x['name'])
+    def list_all(self) -> List[Dict]:
+        """List all available skills"""
+        return self.skills
     
-    # Format output
-    if format == "json":
-        return json.dumps({
-            "skills_directory": str(skills_path),
-            "total_skills": len(skills),
-            "skills": skills
-        }, indent=2)
+    def search(self, query: str) -> List[Dict]:
+        """Search skills by name or description"""
+        query_lower = query.lower()
+        return [
+            skill for skill in self.skills
+            if query_lower in skill['name'].lower() 
+            or query_lower in skill['description'].lower()
+            or query_lower in skill['skill_id'].lower()
+        ]
     
-    elif format == "list":
-        output = f"Available Skills ({len(skills)}):\n"
-        output += "=" * 60 + "\n"
-        for skill in skills:
-            output += f"\n• {skill['name']}\n"
-            output += f"  {skill['description'][:80]}...\n" if len(skill['description']) > 80 else f"  {skill['description']}\n"
+    def get_by_id(self, skill_id: str) -> Optional[Dict]:
+        """Get specific skill by ID"""
+        for skill in self.skills:
+            if skill['skill_id'] == skill_id:
+                return skill
+        return None
+    
+    def format_for_agent(self, skills: List[Dict] = None) -> str:
+        """Format skills list for agent consumption"""
+        if skills is None:
+            skills = self.skills
+        
+        if not skills:
+            return "No skills found."
+        
+        output = f"Found {len(skills)} skill(s):\n\n"
+        
+        for i, skill in enumerate(skills, 1):
+            output += f"{i}. **{skill['name']}** ({skill['category']})\n"
+            output += f"   ID: {skill['skill_id']}\n"
+            output += f"   Description: {skill['description']}\n"
+            output += f"   Path: {skill['path']}\n\n"
+        
         return output
     
-    elif format == "detailed":
-        output = f"Skills Directory: {skills_path}\n"
-        output += f"Total Skills: {len(skills)}\n"
-        output += "=" * 60 + "\n\n"
-        
-        for skill in skills:
-            output += f"Name: {skill['name']}\n"
-            output += f"Path: {skill['path']}\n"
-            output += f"Description: {skill['description']}\n"
-            output += f"Has Scripts: {'Yes' if skill['has_scripts'] else 'No'}\n"
-            output += f"Files: {', '.join(skill['files'])}\n"
-            output += "-" * 60 + "\n\n"
-        
-        return output
-    
-    else:
-        return json.dumps({"error": f"Invalid format: {format}"})
+    def to_json(self, skills: List[Dict] = None) -> str:
+        """Return skills as JSON"""
+        if skills is None:
+            skills = self.skills
+        return json.dumps(skills, indent=2)
 
 
-def get_skill_content(skill_name: str, skills_dir: str = ".claude/skills") -> str:
+def discover_skills(query: Optional[str] = None, format: str = "text") -> str:
     """
-    Get the full content of a specific skill's SKILL.md file
+    Main entry point for skill discovery.
     
     Args:
-        skill_name: Name of the skill to retrieve
-        skills_dir: Path to skills directory
+        query: Optional search query to filter skills
+        format: Output format - 'text' or 'json'
     
     Returns:
-        Content of SKILL.md or error message
+        Formatted string of available skills
     """
-    skills_path = Path(skills_dir)
+    discovery = SkillDiscovery()
     
-    # Find matching skill (case-insensitive)
-    for item in skills_path.iterdir():
-        if item.is_dir() and item.name.lower() == skill_name.lower():
-            skill_md = item / "SKILL.md"
-            if skill_md.exists():
-                return f"=== {item.name} ===\n\n" + skill_md.read_text(encoding='utf-8')
-            else:
-                return f"Error: SKILL.md not found in {item.name}"
+    if query:
+        results = discovery.search(query)
+        prefix = f"Skills matching '{query}':\n\n"
+    else:
+        results = discovery.list_all()
+        prefix = "All available skills:\n\n"
     
-    return f"Error: Skill '{skill_name}' not found"
+    if format == "json":
+        return discovery.to_json(results)
+    else:
+        return prefix + discovery.format_for_agent(results)
 
 
 if __name__ == "__main__":
     import sys
     
-    # CLI interface
-    if len(sys.argv) > 1:
-        command = sys.argv[1]
-        
-        if command == "list":
-            print(discover_skills(format="list"))
-        
-        elif command == "json":
-            print(discover_skills(format="json"))
-        
-        elif command == "detailed":
-            print(discover_skills(format="detailed"))
-        
-        elif command == "get" and len(sys.argv) > 2:
-            skill_name = sys.argv[2]
-            print(get_skill_content(skill_name))
-        
-        else:
-            print("Usage:")
-            print("  python discover_skills.py list       # List all skills")
-            print("  python discover_skills.py json       # JSON output")
-            print("  python discover_skills.py detailed   # Detailed view")
-            print("  python discover_skills.py get <name> # Get specific skill")
-    else:
-        # Default: list format
-        print(discover_skills(format="list"))
+    # Command-line usage
+    query = sys.argv[1] if len(sys.argv) > 1 else None
+    format_type = sys.argv[2] if len(sys.argv) > 2 else "text"
+    
+    print(discover_skills(query, format_type))
