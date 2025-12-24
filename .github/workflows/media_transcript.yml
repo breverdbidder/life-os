@@ -1,0 +1,104 @@
+name: Media Transcript Agent V8
+on:
+  workflow_dispatch:
+    inputs:
+      url:
+        description: 'Media URL (YouTube/Facebook/Instagram/TikTok)'
+        required: true
+        type: string
+      save_to_supabase:
+        description: 'Save transcript to Supabase'
+        required: false
+        type: boolean
+        default: true
+
+jobs:
+  extract_transcript:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+      
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip
+          pip install -r requirements.txt
+      
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg
+      
+      - name: Extract and translate transcript
+        id: transcript
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+        run: |
+          python agents/media/media_transcript_node.py "${{ inputs.url }}" > transcript_output.txt
+          cat transcript_output.txt
+          
+          # Extract JSON result for next steps
+          echo "transcript_extracted=true" >> $GITHUB_OUTPUT
+      
+      - name: Save to Supabase
+        if: inputs.save_to_supabase == true
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+        run: |
+          python -c "
+          import os
+          import json
+          from supabase import create_client
+          
+          # Parse transcript output
+          with open('transcript_output.txt', 'r') as f:
+              output = f.read()
+          
+          # Initialize Supabase
+          supabase = create_client(
+              os.getenv('SUPABASE_URL'),
+              os.getenv('SUPABASE_KEY')
+          )
+          
+          # Insert to insights table
+          insight_data = {
+              'category': 'media_transcript',
+              'subcategory': 'auto_extraction',
+              'content': output,
+              'source': 'media_transcript_agent_v8',
+              'metadata': {
+                  'url': '${{ inputs.url }}',
+                  'workflow_run': '${{ github.run_id }}'
+              }
+          }
+          
+          result = supabase.table('insights').insert(insight_data).execute()
+          print(f'Saved to Supabase: {result.data[0][\"id\"]}')"
+      
+      - name: Upload transcript artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: transcript-${{ github.run_id }}
+          path: transcript_output.txt
+          retention-days: 30
+      
+      - name: Summary
+        run: |
+          echo "## Media Transcript Agent V8 Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**URL:** ${{ inputs.url }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          cat transcript_output.txt >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
