@@ -1,0 +1,59 @@
+# Skills Directory Security Configuration
+# 
+# This file enforces read-only access to skills directories
+# Agents can READ and EXECUTE skills but CANNOT MODIFY them
+#
+# Locked Directories:
+# - .claude/skills/* (all user skills)
+# - /mnt/skills/public/* (system skills)
+# - /mnt/skills/examples/* (example skills)
+# - /mnt/skills/user/* (if exists)
+#
+# Security Rules:
+# 1. Agents CANNOT write to, delete, or modify files in locked directories
+# 2. Agents CANNOT create new files in locked directories
+# 3. Agents CAN read SKILL.md files and execute scripts
+# 4. New skills MUST be created in /tmp/ or outputs/ for review
+# 5. Only human approval can move skills into locked directories
+#
+# Enforcement:
+# - Pre-flight checks in orchestrator workflows
+# - File system permissions in sandbox environments
+# - Git branch protection for skills/ directories
+#
+# Last Updated: 2025-12-24
+# Owner: Ariel Shapira / BidDeed.AI
+
+# Locked paths (read-only for agents)
+locked_paths:
+  - .claude/skills
+  - /mnt/skills/public
+  - /mnt/skills/examples
+  - /mnt/skills/user
+
+# Allowed operations
+allowed_operations:
+  - read
+  - execute
+  - list_directory
+
+# Forbidden operations
+forbidden_operations:
+  - write
+  - delete
+  - create
+  - modify
+  - rename
+  - chmod
+
+# Staging area for new skills (write-allowed)
+staging_paths:
+  - /tmp/new_skills
+  - /mnt/user-data/outputs/new_skills
+
+# Audit log
+audit:
+  enabled: true
+  log_all_skill_access: true
+  alert_on_violation: true
+  storage: supabase.insights
