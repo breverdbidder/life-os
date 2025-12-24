@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "playwright-browser": {
+      "command": "python",
+      "args": ["-m", "src.playwright_mcp_server"],
+      "cwd": "/path/to/browser-control-agent",
+      "env": {
+        "PYTHONPATH": "."
+      }
+    }
+  }
+}
