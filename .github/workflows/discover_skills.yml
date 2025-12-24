@@ -1,0 +1,39 @@
+name: Discover Skills
+
+on:
+  workflow_dispatch:
+    inputs:
+      query:
+        description: 'Search query (leave empty for all skills)'
+        required: false
+        type: string
+        default: ''
+      format:
+        description: 'Output format (text or json)'
+        required: false
+        type: string
+        default: 'text'
+
+jobs:
+  discover:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Discover Skills
+        id: discover
+        run: |
+          echo "=== SKILL DISCOVERY ==="
+          python3 tools/discover_skills.py "${{ github.event.inputs.query }}" "${{ github.event.inputs.format }}"
+          
+      - name: Summary
+        run: |
+          echo "### Skills Discovery Complete" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          if [ -n "${{ github.event.inputs.query }}" ]; then
+            echo "**Query:** ${{ github.event.inputs.query }}" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "**Query:** All skills" >> $GITHUB_STEP_SUMMARY
+          fi
+          echo "**Format:** ${{ github.event.inputs.format }}" >> $GITHUB_STEP_SUMMARY
