@@ -1,0 +1,99 @@
+name: Screen Control Operator - Autonomous Testing
+
+on:
+  workflow_dispatch:
+    inputs:
+      task:
+        description: 'Task to execute'
+        required: true
+        type: choice
+        options:
+          - verify-lovable
+          - inspect-beca
+          - test-scrapers
+          - test-url
+      target:
+        description: 'Target (project ID or URL)'
+        required: false
+        default: 'fe59383e-3396-49f3-9cb9-5fea97dce977'
+  schedule:
+    - cron: '0 */6 * * *'  # Every 6 hours
+
+jobs:
+  screen-control:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      
+      - name: Install Playwright
+        run: |
+          pip install playwright
+          playwright install chromium
+      
+      - name: Execute Screen Control Task
+        id: execute
+        run: |
+          TASK="${{ github.event.inputs.task || 'verify-lovable' }}"
+          TARGET="${{ github.event.inputs.target || 'fe59383e-3396-49f3-9cb9-5fea97dce977' }}"
+          
+          echo "🎯 Task: $TASK"
+          echo "📍 Target: $TARGET"
+          
+          # Run autonomous screen control
+          python scripts/screen_control_operator.py \
+            "$TASK" \
+            "$TARGET" \
+            --headless \
+            --output results.json
+          
+          # Check for issues
+          ISSUES=$(jq -r '.issues | length' results.json)
+          echo "issues=$ISSUES" >> $GITHUB_OUTPUT
+          
+          if [ "$ISSUES" -gt 0 ]; then
+            echo "⚠️  Found $ISSUES issues"
+            jq -r '.issues[]' results.json
+          else
+            echo "✅ No issues found"
+          fi
+      
+      - name: Upload Results
+        uses: actions/upload-artifact@v4
+        with:
+          name: screen-control-results-${{ github.run_id }}
+          path: results.json
+      
+      - name: Log to Supabase
+        if: always()
+        env:
+          SUPABASE_URL: https://mocerqjnksmhcjzxrewo.supabase.co
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+        run: |
+          # Log results to Supabase insights table
+          TASK="${{ github.event.inputs.task || 'verify-lovable' }}"
+          ISSUES="${{ steps.execute.outputs.issues }}"
+          
+          curl -X POST "$SUPABASE_URL/rest/v1/insights" \
+            -H "apikey: $SUPABASE_KEY" \
+            -H "Authorization: Bearer $SUPABASE_KEY" \
+            -H "Content-Type: application/json" \
+            -d "{
+              \"category\": \"screen_control\",
+              \"subcategory\": \"$TASK\",
+              \"insight\": \"Autonomous screen control executed\",
+              \"data\": $(cat results.json),
+              \"created_at\": \"$(date -u +%Y-%m-%dT%H:%M:%SZ)\"
+            }" || echo "Supabase logging failed (non-critical)"
+      
+      - name: Notify if Issues Found
+        if: steps.execute.outputs.issues > 0
+        run: |
+          echo "::warning::Screen Control found ${{ steps.execute.outputs.issues }} issues"
+          exit 1  # Fail workflow to trigger notifications
