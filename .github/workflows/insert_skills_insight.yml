@@ -1,0 +1,46 @@
+name: Log Claude Skills Integration to Supabase
+on:
+  workflow_dispatch:
+
+jobs:
+  log_insight:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Insert skills integration insight
+        run: |
+          curl -X POST \
+            "https://mocerqjnksmhcjzxrewo.supabase.co/rest/v1/insights" \
+            -H "apikey: ${{ secrets.SUPABASE_KEY }}" \
+            -H "Authorization: Bearer ${{ secrets.SUPABASE_KEY }}" \
+            -H "Content-Type: application/json" \
+            -d '{
+              "category": "skills_integration",
+              "title": "Claude Skills Integration Complete - 8 Skills Deployed",
+              "content": "Deployed 6 official Anthropic skills (frontend-design, skill-creator, mcp-builder, brand-guidelines, internal-comms, canvas-design) + 2 custom skills (foreclosure-analysis for BidDeed.AI, adhd-task-management for Life OS) across both repositories. Token savings: 40-55% projected. Custom skills encode 10+ years foreclosure expertise + ADHD productivity patterns. Next: integration testing Dec 26-31.",
+              "metadata": {
+                "base_skills_count": 6,
+                "custom_skills_count": 2,
+                "total_skills": 8,
+                "repos": ["breverdbidder/brevard-bidder-landing", "breverdbidder/life-os"],
+                "token_savings_projected": "40-55%",
+                "deployment_date": "2025-12-24",
+                "phase": "Phase 2 Complete",
+                "next_phase": "Phase 3 Testing",
+                "custom_skills": [
+                  {
+                    "name": "foreclosure-analysis",
+                    "repo": "BidDeed.AI",
+                    "purpose": "The Everest Ascent 12-stage methodology",
+                    "size": "10K+ characters",
+                    "competitive_advantage": "10+ years Brevard County expertise"
+                  },
+                  {
+                    "name": "adhd-task-management",
+                    "repo": "Life OS",
+                    "purpose": "Pattern detection & interventions",
+                    "size": "12K+ characters",
+                    "features": "3-level interventions, abandonment detection, Supabase logging"
+                  }
+                ]
+              }
+            }'
