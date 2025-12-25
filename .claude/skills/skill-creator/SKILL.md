@@ -1,56 +1,24 @@
 ---
 name: skill-creator
-description: Guide for creating effective skills that extend Claude's capabilities with specialized knowledge
+description: Guide for creating effective skills that extend Claude's capabilities
 ---
 
 # Skill Creator
 
-Interactive guide for building custom Claude skills.
+Build custom Claude skills for repetitive workflows.
 
-## When to Use
-- Creating skills for repetitive workflows
-- Codifying domain-specific knowledge
-- Building team skill libraries
-- Documenting best practices as skills
+## Process
 
-## Development Process
+### 1. Identify Use Cases
+Collect 3-5 concrete examples when skill would be used.
 
-### 1. Identify Use Cases (3-5 examples)
-```
-Examples:
-- "Calculate max bid for foreclosure property"
-- "Search AcclaimWeb for lien records"
-- "Parse BCPAO GIS data"
-```
+### 2. Determine Contents
+- **SKILL.md** (required): Instructions
+- **scripts/** (optional): Python/bash executables
+- **references/** (optional): Documentation
+- **assets/** (optional): Templates, boilerplate
 
-### 2. Analyze Patterns
-What's reusable?
-- Common data sources
-- Repeated calculations
-- Standard workflows
-- Reference docs needed
-
-### 3. Determine Contents
-
-**SKILL.md** (required): Instructions Claude follows
-
-**scripts/** (optional): Python/bash executables
-- Clear names: `calculate_max_bid.py`
-- Include docstrings
-- Handle errors
-
-**references/** (optional): Documentation
-- API schemas
-- Business rules
-- Regulations
-
-**assets/** (optional): Templates, logos
-- HTML boilerplate
-- Brand assets
-- Example files
-
-### 4. Write SKILL.md Structure
-
+### 3. Write SKILL.md
 ```yaml
 ---
 name: skill-name
@@ -59,51 +27,21 @@ description: Clear 1-2 sentence description
 
 # Skill Name
 
-Detailed purpose and capabilities.
-
 ## When to Use This Skill
 - Use case 1
 - Use case 2
 
 ## Instructions
-1. First step
-2. Second step
-3. Final step
+Step-by-step guidance for Claude
 
 ## Examples
-Show inputs/outputs
-
-## Best Practices
-- Guideline 1
-- Guideline 2
+Concrete examples with inputs/outputs
 ```
 
-### 5. Keep Minimal
+### 4. Keep Minimal
+Only include what Claude needs to execute.
 
-**DO NOT CREATE:**
-- README files
-- Setup docs
-- Testing procedures
-- Auxiliary context
-
-**Only include what Claude needs.**
-
-## Design Principles
-1. Single responsibility
-2. Self-contained
-3. Discoverable (good name/description)
-4. Tested scripts
-5. Minimal files
-
-## Testing
-1. Place in `.claude/skills/`
-2. Start new conversation
-3. Reference: "Use [skill] to..."
-4. Verify discovery
-5. Check outputs
-
-## Example Usage
+## Usage
 ```
-"Use skill creator to build a Supabase integration skill"
-"Help me create foreclosure lien analysis skill"
+"Use skill creator to build Supabase integration skill"
 ```
