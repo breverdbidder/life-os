@@ -1,171 +1,109 @@
 ---
 name: skill-creator
-description: Meta-skill for creating new BidDeed.AI and Life OS skills using Anthropic's official framework. Use when users want to create a new skill, update an existing skill, or extend Claude's capabilities with specialized knowledge for foreclosure analysis, auction intelligence, ADHD task tracking, swim performance, or any BidDeed.AI/Life OS workflow. Triggers on "create a skill", "new skill for", "build a skill", "skill for X".
+description: Guide for creating effective skills that extend Claude's capabilities with specialized knowledge
 ---
 
-# BidDeed.AI Skill Creator
+# Skill Creator
 
-Create production-ready skills for the BidDeed.AI ecosystem and Life OS platform.
+Interactive guide for building custom Claude skills.
 
-## What Skills Provide
+## When to Use
+- Creating skills for repetitive workflows
+- Codifying domain-specific knowledge
+- Building team skill libraries
+- Documenting best practices as skills
 
-1. **Specialized workflows** - Multi-step procedures (Everest Ascent pipeline stages)
-2. **Tool integrations** - API wrappers (BCPAO, AcclaimWeb, RealTDM, Supabase)
-3. **Domain expertise** - Foreclosure law, lien priority, max bid formulas
-4. **Bundled resources** - Scripts, templates, reference docs
+## Development Process
 
-## Core Principles
-
-### Concise is Key
-- Claude is already smart. Only add context Claude doesn't have.
-- Challenge each piece: "Does this justify its token cost?"
-- Prefer examples over explanations.
-- Keep SKILL.md under 200 lines.
-
-### Freedom Levels
-- **High freedom**: Text instructions for context-dependent decisions
-- **Medium freedom**: Pseudocode with parameters
-- **Low freedom**: Exact scripts for fragile operations (e.g., AcclaimWeb scraping)
-
-## Skill Anatomy
-
+### 1. Identify Use Cases (3-5 examples)
 ```
-skill-name/
-├── SKILL.md (required)
-│   ├── YAML frontmatter (name, description)
-│   └── Markdown body (instructions)
-├── scripts/           # Executable code
-├── references/        # Load-on-demand docs
-└── assets/           # Templates, images
+Examples:
+- "Calculate max bid for foreclosure property"
+- "Search AcclaimWeb for lien records"
+- "Parse BCPAO GIS data"
 ```
 
-### What NOT to Include
-- README.md, CHANGELOG.md, INSTALLATION_GUIDE.md
-- User-facing documentation
-- Setup/testing procedures
+### 2. Analyze Patterns
+What's reusable?
+- Common data sources
+- Repeated calculations
+- Standard workflows
+- Reference docs needed
 
-## Progressive Disclosure
+### 3. Determine Contents
 
-1. **Metadata** (~100 tokens) - Always in context
-2. **SKILL.md body** (<500 lines) - Loaded when triggered
-3. **References/Scripts** - Loaded only when Claude needs them
+**SKILL.md** (required): Instructions Claude follows
 
-## Creating a New Skill
+**scripts/** (optional): Python/bash executables
+- Clear names: `calculate_max_bid.py`
+- Include docstrings
+- Handle errors
 
-### Step 1: Understand the Skill
-Ask clarifying questions:
-- "What should this skill do?"
-- "What triggers would activate it?"
-- "What's an example workflow?"
+**references/** (optional): Documentation
+- API schemas
+- Business rules
+- Regulations
 
-### Step 2: Plan Resources
-Analyze each use case:
-- What scripts would be rewritten repeatedly? → scripts/
-- What documentation would Claude reference? → references/
-- What templates/assets are needed? → assets/
+**assets/** (optional): Templates, logos
+- HTML boilerplate
+- Brand assets
+- Example files
 
-### Step 3: Initialize
-Run the initialization script:
+### 4. Write SKILL.md Structure
 
-```bash
-python scripts/init_skill.py <skill-name> --path /home/claude/skills
-```
-
-### Step 4: Edit the Skill
-
-**Frontmatter:**
 ```yaml
 ---
 name: skill-name
-description: What it does AND when to use it. Include trigger patterns.
----
-```
-
-**Body patterns:**
-- Workflow-based: Sequential steps (best for Everest Ascent stages)
-- Task-based: Different operations (best for tool collections)
-- Reference/Guidelines: Standards or specifications
-
-### Step 5: Package
-```bash
-python scripts/package_skill.py /home/claude/skills/skill-name
-```
-
-### Step 6: Deploy to GitHub
-Auto-commit to:
-- BidDeed.AI: `.claude/skills/` in `breverdbidder/brevard-bidder-scraper`
-- Life OS: `.claude/skills/` in `breverdbidder/life-os`
-
-## BidDeed.AI Skill Patterns
-
-### Everest Ascent Stage Skill
-```markdown
----
-name: stage-03-title-search
-description: Execute Stage 3 of Everest Ascent - AcclaimWeb title search. Triggers on "title search", "chain of title", "recorded docs for [property]".
+description: Clear 1-2 sentence description
 ---
 
-# Stage 3: Title Search
+# Skill Name
 
-## Execution
-1. Extract owner name from BCPAO data
-2. Search AcclaimWeb for recorded documents
-3. Build chain of title
-4. Identify encumbrances
+Detailed purpose and capabilities.
 
-## Script
-See `scripts/title_search.py` for AcclaimWeb automation.
+## When to Use This Skill
+- Use case 1
+- Use case 2
 
-## Output
-Returns to pipeline state:
-- `documents`: List of recorded instruments
-- `encumbrances`: Mortgages, liens, judgments
-- `clean_title`: boolean
+## Instructions
+1. First step
+2. Second step
+3. Final step
+
+## Examples
+Show inputs/outputs
+
+## Best Practices
+- Guideline 1
+- Guideline 2
 ```
 
-### Life OS Task Skill
-```markdown
----
-name: task-tracker
-description: ADHD-optimized task state tracking for Life OS. Triggers on "log task", "track this", "task status", "abandonment check".
----
+### 5. Keep Minimal
 
-# Task Tracker
+**DO NOT CREATE:**
+- README files
+- Setup docs
+- Testing procedures
+- Auxiliary context
 
-## States
-INITIATED → SOLUTION_PROVIDED → IN_PROGRESS → COMPLETED/ABANDONED/BLOCKED/DEFERRED
+**Only include what Claude needs.**
 
-## Abandonment Detection
-- Context switch without closure
-- >30 min after solution
-- Session ends incomplete
+## Design Principles
+1. Single responsibility
+2. Self-contained
+3. Discoverable (good name/description)
+4. Tested scripts
+5. Minimal files
 
-## Interventions
-See `references/adhd-interventions.md` for Level 1/2/3 protocols.
+## Testing
+1. Place in `.claude/skills/`
+2. Start new conversation
+3. Reference: "Use [skill] to..."
+4. Verify discovery
+5. Check outputs
+
+## Example Usage
 ```
-
-## LangGraph Integration
-
-Skills deploy as LangGraph nodes:
-
-```python
-from langgraph.graph import StateGraph
-
-class SkillState(TypedDict):
-    input: dict
-    output: dict
-    errors: list
-
-def skill_node(state: SkillState) -> SkillState:
-    # Load SKILL.md
-    # Execute scripts if needed
-    # Return updated state
-    pass
+"Use skill creator to build a Supabase integration skill"
+"Help me create foreclosure lien analysis skill"
 ```
-
-## Resources
-
-- `scripts/init_skill.py` - Scaffold new skill
-- `scripts/package_skill.py` - Validate and package
-- `references/workflows.md` - Sequential/conditional patterns
-- `references/output-patterns.md` - Template and example patterns
