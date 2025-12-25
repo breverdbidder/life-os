@@ -3,43 +3,33 @@ name: frontend-design
 description: Create distinctive, production-grade frontend interfaces that avoid generic AI slop aesthetics
 ---
 
-# Frontend Design Skill
+# Frontend Design
 
-Creates bold, distinctive UIs that avoid blue/purple gradient "AI slop" aesthetics.
+Creates bold, production-quality frontends with exceptional aesthetic attention.
 
 ## When to Use
-- Building React components or pages
-- Creating landing pages or dashboards  
-- Any frontend work needing unique aesthetics
-- Improving existing UI designs
+- Building React components/pages
+- Creating dashboards or landing pages
+- Any frontend work avoiding generic "AI slop"
 
-## Process
+## Before Coding
 
-1. **Understand Context**: What problem? Who uses it?
-2. **Pick BOLD Aesthetic** (commit fully):
-   - Brutally minimal, Maximalist chaos, Retro-futuristic
-   - Organic/natural, Luxury/refined, Playful/toy-like
-   - Editorial/magazine, Brutalist/raw, Art deco/geometric
-   - Soft/pastel, Industrial/utilitarian
-3. **Execute with Precision**: Typography, spacing, colors matter
+Pick ONE bold aesthetic direction:
+- Brutally minimal
+- Maximalist chaos
+- Retro-futuristic
+- Luxury/refined
+- Brutalist/raw
+- Industrial/utilitarian
 
 ## Core Principles
-- ❌ NO blue/purple gradients
-- ✅ Commit to chosen aesthetic direction  
-- ✅ Production-quality code (not mockups)
-- ✅ Meticulous attention to details
-- ✅ One-shot quality
+1. NO blue/purple gradients
+2. Commit fully to chosen aesthetic
+3. Production-ready code, not mockups
+4. Meticulous typography and spacing
 
-## Tech Stack
-- React + Tailwind CSS
-- Unique color palettes (avoid defaults)
-- Typography hierarchy
-- Micro-interactions
-- Responsive design
-- Accessibility
-
-## Example Usage
+## Usage
 ```
-"Use frontend design skill to build auction dashboard - make it brutalist"
-"Redesign landing page with frontend design - luxury/refined aesthetic"
+"Use frontend design skill to build auction dashboard"
+"Redesign landing page - brutalist aesthetic"
 ```
