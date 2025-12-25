@@ -1,54 +1,28 @@
 ---
 name: content-research-writer
-description: Write high-quality content with research, citations, and style matching
+description: Write blog posts/newsletters in YOUR voice with research and citations
 ---
 
 # Content Research Writer
 
-Creates well-researched content (blog posts, newsletters) in YOUR voice with proper citations.
-
-## When to Use
-- Writing blog posts about product/service
-- Creating newsletters
-- Marketing copy
-- Thought leadership content
-- Getting first customers via content
+Creates well-researched content matching your writing style.
 
 ## Process
-1. **Analyze Style**: Read user's previous writing
-2. **Research Topic**: Search online for relevant info
-3. **Create Outline**: Show for approval
-4. **Write Sections**: One by one, show for review
-5. **Add Citations**: 5-10+ sources with inline references
-6. **Include Hook**: Strong first paragraph
-
-## Instructions
-
-When creating content:
-1. Ask for reference documents showing writing style
-2. Research topic using web search
-3. Create outline for approval
-4. Write section-by-section
-5. Add citations throughout [1]
-6. Strong hook in first 2-3 sentences
-7. Format: headers, short paragraphs (2-3 sentences)
-8. Call-to-action at end
+1. Analyze your writing style from references
+2. Conduct online research
+3. Write section-by-section for review
+4. Add 5-10+ citations
+5. Include strong hook
 
 ## Output Format
-- Engaging hook (first paragraph)
-- Clear structure with headers
+- Engaging hook (2-3 sentences)
+- Clear headers
 - 2-3 sentence paragraphs
-- Inline citations [1] with sources at bottom
-- CTA at end
+- Inline citations [1]
+- Sources at bottom
 
-## Example Usage
+## Usage
 ```
 "Use content research writer to create blog post about foreclosure investing.
-Use my newsletter.md as style reference. Add research and citations."
+Use newsletter.md as style reference. Add research and citations."
 ```
-
-## Avoids AI Slop
-- Matches YOUR voice (not generic AI)
-- Real research + citations
-- Section-by-section refinement
-- Specific examples
