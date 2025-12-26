@@ -1,0 +1,89 @@
+name: Simple YouTube Transcript
+
+on:
+  workflow_dispatch:
+    inputs:
+      url:
+        description: 'YouTube URL'
+        required: true
+        type: string
+
+jobs:
+  extract:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      
+      - name: Install dependencies
+        run: |
+          pip install youtube-transcript-api
+      
+      - name: Extract Transcript
+        env:
+          VIDEO_URL: ${{ inputs.url }}
+        run: |
+          python3 << 'PYTHON'
+          import os
+          import re
+          from youtube_transcript_api import YouTubeTranscriptApi
+
+          url = os.environ['VIDEO_URL']
+          
+          # Extract video ID
+          patterns = [
+              r'(?:v=|\/)([0-9A-Za-z_-]{11}).*',
+              r'youtu\.be\/([0-9A-Za-z_-]{11})'
+          ]
+          
+          video_id = None
+          for pattern in patterns:
+              match = re.search(pattern, url)
+              if match:
+                  video_id = match.group(1)
+                  break
+          
+          if not video_id:
+              print("ERROR: Could not extract video ID")
+              exit(1)
+          
+          print(f"Video ID: {video_id}")
+          
+          try:
+              # Get transcript
+              api = YouTubeTranscriptApi()
+              transcript_data = api.fetch(video_id, languages=['en'])
+              
+              full_text = ' '.join([item['text'] for item in transcript_data])
+              
+              # Save to file
+              with open('transcript.txt', 'w') as f:
+                  f.write("YouTube Video Transcript\n")
+                  f.write("=" * 80 + "\n\n")
+                  f.write(f"URL: {url}\n")
+                  f.write(f"Video ID: {video_id}\n")
+                  f.write(f"Method: YouTube Transcript API\n\n")
+                  f.write("=" * 80 + "\n\n")
+                  f.write(full_text)
+              
+              print("\n" + "="*80)
+              print("TRANSCRIPT:")
+              print("="*80)
+              print(full_text)
+              print("="*80)
+              
+              print(f"\n✅ SUCCESS! Length: {len(full_text)} characters")
+              
+          except Exception as e:
+              print(f"ERROR: {e}")
+              exit(1)
+          PYTHON
+      
+      - name: Upload Transcript
+        uses: actions/upload-artifact@v4
+        with:
+          name: youtube-transcript
+          path: transcript.txt
