@@ -1,4 +1,4 @@
-name: YouTube Transcript - Apify Premium
+name: YouTube Transcript - Fixed
 
 on:
   workflow_dispatch:
@@ -6,7 +6,7 @@ on:
       video_url:
         description: 'YouTube Video URL'
         required: true
-        default: 'https://youtu.be/NuKrtiJqW3Y'
+        type: string
 
 jobs:
   transcript:
@@ -23,12 +23,12 @@ jobs:
       
       - name: Install dependencies
         run: |
-          pip install requests
+          pip install requests --break-system-packages
       
       - name: Extract Transcript via Apify
         env:
           APIFY_API_TOKEN: ${{ secrets.APIFY_API_TOKEN }}
-          VIDEO_URL: ${{ github.event.inputs.video_url }}
+          VIDEO_URL: ${{ inputs.video_url }}
         run: |
           cat > transcript_apify.py << 'SCRIPT'
           #!/usr/bin/env python3
@@ -39,8 +39,8 @@ jobs:
           import requests
           
           APIFY_TOKEN = os.environ.get('APIFY_API_TOKEN')
-          VIDEO_URL = os.environ.get('VIDEO_URL', 'https://youtu.be/NuKrtiJqW3Y')
-          ACTOR_ID = "smartly_automated/youtube-transcript-scraper-premium-version"
+          VIDEO_URL = os.environ.get('VIDEO_URL')
+          ACTOR_ID = "starvibe/youtube-video-transcript"  # FIXED ACTOR ID
           
           def run_apify_actor(video_url):
               if not APIFY_TOKEN:
@@ -49,9 +49,7 @@ jobs:
               
               run_url = f"https://api.apify.com/v2/acts/{ACTOR_ID}/runs"
               payload = {
-                  "videoUrls": [video_url],
-                  "includeComments": False,
-                  "languageCodes": ["en"]
+                  "startUrls": [{"url": video_url}]
               }
               
               print(f"🚀 Starting Apify actor: {ACTOR_ID}")
@@ -117,10 +115,9 @@ jobs:
               if not result:
                   sys.exit(1)
               
-              transcript = result.get('transcript', '')
+              transcript = result.get('transcript') or result.get('subtitles', '')
               title = result.get('title', 'Unknown')
-              channel = result.get('channelTitle', 'Unknown')
-              duration = result.get('duration', 'Unknown')
+              channel = result.get('channelName') or result.get('channelTitle', 'Unknown')
               
               if not transcript:
                   print("❌ No transcript found")
@@ -134,16 +131,14 @@ jobs:
                   f.write(f"{'=' * 80}\n\n")
                   f.write(f"Title: {title}\n")
                   f.write(f"Channel: {channel}\n")
-                  f.write(f"Duration: {duration}\n")
                   f.write(f"URL: {VIDEO_URL}\n")
-                  f.write(f"Method: Apify Premium (99.4% success)\n")
+                  f.write(f"Method: Apify (starvibe/youtube-video-transcript)\n")
                   f.write(f"\n{'=' * 80}\n\n")
                   f.write(transcript)
               
               print(f"\n✅ SUCCESS!")
               print(f"📝 Title: {title}")
               print(f"📺 Channel: {channel}")
-              print(f"⏱️  Duration: {duration}")
               print(f"📊 Length: {len(transcript)} chars")
               print(f"\n📄 Preview:\n")
               print(transcript[:2000])
@@ -161,4 +156,3 @@ jobs:
         with:
           name: youtube-transcript
           path: transcript_output.txt
-          retention-days: 30
