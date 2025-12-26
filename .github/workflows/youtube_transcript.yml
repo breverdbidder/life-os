@@ -1,276 +1,210 @@
-name: YouTube Transcript V7
+name: YouTube Transcript Extractor
 
 on:
   workflow_dispatch:
     inputs:
       video_url:
-        description: 'YouTube URL (full URL or just video ID)'
+        description: 'YouTube Video URL'
         required: true
-        type: string
-      category:
-        description: 'Category for Supabase'
-        required: false
-        default: 'learning'
-        type: string
-
-env:
-  SUPABASE_URL: https://mocerqjnksmhcjzxrewo.supabase.co
+        default: 'https://www.youtube.com/watch?v=NuKrtiJqW3Y'
 
 jobs:
-  transcribe:
+  extract_transcript:
     runs-on: ubuntu-latest
-    timeout-minutes: 25
     
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
       
-      - uses: actions/setup-python@v5
+      - name: Set up Python
+        uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
-          
-      - name: Install Dependencies
+          python-version: '3.12'
+      
+      - name: Install dependencies
         run: |
-          pip install youtube-transcript-api yt-dlp httpx requests openai-whisper
-          sudo apt-get update && sudo apt-get install -y ffmpeg
-          
-      - name: Transcribe Video
-        id: transcribe
+          pip install requests
+      
+      - name: Extract YouTube Transcript via Apify
         env:
-          VIDEO_INPUT: ${{ github.event.inputs.video_url }}
-          CATEGORY: ${{ github.event.inputs.category }}
-          SUPABASE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
           APIFY_API_TOKEN: ${{ secrets.APIFY_API_TOKEN }}
         run: |
-          python3 << 'PYEOF'
-          import os, re, json, subprocess, glob, requests, time
-          from datetime import datetime, timezone
+          python << 'PYTHON_SCRIPT'
+          import os
+          import sys
+          import json
+          import time
+          import requests
+          from urllib.parse import urlparse, parse_qs
           
-          video_input = os.environ.get('VIDEO_INPUT', '').strip()
-          category = os.environ.get('CATEGORY', 'learning')
-          supabase_url = os.environ.get('SUPABASE_URL', '')
-          supabase_key = os.environ.get('SUPABASE_KEY', '')
-          apify_token = os.environ.get('APIFY_API_TOKEN', '')
+          def extract_video_id(url):
+              """Extract YouTube video ID from URL"""
+              parsed = urlparse(url)
+              if parsed.hostname in ['www.youtube.com', 'youtube.com']:
+                  if parsed.path == '/watch':
+                      return parse_qs(parsed.query).get('v', [None])[0]
+              elif parsed.hostname == 'youtu.be':
+                  return parsed.path.lstrip('/')
+              return None
           
-          print(f"{'='*60}")
-          print(f"YOUTUBE TRANSCRIPT V7.1 (4-Tier + Flexible Input)")
-          print(f"{'='*60}")
-          
-          # FLEXIBLE INPUT: Accept video_id OR full URL
-          video_id = None
-          video_url = video_input
-          
-          # Check if input is just a video ID (11 chars, alphanumeric with - and _)
-          if re.match(r'^[a-zA-Z0-9_-]{11}$', video_input):
-              video_id = video_input
-              video_url = f"https://www.youtube.com/watch?v={video_id}"
-              print(f"Input detected as VIDEO ID: {video_id}")
-          else:
-              # Extract video ID from URL
-              patterns = [
-                  r'shorts/([a-zA-Z0-9_-]{11})',
-                  r'(?:v=|/v/)([a-zA-Z0-9_-]{11})',
-                  r'youtu\.be/([a-zA-Z0-9_-]{11})',
-                  r'embed/([a-zA-Z0-9_-]{11})',
-                  r'/live/([a-zA-Z0-9_-]{11})',
-                  r'watch\?.*v=([a-zA-Z0-9_-]{11})'
-              ]
-              for p in patterns:
-                  m = re.search(p, video_input)
-                  if m:
-                      video_id = m.group(1)
+          def run_apify_transcript(video_url):
+              """Extract transcript using Apify"""
+              apify_token = os.environ.get('APIFY_API_TOKEN')
+              
+              if not apify_token:
+                  print("::error::APIFY_API_TOKEN not found in secrets")
+                  sys.exit(1)
+              
+              # Best rated YouTube transcript actor
+              actor_id = 'karamelo/youtube-structured-transcript-extractor'
+              
+              print(f"🚀 Starting Apify Actor: {actor_id}")
+              print(f"📹 Video URL: {video_url}\n")
+              
+              # Start actor run
+              run_url = f"https://api.apify.com/v2/acts/{actor_id}/runs"
+              
+              payload = {
+                  "videoUrls": [video_url],
+                  "outputFormat": "captions_array_text_only"
+              }
+              
+              headers = {
+                  "Authorization": f"Bearer {apify_token}",
+                  "Content-Type": "application/json"
+              }
+              
+              # Start the run
+              response = requests.post(run_url, json=payload, headers=headers, timeout=30)
+              response.raise_for_status()
+              run_data = response.json()
+              run_id = run_data['data']['id']
+              
+              print(f"✅ Actor started. Run ID: {run_id}")
+              print("⏳ Waiting for completion...\n")
+              
+              # Poll for completion (max 3 minutes)
+              for i in range(36):  # 36 * 5 = 180 seconds
+                  time.sleep(5)
+                  status_url = f"https://api.apify.com/v2/acts/{actor_id}/runs/{run_id}"
+                  status_response = requests.get(status_url, headers=headers, timeout=10)
+                  status_data = status_response.json()
+                  
+                  status = status_data['data']['status']
+                  print(f"[{i*5}s] Status: {status}")
+                  
+                  if status in ['SUCCEEDED', 'FAILED', 'ABORTED', 'TIMED-OUT']:
                       break
-              print(f"Input detected as URL")
+              
+              if status != 'SUCCEEDED':
+                  print(f"::error::Actor run {status}")
+                  sys.exit(1)
+              
+              # Get results
+              print("\n📥 Fetching results...")
+              dataset_url = f"https://api.apify.com/v2/acts/{actor_id}/runs/{run_id}/dataset/items"
+              dataset_response = requests.get(dataset_url, headers=headers, timeout=30)
+              dataset_response.raise_for_status()
+              results = dataset_response.json()
+              
+              if not results or len(results) == 0:
+                  print("::error::No results returned from Apify")
+                  sys.exit(1)
+              
+              return results[0]
+          
+          def save_transcript(data, video_id):
+              """Save transcript to workspace"""
+              
+              # Extract transcript text from various possible fields
+              transcript_text = ""
+              
+              if 'transcript' in data:
+                  transcript_text = data['transcript']
+              elif 'captions' in data:
+                  captions = data['captions']
+                  if isinstance(captions, list):
+                      transcript_text = ' '.join([c.get('text', '') for c in captions if 'text' in c])
+                  elif isinstance(captions, str):
+                      transcript_text = captions
+              elif 'text' in data:
+                  transcript_text = data['text']
+              
+              if not transcript_text:
+                  print(f"::warning::Could not extract transcript. Available fields: {list(data.keys())}")
+                  print("::warning::Full response:")
+                  print(json.dumps(data, indent=2)[:1000])
+                  
+                  # Try to get any text-like field
+                  for key, value in data.items():
+                      if isinstance(value, str) and len(value) > 100:
+                          transcript_text = value
+                          break
+              
+              if not transcript_text:
+                  print("::error::No transcript text found in response")
+                  sys.exit(1)
+              
+              # Save to file
+              output_file = f'transcript_{video_id}.txt'
+              with open(output_file, 'w', encoding='utf-8') as f:
+                  f.write(f"YouTube Video: https://www.youtube.com/watch?v={video_id}\n")
+                  f.write(f"Transcription Method: Apify API (karamelo/youtube-structured-transcript-extractor)\n")
+                  f.write(f"Extraction Date: {time.strftime('%Y-%m-%d %H:%M:%S UTC')}\n")
+                  f.write(f"\n{'=' * 80}\n\n")
+                  f.write(transcript_text)
+              
+              print(f"\n✅ Transcript saved to {output_file}")
+              print(f"📊 Word count: {len(transcript_text.split())} words")
+              print(f"📊 Character count: {len(transcript_text)} characters")
+              print(f"\n{'=' * 80}")
+              print("TRANSCRIPT PREVIEW (first 2000 chars):")
+              print('=' * 80)
+              print(transcript_text[:2000])
+              if len(transcript_text) > 2000:
+                  print("\n... (truncated, see full file)")
+              print('=' * 80)
+              
+              # Also save metadata
+              metadata_file = f'transcript_{video_id}_metadata.json'
+              with open(metadata_file, 'w') as f:
+                  json.dump(data, f, indent=2)
+              print(f"\n📋 Metadata saved to {metadata_file}")
+              
+              return output_file
+          
+          # Main execution
+          video_url = "${{ github.event.inputs.video_url }}"
+          video_id = extract_video_id(video_url)
           
           if not video_id:
-              print(f"ERROR: Could not extract video ID from: {video_input}")
-              exit(1)
+              print(f"::error::Could not extract video ID from URL: {video_url}")
+              sys.exit(1)
           
-          video_type = "short" if '/shorts/' in video_url else "regular"
-          print(f"Video ID: {video_id}")
-          print(f"Video URL: {video_url}")
-          print(f"Type: {video_type}")
+          print(f"📹 Video ID: {video_id}\n")
           
-          # Get metadata
-          metadata = {"title": "Unknown", "channel": "Unknown", "duration": 0}
-          try:
-              r = subprocess.run(['yt-dlp', '--dump-json', '--no-download', video_url], 
-                                capture_output=True, text=True, timeout=30)
-              if r.returncode == 0:
-                  d = json.loads(r.stdout)
-                  metadata = {
-                      "title": d.get('title', ''),
-                      "channel": d.get('channel', '') or d.get('uploader', ''),
-                      "duration": d.get('duration', 0)
-                  }
-                  print(f"Title: {metadata['title'][:60]}")
-                  print(f"Channel: {metadata['channel']}")
-          except Exception as e:
-              print(f"Metadata error: {e}")
+          # Run Apify extraction
+          result = run_apify_transcript(video_url)
           
-          transcript = None
-          source = "none"
+          # Save transcript
+          output_file = save_transcript(result, video_id)
           
-          # TIER 1: YouTube Transcript API
-          print("\nTIER 1: YouTube Transcript API")
-          try:
-              from youtube_transcript_api import YouTubeTranscriptApi
-              fetched = YouTubeTranscriptApi().fetch(video_id)
-              transcript = ' '.join([e.text for e in fetched])
-              source = "youtube_api"
-              print(f"SUCCESS: {len(transcript)} chars")
-          except Exception as e:
-              print(f"Failed: {str(e)[:100]}")
-          
-          # TIER 2: yt-dlp subtitles
-          if not transcript or len(transcript) < 20:
-              print("\nTIER 2: yt-dlp subtitles")
-              try:
-                  subprocess.run([
-                      'yt-dlp', '--skip-download', 
-                      '--write-auto-sub', '--sub-lang', 'en',
-                      '-o', f'/tmp/{video_id}', video_url
-                  ], capture_output=True, timeout=60)
-                  
-                  vtt_files = glob.glob(f'/tmp/{video_id}*.vtt')
-                  if vtt_files:
-                      with open(vtt_files[0]) as f:
-                          lines = [l.strip() for l in f 
-                                  if l.strip() and not any(x in l for x in ['WEBVTT', '-->', '<'])]
-                      transcript = ' '.join(lines)
-                      source = "yt-dlp_subs"
-                      print(f"SUCCESS: {len(transcript)} chars")
-                  else:
-                      print("No subtitle files found")
-              except Exception as e:
-                  print(f"Failed: {e}")
-          
-          # TIER 3: Whisper
-          if not transcript or len(transcript) < 20:
-              print("\nTIER 3: Whisper (base)")
-              try:
-                  os.makedirs('/tmp/audio', exist_ok=True)
-                  subprocess.run([
-                      'yt-dlp', '-x', '--audio-format', 'mp3',
-                      '-o', '/tmp/audio/%(id)s.%(ext)s', video_url
-                  ], capture_output=True, timeout=120)
-                  
-                  audio_files = glob.glob(f'/tmp/audio/{video_id}*')
-                  actual_audio = next((f for f in audio_files 
-                                      if any(f.endswith(e) for e in ['.mp3','.m4a','.webm','.opus'])), None)
-                  
-                  if actual_audio and os.path.exists(actual_audio):
-                      size = os.path.getsize(actual_audio)
-                      if size > 1000:
-                          import whisper
-                          model = whisper.load_model("base")
-                          result = model.transcribe(actual_audio)
-                          transcript = result["text"].strip()
-                          source = "whisper_base"
-                          print(f"SUCCESS: {len(transcript)} chars")
-              except Exception as e:
-                  print(f"Failed: {e}")
-          
-          # TIER 4: Apify
-          if (not transcript or len(transcript) < 20) and apify_token:
-              print("\nTIER 4: Apify")
-              try:
-                  run_response = requests.post(
-                      f"https://api.apify.com/v2/acts/karamelo~youtube-transcripts/runs?token={apify_token}&waitForFinish=120",
-                      headers={"Content-Type": "application/json"},
-                      json={"urls": [video_url], "output_format": "captions_text"},
-                      timeout=130
-                  )
-                  
-                  if run_response.status_code == 201:
-                      run_data = run_response.json()
-                      dataset_id = run_data.get('data', {}).get('defaultDatasetId')
-                      
-                      if dataset_id:
-                          time.sleep(5)
-                          items_response = requests.get(
-                              f"https://api.apify.com/v2/datasets/{dataset_id}/items?token={apify_token}",
-                              timeout=30
-                          )
-                          
-                          if items_response.status_code == 200:
-                              items = items_response.json()
-                              if items:
-                                  captions = items[0].get('captions', [])
-                                  if captions:
-                                      raw_text = ' '.join(captions)
-                                      transcript = raw_text.replace('&#39;', "'").replace('&amp;', '&')
-                                      source = "apify"
-                                      print(f"SUCCESS: {len(transcript)} chars")
-              except Exception as e:
-                  print(f"Failed: {e}")
-          
-          if not transcript or len(transcript) < 20:
-              transcript = "Transcript unavailable"
-              source = "failed"
-          
-          print(f"\n{'='*60}")
-          print(f"RESULT: {source} | {len(transcript)} chars")
-          print(f"{'='*60}")
-          print(f"\n{transcript[:1000]}...")
-          
-          # Save to Supabase
-          if supabase_key and source != "failed":
-              try:
-                  headers = {
-                      "apikey": supabase_key,
-                      "Authorization": f"Bearer {supabase_key}",
-                      "Content-Type": "application/json",
-                      "Prefer": "return=minimal"
-                  }
-                  
-                  insight = {
-                      "user_id": 1,
-                      "insight_type": "youtube_transcript",
-                      "title": f"{metadata['title'][:80]}",
-                      "content": transcript[:10000],
-                      "category": category,
-                      "source": f"youtube_v7_{source}",
-                      "priority": 2,
-                      "status": "Active",
-                      "metadata": json.dumps({
-                          "video_id": video_id,
-                          "video_type": video_type,
-                          "channel": metadata['channel'],
-                          "duration": metadata['duration'],
-                          "source": source,
-                          "word_count": len(transcript.split())
-                      })
-                  }
-                  
-                  r = requests.post(
-                      f"{supabase_url}/rest/v1/insights",
-                      headers=headers,
-                      json=insight,
-                      timeout=10
-                  )
-                  print(f"\nSupabase: {r.status_code}")
-              except Exception as e:
-                  print(f"Supabase error: {e}")
-          
-          # Set outputs
-          with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
-              f.write(f"video_id={video_id}\n")
-              f.write(f"source={source}\n")
-              f.write(f"length={len(transcript)}\n")
-          
-          # Save artifact
-          with open('transcript.json', 'w') as f:
-              json.dump({
-                  "video_id": video_id,
-                  "title": metadata['title'],
-                  "channel": metadata['channel'],
-                  "transcript": transcript,
-                  "source": source
-              }, f, indent=2)
-          PYEOF
-          
-      - uses: actions/upload-artifact@v4
+          print(f"\n🎉 SUCCESS! Transcript extracted to {output_file}")
+          PYTHON_SCRIPT
+      
+      - name: Upload transcript as artifact
+        uses: actions/upload-artifact@v4
         with:
-          name: transcript-${{ steps.transcribe.outputs.video_id }}
-          path: transcript.json
+          name: youtube-transcript
+          path: |
+            transcript_*.txt
+            transcript_*_metadata.json
           retention-days: 30
+      
+      - name: Commit transcript to repository (optional)
+        run: |
+          git config user.name "GitHub Actions"
+          git config user.email "actions@github.com"
+          git add transcript_*.txt transcript_*_metadata.json || true
+          git commit -m "Add YouTube transcript: ${{ github.event.inputs.video_url }}" || echo "No changes to commit"
+          git push || echo "Nothing to push"
