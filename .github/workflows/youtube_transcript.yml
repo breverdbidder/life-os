@@ -13,9 +13,6 @@ jobs:
     runs-on: ubuntu-latest
     
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-      
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
@@ -23,29 +20,26 @@ jobs:
       
       - name: Install dependencies
         run: |
-          pip install --break-system-packages requests
+          pip install --break-system-packages youtube-transcript-api
       
-      - name: Extract Transcript via Apify
+      - name: Extract Transcript
         env:
           VIDEO_URL: ${{ inputs.video_url }}
-          APIFY_TOKEN: ${{ secrets.APIFY_API_TOKEN }}
         run: |
           python3 << 'PYTHON'
           import os
-          import requests
-          import json
-          import time
           import re
+          from youtube_transcript_api import YouTubeTranscriptApi
 
           video_url = os.environ['VIDEO_URL']
-          apify_token = os.environ.get('APIFY_TOKEN', '')
           
           # Extract video ID
-          video_id = None
           patterns = [
               r'(?:v=|\/)([0-9A-Za-z_-]{11}).*',
               r'youtu\.be\/([0-9A-Za-z_-]{11})',
           ]
+          
+          video_id = None
           for pattern in patterns:
               match = re.search(pattern, video_url)
               if match:
@@ -57,101 +51,44 @@ jobs:
               exit(1)
           
           print(f"📹 Video ID: {video_id}")
-          print(f"🔄 Fetching transcript via Apify...")
+          print("🔄 Fetching transcript...")
           
-          # Use Apify's YouTube Transcript Actor
-          actor_id = "streamers/youtube-transcript-scraper"
-          
-          # Start actor run
-          run_url = f"https://api.apify.com/v2/acts/{actor_id}/runs"
-          headers = {"Content-Type": "application/json"}
-          
-          payload = {
-              "videoUrls": [f"https://www.youtube.com/watch?v={video_id}"],
-              "language": "en"
-          }
-          
-          if apify_token:
-              params = {"token": apify_token}
-          else:
-              params = {}
-          
-          response = requests.post(run_url, json=payload, headers=headers, params=params)
-          
-          if response.status_code != 201:
-              print(f"❌ Failed to start Apify actor: {response.status_code}")
-              print(response.text)
-              exit(1)
-          
-          run_data = response.json()
-          run_id = run_data['data']['id']
-          default_dataset_id = run_data['data']['defaultDatasetId']
-          
-          print(f"✅ Started run: {run_id}")
-          print(f"⏳ Waiting for completion...")
-          
-          # Poll for completion
-          status_url = f"https://api.apify.com/v2/acts/{actor_id}/runs/{run_id}"
-          max_wait = 180  # 3 minutes
-          waited = 0
-          
-          while waited < max_wait:
-              time.sleep(5)
-              waited += 5
+          try:
+              # Create API instance and fetch transcript
+              api = YouTubeTranscriptApi()
+              transcript_list = api.list(video_id)
               
-              status_response = requests.get(status_url, params=params)
-              if status_response.status_code != 200:
-                  continue
-              
-              status_data = status_response.json()
-              status = status_data['data']['status']
-              
-              print(f"⏳ Status: {status} ({waited}s)")
-              
-              if status == 'SUCCEEDED':
+              # Get first available transcript
+              transcript_data = None
+              for transcript in transcript_list:
+                  transcript_data = transcript.fetch()
                   break
-              elif status in ['FAILED', 'ABORTED', 'TIMED-OUT']:
-                  print(f"❌ Run {status}")
+              
+              if not transcript_data:
+                  print("❌ No transcript available")
                   exit(1)
-          
-          if waited >= max_wait:
-              print(f"❌ Timeout waiting for transcript")
-              exit(1)
-          
-          # Get results
-          dataset_url = f"https://api.apify.com/v2/datasets/{default_dataset_id}/items"
-          results_response = requests.get(dataset_url, params=params)
-          
-          if results_response.status_code != 200:
-              print(f"❌ Failed to get results: {results_response.status_code}")
-              exit(1)
-          
-          results = results_response.json()
-          
-          if not results or len(results) == 0:
-              print(f"❌ No transcript data returned")
-              exit(1)
-          
-          result = results[0]
-          
-          # Write transcript
-          with open('transcript_output.txt', 'w') as f:
-              f.write("YouTube Video Transcript\n")
-              f.write("=" * 80 + "\n\n")
-              f.write(f"Title: {result.get('title', 'Unknown')}\n")
-              f.write(f"Channel: {result.get('channelName', 'Unknown')}\n")
-              f.write(f"URL: {video_url}\n")
-              f.write(f"Method: Apify YouTube Transcript Scraper\n\n")
-              f.write("=" * 80 + "\n\n")
               
-              transcript_text = result.get('transcript', result.get('text', ''))
-              if isinstance(transcript_text, list):
-                  transcript_text = ' '.join([seg.get('text', '') for seg in transcript_text])
+              # Combine segments
+              full_text = " ".join([seg['text'] for seg in transcript_data])
+              full_text = full_text.replace('\n', ' ').replace('  ', ' ')
               
-              f.write(transcript_text)
-          
-          print(f"✅ SUCCESS!")
-          print(f"📊 Transcript length: {len(transcript_text)} characters")
+              # Write output
+              with open('transcript_output.txt', 'w') as f:
+                  f.write("YouTube Video Transcript\n")
+                  f.write("=" * 80 + "\n\n")
+                  f.write(f"Video ID: {video_id}\n")
+                  f.write(f"URL: {video_url}\n")
+                  f.write(f"Method: youtube-transcript-api (FREE)\n\n")
+                  f.write("=" * 80 + "\n\n")
+                  f.write(full_text)
+              
+              print("✅ SUCCESS!")
+              print(f"📊 Length: {len(full_text)} characters")
+              print(f"\n📄 Preview:\n{full_text[:500]}...")
+              
+          except Exception as e:
+              print(f"❌ Error: {e}")
+              exit(1)
           PYTHON
       
       - name: Upload Transcript
