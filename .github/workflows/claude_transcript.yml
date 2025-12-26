@@ -1,0 +1,64 @@
+name: Claude Transcript Extractor
+
+on:
+  workflow_dispatch:
+    inputs:
+      video_url:
+        required: true
+        type: string
+
+jobs:
+  extract:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Extract with Claude API
+        env:
+          VIDEO_URL: ${{ inputs.video_url }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          python3 << 'EOF'
+import os
+import requests
+import json
+
+video_url = os.environ['VIDEO_URL']
+api_key = os.environ['ANTHROPIC_API_KEY']
+
+# Use Claude to navigate to YouTube and extract transcript
+prompt = f'''I need you to help me get the transcript from this YouTube video: {video_url}
+
+Please try these methods in order:
+1. Use yt-dlp to download the auto-generated captions
+2. If that fails, try youtube-transcript-api library
+3. If that fails, scrape the YouTube page HTML for the transcript data
+
+Provide the full transcript text.'''
+
+response = requests.post(
+    'https://api.anthropic.com/v1/messages',
+    headers={
+        'x-api-key': api_key,
+        'anthropic-version': '2023-06-01',
+        'content-type': 'application/json'
+    },
+    json={
+        'model': 'claude-sonnet-4-20250514',
+        'max_tokens': 4096,
+        'messages': [{'role': 'user', 'content': prompt}]
+    }
+)
+
+data = response.json()
+transcript = data['content'][0]['text']
+
+with open('transcript.txt', 'w') as f:
+    f.write(transcript)
+
+print("✅ Transcript extracted")
+EOF
+      
+      - name: Upload
+        uses: actions/upload-artifact@v4
+        with:
+          name: transcript
+          path: transcript.txt
