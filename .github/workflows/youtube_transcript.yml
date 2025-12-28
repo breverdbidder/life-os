@@ -1,4 +1,4 @@
-name: YouTube Transcript Agent
+name: YouTube Transcript Agent V8
 
 on:
   workflow_dispatch:
@@ -23,20 +23,23 @@ jobs:
       
       - name: Install dependencies
         run: |
-          pip install --break-system-packages requests
+          pip install --break-system-packages requests youtube-transcript-api
       
-      - name: Extract Transcript via Apify
+      - name: Extract Transcript
         env:
           VIDEO_URL: ${{ inputs.video_url }}
+          GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
         run: |
           python3 << 'PYTHON_SCRIPT'
           import requests
           import json
-          import time
           import os
           import re
+          from youtube_transcript_api import YouTubeTranscriptApi
+          from youtube_transcript_api._errors import TranscriptsDisabled, NoTranscriptFound
 
           def extract_video_id(url):
+              """Extract video ID from YouTube URL"""
               patterns = [
                   r'(?:v=|\/)([0-9A-Za-z_-]{11}).*',
                   r'youtu\.be\/([0-9A-Za-z_-]{11})',
@@ -47,72 +50,116 @@ jobs:
                       return match.group(1)
               return None
 
+          def get_video_metadata(video_id, api_key):
+              """Get video metadata using YouTube Data API v3"""
+              url = "https://www.googleapis.com/youtube/v3/videos"
+              params = {
+                  'part': 'snippet,contentDetails,statistics',
+                  'id': video_id,
+                  'key': api_key
+              }
+              
+              response = requests.get(url, params=params)
+              data = response.json()
+              
+              if 'items' in data and len(data['items']) > 0:
+                  return data['items'][0]
+              return None
+
+          def format_transcript(transcript_data):
+              """Format transcript from youtube-transcript-api"""
+              formatted = []
+              for entry in transcript_data:
+                  text = entry['text'].strip()
+                  if text:
+                      formatted.append(text)
+              return ' '.join(formatted)
+
+          # Main execution
           video_url = os.environ['VIDEO_URL']
+          api_key = os.environ['GOOGLE_API_KEY']
+          
           video_id = extract_video_id(video_url)
-          
           print(f"📹 Video ID: {video_id}")
-          print(f"🔄 Starting Apify actor...")
-
-          # Start actor run
-          actor_input = {
-              "startUrls": [{"url": f"https://www.youtube.com/watch?v={video_id}"}],
-              "maxResults": 1
-          }
-
-          response = requests.post(
-              "https://api.apify.com/v2/acts/streamers~youtube-scraper/runs?token=apify_api_REdm4BQGUAVJlt7CEnWz5BdXP0gqYP1v39eB",
-              json=actor_input
-          )
           
-          run_id = response.json()['data']['id']
-          print(f"🎬 Run ID: {run_id}")
+          # Get video metadata
+          print("🔍 Fetching video metadata...")
+          metadata = get_video_metadata(video_id, api_key)
           
-          # Wait for completion
-          for i in range(60):
-              time.sleep(5)
-              status_response = requests.get(
-                  f"https://api.apify.com/v2/acts/streamers~youtube-scraper/runs/{run_id}?token=apify_api_REdm4BQGUAVJlt7CEnWz5BdXP0gqYP1v39eB"
-              )
-              status = status_response.json()['data']['status']
-              print(f"⏳ Status: {status}")
-              
-              if status == 'SUCCEEDED':
-                  break
-          
-          # Get dataset
-          dataset_id = status_response.json()['data']['defaultDatasetId']
-          items_response = requests.get(
-              f"https://api.apify.com/v2/datasets/{dataset_id}/items?token=apify_api_REdm4BQGUAVJlt7CEnWz5BdXP0gqYP1v39eB"
-          )
-          
-          items = items_response.json()
-          if items and len(items) > 0:
-              video = items[0]
-              
-              # Write transcript
-              with open('transcript_output.txt', 'w') as f:
-                  f.write("="*80 + "\n")
-                  f.write("YOUTUBE VIDEO TRANSCRIPT\n")
-                  f.write("="*80 + "\n\n")
-                  f.write(f"Title: {video.get('title', 'N/A')}\n")
-                  f.write(f"Channel: {video.get('channelName', 'N/A')}\n")
-                  f.write(f"URL: {video_url}\n")
-                  f.write(f"Method: Apify YouTube Scraper\n\n")
-                  f.write("="*80 + "\n")
-                  f.write("TRANSCRIPT\n")
-                  f.write("="*80 + "\n\n")
-                  
-                  if 'subtitles' in video and video['subtitles']:
-                      f.write(video['subtitles'])
-                  else:
-                      f.write("No transcript available for this video.\n")
-              
-              print("✅ Transcript saved!")
-              with open('transcript_output.txt', 'r') as f:
-                  print(f.read())
-          else:
-              print("❌ No video data returned")
+          if not metadata:
+              print("❌ Video not found or private")
               exit(1)
+          
+          snippet = metadata['snippet']
+          stats = metadata.get('statistics', {})
+          
+          print(f"✅ Video: {snippet['title']}")
+          print(f"📺 Channel: {snippet['channelTitle']}")
+          print(f"👁️  Views: {stats.get('viewCount', 'N/A')}")
+          
+          # Try to get transcript using youtube-transcript-api
+          transcript_text = None
+          method = "None"
+          
+          try:
+              print("\n🎬 Method 1: Attempting auto-generated captions...")
+              transcript_list = YouTubeTranscriptApi.get_transcript(video_id)
+              transcript_text = format_transcript(transcript_list)
+              method = "Auto-generated captions (youtube-transcript-api)"
+              print("✅ Success with auto-generated captions!")
+              
+          except NoTranscriptFound:
+              print("⚠️  No auto-generated captions found")
+              try:
+                  print("🎬 Method 2: Attempting manual captions...")
+                  transcript_list = YouTubeTranscriptApi.list_transcripts(video_id)
+                  transcript = transcript_list.find_manually_created_transcript(['en'])
+                  transcript_text = format_transcript(transcript.fetch())
+                  method = "Manual captions (youtube-transcript-api)"
+                  print("✅ Success with manual captions!")
+              except:
+                  print("⚠️  No manual captions available")
+                  
+          except TranscriptsDisabled:
+              print("❌ Transcripts are disabled for this video")
+              
+          except Exception as e:
+              print(f"⚠️  Transcript extraction failed: {str(e)}")
+          
+          # Write output
+          with open('transcript_output.txt', 'w', encoding='utf-8') as f:
+              f.write("=" * 80 + "\n")
+              f.write("YOUTUBE VIDEO TRANSCRIPT\n")
+              f.write("=" * 80 + "\n\n")
+              f.write(f"Title: {snippet['title']}\n")
+              f.write(f"Channel: {snippet['channelTitle']}\n")
+              f.write(f"Published: {snippet['publishedAt']}\n")
+              f.write(f"URL: {video_url}\n")
+              f.write(f"Views: {stats.get('viewCount', 'N/A')}\n")
+              f.write(f"Likes: {stats.get('likeCount', 'N/A')}\n")
+              f.write(f"Method: {method}\n\n")
+              f.write("=" * 80 + "\n")
+              f.write("DESCRIPTION\n")
+              f.write("=" * 80 + "\n\n")
+              f.write(snippet.get('description', 'No description available') + "\n\n")
+              f.write("=" * 80 + "\n")
+              f.write("TRANSCRIPT\n")
+              f.write("=" * 80 + "\n\n")
+              
+              if transcript_text:
+                  f.write(transcript_text + "\n")
+              else:
+                  f.write("⚠️  No transcript available for this video.\n\n")
+                  f.write("Note: This could mean:\n")
+                  f.write("- The video has no captions/subtitles\n")
+                  f.write("- Captions are disabled by the creator\n")
+                  f.write("- The video is too new (captions not generated yet)\n")
+          
+          print("\n✅ Output saved to transcript_output.txt")
+          print("\n" + "=" * 80)
+          with open('transcript_output.txt', 'r', encoding='utf-8') as f:
+              print(f.read())
+          
           PYTHON_SCRIPT
       
       - name: Upload Transcript
@@ -120,3 +167,4 @@ jobs:
         with:
           name: youtube-transcript
           path: transcript_output.txt
+          retention-days: 30
