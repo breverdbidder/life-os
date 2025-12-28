@@ -936,3 +936,52 @@ uvx kroger-mcp
 
 ---
 
+
+---
+
+## 🤖 Auto-discovered APIs (2025-12-28)
+
+### ⭐ High Priority MCP Servers
+
+| Name | Description | URL |
+|------|-------------|-----|
+| BB-fat/browser-use-rs | 🦀 Lightweight browser automation MCP server in Rust with zero dependencies. | https://github.com/BB-fat/browser-use-rs |
+| JamesANZ/medical-mcp | 📇 🏠 - An MCP server that provides access to medical information, drug databases, and healthcare reso | https://github.com/JamesANZ/medical-mcp |
+| Pantheon-Security/chrome-mcp-secure | 📇 🏠 🍎 🪟 🐧 - Security-hardened Chrome automation with post-quantum encryption (ML-KEM-768 + ChaCha20- | https://github.com/Pantheon-Security/chrome-mcp-secure |
+| PhungXuanAnh/selenium-mcp-server | 🐍 🏠 🍎 🪟 🐧 - A Model Context Protocol server providing web automation capabilities through Selenium W | https://github.com/PhungXuanAnh/selenium-mcp-server |
+| agent-infra/mcp-server-browser | 📇 🏠 - Browser automation capabilities using Puppeteer, both support local and remote browser connect | https://github.com/bytedance/UI-TARS-desktop/tree/main/packages/agent-infra/mcp-servers/browser |
+| arpitbatra123/mcp-googletasks | 📇 ☁️ - An MCP server to interface with the Google Tasks API | https://github.com/arpitbatra123/mcp-googletasks |
+| automatalabs/mcp-server-playwright | 🐍 - An MCP server for browser automation using Playwright | https://github.com/Automata-Labs-team/MCP-Server-Playwright |
+| blackwhite084/playwright-plus-python-mcp | 🐍 - An MCP python server using Playwright for browser automation,more suitable for llm | https://github.com/blackwhite084/playwright-plus-python-mcp |
+| carterlasalle/mac_messages_mcp | 🏠 🍎 🚀 - An MCP server that securely interfaces with your iMessage database via the Model Context Pro | https://github.com/carterlasalle/mac_messages_mcp |
+| drakonkat/wizzy-mcp-tmdb | 📇 ☁️ - A MCP server for The Movie Database API that enables AI assistants to search and retrieve mov | https://github.com/drakonkat/wizzy-mcp-tmdb |
+
+### 🔌 New MCP Servers
+
+| Name | Description | URL |
+|------|-------------|-----|
+| 1mcp/agent | 📇 ☁️ 🏠 🍎 🪟 🐧 - A unified Model Context Protocol server implementation that aggregates multiple MCP s | https://github.com/1mcp-app/agent |
+| 34892002/bilibili-mcp-js | 📇 🏠 - A MCP server that supports searching for Bilibili content. Provides LangChain integration exam | https://github.com/34892002/bilibili-mcp-js |
+| 4everland/4everland-hosting-mcp | 🎖️ 📇 🏠 🍎 🐧 - An MCP server implementation for 4EVERLAND Hosting enabling instant deployment of AI-ge | https://github.com/4everland/4everland-hosting-mcp |
+| 8enSmith/mcp-open-library | 📇 ☁️ - A MCP server for the Open Library API that enables AI assistants to search for book informati | https://github.com/8enSmith/mcp-open-library |
+| AbdelStark/nostr-mcp | ☁️ - A Nostr MCP server that allows to interact with Nostr, enabling posting notes, and more. | https://github.com/AbdelStark/nostr-mcp |
+| Cactusinhand/mcp_server_notify | 🐍 🏠 - A MCP server that send desktop notifications with sound effect when agent tasks are completed. | https://github.com/Cactusinhand/mcp_server_notify |
+| Danielpeter-99/calcom-mcp | 🐍 🏠 - MCP server for Calcom. Manage event types, create bookings, and access Cal.com scheduling data | https://github.com/Danielpeter-99/calcom-mcp |
+| Data-Everything/mcp-server-templates | 📇 🏠 🍎 🪟 🐧 - One server. All tools. A unified MCP platform that connects many apps, tools, and servic | https://github.com/Data-Everything/mcp-server-templates |
+| GenWaveLLC/svgmaker-mcp | 📇 ☁️ - Provides AI-driven SVG generation and editing via natural language, with real-time updates an | https://github.com/GenWaveLLC/svgmaker-mcp |
+| IO-Aerospace-software-community/mcp-server | #️⃣ ☁️/🏠 🐧 - IO Aerospace MCP Server: a .NET-based MCP server for aerospace & astrodynamics — epheme | https://github.com/IO-Aerospace-software-engineering/mcp-server |
+
+### 🕷️ New Apify Actors
+
+| Actor | Description | URL |
+|-------|-------------|-----|
+| igolaizola/idealista-scraper | Extract real estate data from Spain, Italy, and Portugal on idealista.com, including pricing, proper | https://apify.com/igolaizola/idealista-scraper |
+| expanditumarca/real-estate-lead-generator-market-analysis-zonaprop | 🚀 3-in-1: Leads + Property Data + Market Analysis with this exclusive Real Estate system - 3-en-1: L | https://apify.com/expanditumarca/real-estate-lead-generator-market-analysis-zonaprop |
+| yogen48-owner/kleinanzeigen-scraper | Extract comprehensive German real estate data from kleinanzeigen.de for market analysis and investme | https://apify.com/yogen48-owner/kleinanzeigen-scraper |
+| dainty_screw/real-estate-fsbo-com-data-scraper | Discover off-market gems with FSBO Detail Scraper. Tailored for real estate investors, this tool ext | https://apify.com/dainty_screw/real-estate-fsbo-com-data-scraper |
+| websift/australian-realestate-agent-collector | Extract comprehensive Australian real estate agent data with precision. Collect contact details, pro | https://apify.com/websift/australian-realestate-agent-collector |
+| easyapi/domain-com-au-real-estate-agents-scraper | 🏠 Extract detailed real estate agent information from Domain.com.au including contact details, perfo | https://apify.com/easyapi/domain-com-au-real-estate-agents-scraper |
+| scrapestorm/zillow-find-a-real-estate-agent | Unlock the power of Zillow with automated agent profile scraping – effortlessly gather key insights  | https://apify.com/scrapestorm/zillow-find-a-real-estate-agent |
+| igolaizola/fotocasa-scraper | Extract detailed real estate listings from fotocasa.es across Spain: pricing, property features, loc | https://apify.com/igolaizola/fotocasa-scraper |
+| emastra/subito-it-immobili | Extract real estate data from Subito.it: houses, apartments, offices, and more. Supports search page | https://apify.com/emastra/subito-it-immobili |
+| harvestlabs/ai-real-estate-agent | Given a user's input the agent extracts key criteria, searches relevant real estate listings, and ou | https://apify.com/harvestlabs/ai-real-estate-agent |
