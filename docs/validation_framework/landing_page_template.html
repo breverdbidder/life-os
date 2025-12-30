@@ -1,0 +1,448 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Your Startup Name - Solve [Problem] for [Customer]</title>
+    <meta name="description" content="Stop [pain point]. Start [benefit]. [Your product] helps [customer] [outcome].">
+    
+    <!-- Google Analytics 4 - Replace G-XXXXXXXXXX -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-XXXXXXXXXX"></script>
+    <script>
+        window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('js', new Date());
+        gtag('config', 'G-XXXXXXXXXX');
+    </script>
+    
+    <!-- Hotjar - Replace YOUR_SITE_ID -->
+    <script>
+        (function(h,o,t,j,a,r){
+            h.hj=h.hj||function(){(h.hj.q=h.hj.q||[]).push(arguments)};
+            h._hjSettings={hjid:YOUR_SITE_ID,hjsv:6};
+            a=o.getElementsByTagName('head')[0];
+            r=o.createElement('script');r.async=1;
+            r.src=t+h._hjSettings.hjid+j+h._hjSettings.hjsv;
+            a.appendChild(r);
+        })(window,document,'https://static.hotjar.com/c/hotjar-','.js?sv=');
+    </script>
+    
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 20px;
+        }
+        
+        /* Hero Section */
+        .hero {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 80px 20px;
+            text-align: center;
+        }
+        
+        .hero h1 {
+            font-size: 3rem;
+            font-weight: 700;
+            margin-bottom: 20px;
+            line-height: 1.2;
+        }
+        
+        .hero p {
+            font-size: 1.5rem;
+            margin-bottom: 40px;
+            opacity: 0.95;
+        }
+        
+        /* CTA Buttons - 3 Tiers */
+        .cta-container {
+            display: flex;
+            gap: 20px;
+            justify-content: center;
+            flex-wrap: wrap;
+            margin-top: 30px;
+        }
+        
+        .btn {
+            padding: 15px 30px;
+            font-size: 1.1rem;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            text-decoration: none;
+            display: inline-block;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+        }
+        
+        /* Primary CTA - Highest Commitment */
+        .btn-primary {
+            background: #10b981;
+            color: white;
+            font-size: 1.2rem;
+            padding: 18px 40px;
+        }
+        
+        /* Secondary CTA - Medium Commitment */
+        .btn-secondary {
+            background: white;
+            color: #667eea;
+            border: 2px solid white;
+        }
+        
+        /* Tertiary CTA - Low Commitment */
+        .btn-tertiary {
+            background: transparent;
+            color: white;
+            border: 2px solid white;
+        }
+        
+        /* Features Section */
+        .features {
+            padding: 80px 20px;
+            background: #f9fafb;
+        }
+        
+        .features h2 {
+            text-align: center;
+            font-size: 2.5rem;
+            margin-bottom: 50px;
+        }
+        
+        .features-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 40px;
+        }
+        
+        .feature-card {
+            background: white;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+        }
+        
+        .feature-card h3 {
+            font-size: 1.5rem;
+            margin-bottom: 15px;
+            color: #667eea;
+        }
+        
+        .feature-card p {
+            color: #666;
+            line-height: 1.8;
+        }
+        
+        /* Demo Section */
+        .demo {
+            padding: 80px 20px;
+            text-align: center;
+        }
+        
+        .demo h2 {
+            font-size: 2.5rem;
+            margin-bottom: 30px;
+        }
+        
+        .demo-video {
+            max-width: 800px;
+            margin: 0 auto;
+            background: #f0f0f0;
+            border-radius: 12px;
+            aspect-ratio: 16/9;
+        }
+        
+        /* Social Proof */
+        .social-proof {
+            background: #667eea;
+            color: white;
+            padding: 60px 20px;
+            text-align: center;
+        }
+        
+        .social-proof h3 {
+            font-size: 2rem;
+            margin-bottom: 30px;
+        }
+        
+        .stats {
+            display: flex;
+            justify-content: center;
+            gap: 60px;
+            flex-wrap: wrap;
+        }
+        
+        .stat {
+            text-align: center;
+        }
+        
+        .stat-number {
+            font-size: 3rem;
+            font-weight: 700;
+            display: block;
+        }
+        
+        .stat-label {
+            font-size: 1.2rem;
+            opacity: 0.9;
+        }
+        
+        /* Footer */
+        footer {
+            background: #1f2937;
+            color: white;
+            padding: 40px 20px;
+            text-align: center;
+        }
+        
+        /* Modal for Email Capture */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.8);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+        }
+        
+        .modal-content {
+            background: white;
+            padding: 40px;
+            border-radius: 12px;
+            max-width: 500px;
+            width: 90%;
+        }
+        
+        .modal-content h2 {
+            margin-bottom: 20px;
+        }
+        
+        .modal-content input {
+            width: 100%;
+            padding: 12px;
+            margin-bottom: 15px;
+            border: 2px solid #e5e7eb;
+            border-radius: 6px;
+            font-size: 1rem;
+        }
+        
+        .close-modal {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            font-size: 2rem;
+            cursor: pointer;
+            color: #666;
+        }
+        
+        @media (max-width: 768px) {
+            .hero h1 {
+                font-size: 2rem;
+            }
+            
+            .hero p {
+                font-size: 1.2rem;
+            }
+            
+            .cta-container {
+                flex-direction: column;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Hero Section -->
+    <section class="hero">
+        <div class="container">
+            <h1>Stop [Pain Point]. Start [Benefit].</h1>
+            <p>The first [solution] that helps [target customer] [achieve outcome] in [timeframe].</p>
+            
+            <div class="cta-container">
+                <!-- Primary CTA: Highest Commitment -->
+                <a href="#" class="btn btn-primary" onclick="trackCTA('primary'); openModal('primary'); return false;">
+                    Get Early Access
+                </a>
+                
+                <!-- Secondary CTA: Medium Commitment -->
+                <a href="#" class="btn btn-secondary" onclick="trackCTA('secondary'); openModal('waitlist'); return false;">
+                    Join Waitlist
+                </a>
+                
+                <!-- Tertiary CTA: Low Commitment -->
+                <a href="#" class="btn btn-tertiary" onclick="trackCTA('tertiary'); openModal('demo'); return false;">
+                    Schedule Demo
+                </a>
+            </div>
+        </div>
+    </section>
+    
+    <!-- Features Section -->
+    <section class="features">
+        <div class="container">
+            <h2>How It Works</h2>
+            <div class="features-grid">
+                <div class="feature-card">
+                    <h3>🚀 Feature 1</h3>
+                    <p>Describe the benefit, not the feature. Focus on what the customer gets, not how it works.</p>
+                </div>
+                <div class="feature-card">
+                    <h3>⚡ Feature 2</h3>
+                    <p>Quantify the benefit. "Save 10 hours per week" is better than "Saves time".</p>
+                </div>
+                <div class="feature-card">
+                    <h3>🎯 Feature 3</h3>
+                    <p>Address the objection. "No credit card required" or "Setup in 5 minutes".</p>
+                </div>
+            </div>
+        </div>
+    </section>
+    
+    <!-- Demo Section (Wizard of Oz) -->
+    <section class="demo">
+        <div class="container">
+            <h2>See It In Action</h2>
+            <p style="margin-bottom: 30px; color: #666;">Watch how [product] solves [problem] in under 2 minutes.</p>
+            
+            <!-- Replace with actual Loom/YouTube embed -->
+            <div class="demo-video">
+                <p style="padding: 150px 0; color: #999;">
+                    [Embed Loom video here or link to Figma prototype]
+                </p>
+            </div>
+        </div>
+    </section>
+    
+    <!-- Social Proof -->
+    <section class="social-proof">
+        <div class="container">
+            <h3>Join 500+ Founders Already Validating</h3>
+            <div class="stats">
+                <div class="stat">
+                    <span class="stat-number">500+</span>
+                    <span class="stat-label">Early Users</span>
+                </div>
+                <div class="stat">
+                    <span class="stat-number">5%</span>
+                    <span class="stat-label">Conversion Rate</span>
+                </div>
+                <div class="stat">
+                    <span class="stat-number">$50K</span>
+                    <span class="stat-label">Saved on Average</span>
+                </div>
+            </div>
+        </div>
+    </section>
+    
+    <!-- Footer -->
+    <footer>
+        <div class="container">
+            <p>&copy; 2025 Your Startup. All rights reserved.</p>
+            <p style="margin-top: 10px;">
+                <a href="privacy.html" style="color: white; margin: 0 10px;">Privacy</a> |
+                <a href="terms.html" style="color: white; margin: 0 10px;">Terms</a>
+            </p>
+        </div>
+    </footer>
+    
+    <!-- Modal for Email Capture -->
+    <div id="modal" class="modal">
+        <div class="modal-content">
+            <span class="close-modal" onclick="closeModal()">&times;</span>
+            <h2 id="modal-title">Get Early Access</h2>
+            <p id="modal-subtitle">Enter your email and we'll send you first access.</p>
+            
+            <form onsubmit="submitForm(event)">
+                <input type="email" id="email" placeholder="your.email@example.com" required>
+                <button type="submit" class="btn btn-primary" style="width: 100%;">
+                    Submit
+                </button>
+            </form>
+        </div>
+    </div>
+    
+    <script>
+        // Event Tracking
+        function trackCTA(type) {
+            gtag('event', 'click', {
+                'event_category': 'CTA',
+                'event_label': type === 'primary' ? 'Primary - Get Early Access' : 
+                              type === 'secondary' ? 'Secondary - Join Waitlist' :
+                              'Tertiary - Schedule Demo'
+            });
+            console.log('CTA Tracked:', type);
+        }
+        
+        // Modal Functions
+        function openModal(type) {
+            const modal = document.getElementById('modal');
+            const title = document.getElementById('modal-title');
+            const subtitle = document.getElementById('modal-subtitle');
+            
+            if (type === 'primary') {
+                title.textContent = 'Get Early Access';
+                subtitle.textContent = 'Enter your email and we\'ll send you first access.';
+            } else if (type === 'waitlist') {
+                title.textContent = 'Join the Waitlist';
+                subtitle.textContent = 'Be the first to know when we launch.';
+            } else {
+                title.textContent = 'Schedule a Demo';
+                subtitle.textContent = 'We\'ll reach out to schedule your personal demo.';
+            }
+            
+            modal.style.display = 'flex';
+        }
+        
+        function closeModal() {
+            document.getElementById('modal').style.display = 'none';
+        }
+        
+        function submitForm(e) {
+            e.preventDefault();
+            const email = document.getElementById('email').value;
+            
+            // Send to your email collection service (Mailchimp, ConvertKit, etc.)
+            console.log('Email collected:', email);
+            
+            // Track conversion
+            gtag('event', 'conversion', {
+                'event_category': 'Lead',
+                'event_label': 'Email Submitted'
+            });
+            
+            // Show thank you
+            alert('Thanks! Check your email for next steps.');
+            closeModal();
+        }
+        
+        // Close modal when clicking outside
+        window.onclick = function(event) {
+            const modal = document.getElementById('modal');
+            if (event.target === modal) {
+                closeModal();
+            }
+        }
+    </script>
+</body>
+</html>
