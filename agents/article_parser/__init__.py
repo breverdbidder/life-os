@@ -1,29 +1,20 @@
 """
-Article Parser Agent V1.0
-=========================
-Life OS web article extraction and analysis.
+Article Parser Agent for Life OS
 
-Author: Claude AI Architect
-Date: 2025-12-30
+Parses web articles (including JS-rendered) and classifies by Life OS domains.
+Uses Jina AI Reader (FREE) for content extraction.
 """
 
-from .article_parser_agent import (
-    extract_article,
+from .article_parser_node import (
+    ArticleParserNode,
     article_parser_node,
-    ArticleResult,
-    ArticleSource,
-    LifeOSDomain,
-    is_article_url,
-    extract_article_urls,
+    LIFE_OS_DOMAINS
 )
 
-__version__ = "1.0.0"
 __all__ = [
-    "extract_article",
-    "article_parser_node",
-    "ArticleResult",
-    "ArticleSource",
-    "LifeOSDomain",
-    "is_article_url",
-    "extract_article_urls",
+    'ArticleParserNode',
+    'article_parser_node',
+    'LIFE_OS_DOMAINS'
 ]
+
+__version__ = '1.0.0'
