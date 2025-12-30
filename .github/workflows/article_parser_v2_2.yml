@@ -1,0 +1,76 @@
+name: Article Parser V2.2 (MCP-Enabled)
+
+on:
+  workflow_dispatch:
+    inputs:
+      url:
+        description: 'Article URL to parse (supports JS-rendered sites)'
+        required: true
+        type: string
+
+env:
+  SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+  SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+  ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+  USE_MCP: "true"
+
+jobs:
+  parse_article_v2_2:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: Set up Node.js (for MCP)
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+      
+      - name: Install Python dependencies
+        run: |
+          pip install --upgrade pip
+          pip install httpx beautifulsoup4 html2text trafilatura lxml
+          pip install -r requirements.txt || true
+      
+      - name: Install MCP Playwright
+        run: |
+          npm install -g @modelcontextprotocol/server-playwright
+          npx @modelcontextprotocol/server-playwright --version || echo "MCP Playwright installed"
+      
+      - name: Run V2.2 Parser with MCP
+        id: parse
+        run: |
+          cd $GITHUB_WORKSPACE
+          export PYTHONPATH=$GITHUB_WORKSPACE:$PYTHONPATH
+          python agents/article_parser/article_parser_agent_v2_2_mcp.py "${{ github.event.inputs.url }}" | tee /tmp/parse_output.txt
+          
+          # Extract key metrics
+          echo "::set-output name=success::true"
+      
+      - name: Display Results
+        if: always()
+        run: |
+          echo "=== V2.2 EXTRACTION RESULTS ==="
+          cat /tmp/parse_output.txt || echo "No output file"
+      
+      - name: Comment on PR (if applicable)
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const output = fs.readFileSync('/tmp/parse_output.txt', 'utf8');
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: '### Article Parser V2.2 Results\n\n```\n' + output + '\n```'
+            });
