@@ -1,0 +1,93 @@
+name: Article Parser Agent
+
+on:
+  workflow_dispatch:
+    inputs:
+      url:
+        description: 'Article URL to parse'
+        required: true
+        type: string
+  
+  repository_dispatch:
+    types: [article_parse]
+
+env:
+  SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+  SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+  ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+  GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
+  APIFY_API_TOKEN: ${{ secrets.APIFY_API_TOKEN }}
+
+jobs:
+  parse_article:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+      
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip
+          pip install trafilatura beautifulsoup4 html2text httpx lxml
+          pip install -r requirements.txt
+      
+      - name: Parse Article
+        id: parse
+        run: |
+          URL="${{ github.event.inputs.url || github.event.client_payload.url }}"
+          echo "Parsing article: $URL"
+          
+          python agents/article_parser/article_parser_agent.py "$URL" > output.txt 2>&1
+          
+          # Capture result
+          if [ $? -eq 0 ]; then
+            echo "status=success" >> $GITHUB_OUTPUT
+            echo "✅ Article parsed successfully"
+          else
+            echo "status=failure" >> $GITHUB_OUTPUT
+            echo "❌ Article parsing failed"
+            exit 1
+          fi
+          
+          cat output.txt
+      
+      - name: Upload Result
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: article-parse-result-${{ github.run_id }}
+          path: output.txt
+          retention-days: 7
+      
+      - name: Log to Supabase
+        if: always()
+        run: |
+          python -c "
+          import os
+          import json
+          from datetime import datetime, timezone
+          from lib.supabase_client import get_supabase_client
+          
+          supabase = get_supabase_client()
+          status = '${{ steps.parse.outputs.status }}'
+          url = '${{ github.event.inputs.url || github.event.client_payload.url }}'
+          
+          supabase.table('activity_log').insert({
+              'activity_type': 'article_parse',
+              'status': status,
+              'metadata': json.dumps({
+                  'url': url,
+                  'workflow_run_id': '${{ github.run_id }}',
+                  'trigger': 'workflow_dispatch' if '${{ github.event_name }}' == 'workflow_dispatch' else 'api'
+              }),
+              'timestamp': datetime.now(timezone.utc).isoformat()
+          }).execute()
+          "
