@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Your Startup - Solve [Problem] in [Time]</title>
+    
+    <!-- SEO Meta -->
+    <meta name="description" content="Stop struggling with [problem]. [Your solution] helps [target] achieve [outcome] in [time].">
+    
+    <!-- Google Analytics 4 -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-XXXXXXXXXX"></script>
+    <script>
+        window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('js', new Date());
+        gtag('config', 'G-XXXXXXXXXX');
+        
+        // Event tracking function
+        function trackEvent(eventName, params) {
+            gtag('event', eventName, params);
+        }
+    </script>
+    
+    <!-- Hotjar Tracking -->
+    <script>
+        (function(h,o,t,j,a,r){
+            h.hj=h.hj||function(){(h.hj.q=h.hj.q||[]).push(arguments)};
+            h._hjSettings={hjid:YOUR_HOTJAR_ID,hjsv:6};
+            a=o.getElementsByTagName('head')[0];
+            r=o.createElement('script');r.async=1;
+            r.src=t+h._hjSettings.hjid+j+h._hjSettings.hjsv;
+            a.appendChild(r);
+        })(window,document,'https://static.hotjar.com/c/hotjar-','.js?sv=');
+    </script>
+    
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif; line-height: 1.6; color: #333; }
+        .container { max-width: 1200px; margin: 0 auto; padding: 0 20px; }
+        
+        /* Hero Section */
+        .hero { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 100px 20px; text-align: center; }
+        .hero h1 { font-size: 3rem; margin-bottom: 20px; font-weight: 700; }
+        .hero p { font-size: 1.5rem; margin-bottom: 40px; opacity: 0.9; }
+        
+        /* CTA Buttons */
+        .cta-group { display: flex; gap: 20px; justify-content: center; flex-wrap: wrap; margin-top: 30px; }
+        .cta-button { padding: 16px 32px; font-size: 1.1rem; border: none; border-radius: 8px; cursor: pointer; font-weight: 600; transition: transform 0.2s, box-shadow 0.2s; text-decoration: none; display: inline-block; }
+        .cta-button:hover { transform: translateY(-2px); box-shadow: 0 10px 20px rgba(0,0,0,0.2); }
+        
+        .primary-cta { background: #f59e0b; color: white; }
+        .secondary-cta { background: white; color: #667eea; }
+        .tertiary-cta { background: transparent; color: white; border: 2px solid white; }
+        
+        /* Problem Section */
+        .problem { padding: 80px 20px; background: #f9fafb; }
+        .problem h2 { font-size: 2.5rem; margin-bottom: 30px; text-align: center; color: #1f2937; }
+        .problem-list { max-width: 800px; margin: 0 auto; }
+        .problem-item { background: white; padding: 30px; margin-bottom: 20px; border-radius: 8px; border-left: 4px solid #f59e0b; }
+        .problem-item h3 { color: #667eea; margin-bottom: 10px; }
+        
+        /* Solution Section */
+        .solution { padding: 80px 20px; }
+        .solution h2 { font-size: 2.5rem; margin-bottom: 50px; text-align: center; }
+        .features { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 30px; }
+        .feature { text-align: center; padding: 30px; }
+        .feature-icon { font-size: 3rem; margin-bottom: 20px; }
+        .feature h3 { color: #667eea; margin-bottom: 15px; }
+        
+        /* Demo Section */
+        .demo { padding: 80px 20px; background: #f9fafb; text-align: center; }
+        .demo h2 { font-size: 2.5rem; margin-bottom: 30px; }
+        .demo-container { max-width: 800px; margin: 0 auto; }
+        .demo iframe { width: 100%; height: 450px; border-radius: 8px; }
+        
+        /* Final CTA */
+        .final-cta { padding: 80px 20px; background: #667eea; color: white; text-align: center; }
+        .final-cta h2 { font-size: 2.5rem; margin-bottom: 20px; }
+        .final-cta p { font-size: 1.3rem; margin-bottom: 40px; }
+        
+        /* Form */
+        .email-form { max-width: 500px; margin: 0 auto; display: flex; gap: 10px; }
+        .email-form input { flex: 1; padding: 16px; border: none; border-radius: 8px; font-size: 1rem; }
+        .email-form button { padding: 16px 32px; background: #f59e0b; border: none; border-radius: 8px; color: white; font-weight: 600; cursor: pointer; }
+        
+        /* Footer */
+        footer { padding: 40px 20px; text-align: center; background: #1f2937; color: white; }
+        
+        /* Mobile Responsive */
+        @media (max-width: 768px) {
+            .hero h1 { font-size: 2rem; }
+            .hero p { font-size: 1.2rem; }
+            .cta-group { flex-direction: column; }
+            .cta-button { width: 100%; }
+        }
+    </style>
+</head>
+<body>
+    <!-- Hero Section -->
+    <section class="hero">
+        <div class="container">
+            <h1>Stop Wasting Time on [Problem].<br/>Start [Outcome] in [Time].</h1>
+            <p>Join 1,000+ [target users] who are already [specific benefit]</p>
+            
+            <!-- 3-Tier CTA -->
+            <div class="cta-group">
+                <a href="#signup" class="cta-button primary-cta" 
+                   onclick="trackEvent('primary_cta_click', {location: 'hero'}); return true;">
+                    Get Early Access →
+                </a>
+                <a href="#waitlist" class="cta-button secondary-cta" 
+                   onclick="trackEvent('secondary_cta_click', {location: 'hero'}); return true;">
+                    Join Waitlist
+                </a>
+                <a href="#demo" class="cta-button tertiary-cta" 
+                   onclick="trackEvent('tertiary_cta_click', {location: 'hero'}); return true;">
+                    Watch Demo
+                </a>
+            </div>
+        </div>
+    </section>
+    
+    <!-- Problem Section -->
+    <section class="problem">
+        <div class="container">
+            <h2>You're Struggling Because...</h2>
+            <div class="problem-list">
+                <div class="problem-item">
+                    <h3>❌ Problem #1</h3>
+                    <p>[Describe specific pain point using customer's exact words from interviews]</p>
+                </div>
+                <div class="problem-item">
+                    <h3>❌ Problem #2</h3>
+                    <p>[Second major frustration]</p>
+                </div>
+                <div class="problem-item">
+                    <h3>❌ Problem #3</h3>
+                    <p>[Third pain point - quantify the cost if possible]</p>
+                </div>
+            </div>
+        </div>
+    </section>
+    
+    <!-- Solution Section -->
+    <section class="solution">
+        <div class="container">
+            <h2>Here's How We Solve It</h2>
+            <div class="features">
+                <div class="feature">
+                    <div class="feature-icon">⚡</div>
+                    <h3>Feature #1</h3>
+                    <p>[Benefit-focused description. "Save 10 hours/week" not "AI-powered"]</p>
+                </div>
+                <div class="feature">
+                    <div class="feature-icon">🎯</div>
+                    <h3>Feature #2</h3>
+                    <p>[Second key benefit]</p>
+                </div>
+                <div class="feature">
+                    <div class="feature-icon">📊</div>
+                    <h3>Feature #3</h3>
+                    <p>[Third key benefit]</p>
+                </div>
+            </div>
+        </div>
+    </section>
+    
+    <!-- Demo Section -->
+    <section class="demo" id="demo">
+        <div class="container">
+            <h2>See It In Action</h2>
+            <div class="demo-container">
+                <!-- Option 1: Loom Video -->
+                <iframe src="YOUR_LOOM_URL" frameborder="0" allowfullscreen
+                        onload="trackEvent('demo_video_load', {})"></iframe>
+                
+                <!-- Option 2: Figma Prototype -->
+                <!-- <iframe src="YOUR_FIGMA_PROTOTYPE_URL" frameborder="0" allowfullscreen></iframe> -->
+                
+                <!-- Option 3: Screenshot Carousel (use Swiper.js or similar) -->
+            </div>
+        </div>
+    </section>
+    
+    <!-- Final CTA Section -->
+    <section class="final-cta">
+        <div class="container">
+            <h2>Ready to [Achieve Outcome]?</h2>
+            <p>Join the beta. No credit card required.</p>
+            
+            <!-- Email Signup Form -->
+            <form id="signup" class="email-form" onsubmit="handleSignup(event); return false;">
+                <input type="email" placeholder="Enter your email" required>
+                <button type="submit">Get Early Access</button>
+            </form>
+            
+            <div class="cta-group" style="margin-top: 30px;">
+                <a href="#waitlist" class="cta-button secondary-cta" 
+                   onclick="trackEvent('final_secondary_cta_click', {}); return true;">
+                    Just Join Waitlist
+                </a>
+            </div>
+        </div>
+    </section>
+    
+    <!-- Footer -->
+    <footer>
+        <div class="container">
+            <p>&copy; 2025 Your Startup. Built by [Your Name].</p>
+            <p><a href="mailto:you@email.com" style="color: #f59e0b;">Contact</a> | 
+               <a href="/privacy" style="color: #f59e0b;">Privacy</a></p>
+        </div>
+    </footer>
+    
+    <!-- JavaScript -->
+    <script>
+        // Handle signup form
+        function handleSignup(event) {
+            event.preventDefault();
+            const email = event.target[0].value;
+            
+            // Track event
+            trackEvent('form_submit', {
+                email: email,
+                cta_type: 'primary'
+            });
+            
+            // TODO: Send to your email collection service
+            // Options: Mailchimp, ConvertKit, Supabase, Google Sheets
+            
+            alert('Thanks! We\'ll be in touch soon.');
+            event.target.reset();
+        }
+        
+        // Track scroll depth
+        let maxScroll = 0;
+        window.addEventListener('scroll', function() {
+            const scrollPercent = (window.scrollY / (document.body.scrollHeight - window.innerHeight)) * 100;
+            if (scrollPercent > maxScroll) {
+                maxScroll = Math.floor(scrollPercent / 25) * 25; // Track 25%, 50%, 75%, 100%
+                if (maxScroll > 0) {
+                    trackEvent('scroll_depth', {depth: maxScroll});
+                }
+            }
+        });
+    </script>
+</body>
+</html>
