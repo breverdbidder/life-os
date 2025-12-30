@@ -1,0 +1,67 @@
+name: Article Parser V2.2 - PathForge Test
+
+on:
+  workflow_dispatch:
+    inputs:
+      url:
+        description: 'Article URL to parse'
+        required: true
+        default: 'https://getpathforge.web.app/blog/how-to-validate-your-startup-idea-before-writing-any-code'
+
+jobs:
+  test-v2-2:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+      
+      - name: Setup Node.js for MCP
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+      
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+      
+      - name: Install Python dependencies
+        run: |
+          pip install httpx beautifulsoup4 html2text trafilatura --break-system-packages
+      
+      - name: Install Playwright MCP
+        run: |
+          npm install -g @modelcontextprotocol/server-playwright
+          echo "✅ MCP Playwright installed"
+      
+      - name: Verify MCP installation
+        run: |
+          npx @modelcontextprotocol/server-playwright --version || echo "⚠️  MCP version check failed (may be normal)"
+      
+      - name: Test V2.2 Parser with PathForge
+        env:
+          USE_MCP: "true"
+          PYTHONPATH: ${{ github.workspace }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+        run: |
+          cd $GITHUB_WORKSPACE
+          echo "🚀 Testing Article Parser V2.2..."
+          echo "URL: ${{ github.event.inputs.url }}"
+          echo ""
+          
+          python agents/article_parser/article_parser_agent_v2_2_mcp.py "${{ github.event.inputs.url }}" || exit 1
+      
+      - name: Save test results
+        if: always()
+        run: |
+          echo "Test completed at $(date)" > test_results.txt
+          echo "URL: ${{ github.event.inputs.url }}" >> test_results.txt
+      
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: test-results
+          path: test_results.txt
