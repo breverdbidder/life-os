@@ -1,0 +1,193 @@
+name: YouTube Transcript V8 - LangGraph Workflow
+
+on:
+  workflow_dispatch:
+    inputs:
+      youtube_url:
+        description: 'YouTube URL to transcribe'
+        required: true
+        type: string
+      
+  schedule:
+    # Run daily at 8 AM EST to check for new videos (optional)
+    - cron: '0 13 * * *'
+
+env:
+  OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+  ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+  SUPABASE_URL: https://mocerqjnksmhcjzxrewo.supabase.co
+  SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+
+jobs:
+  youtube_transcript_v8:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+      
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg
+      
+      - name: Install Python dependencies
+        run: |
+          pip install --upgrade pip
+          pip install langgraph langchain-openai
+          pip install youtube-transcript-api
+          pip install openai
+          pip install yt-dlp
+          pip install supabase
+      
+      - name: Run YouTube Transcript Agent V8
+        id: transcript
+        run: |
+          python << 'PYTHON_SCRIPT'
+          import os
+          import sys
+          
+          # Add agents directory to path
+          sys.path.insert(0, 'agents/youtube')
+          
+          from youtube_transcript_node_v8 import create_youtube_transcript_graph, YouTubeAgentState
+          
+          # Get URL from workflow input or use default
+          youtube_url = "${{ github.event.inputs.youtube_url }}" or "https://youtu.be/vkQkQmvDz1M"
+          
+          print(f"Processing video: {youtube_url}")
+          
+          # Create the graph
+          app = create_youtube_transcript_graph()
+          
+          # Initialize state
+          initial_state: YouTubeAgentState = {
+              "youtube_url": youtube_url,
+              "video_id": "",
+              "audio_path": None,
+              "transcript_text": None,
+              "transcript_path": None,
+              "title": None,
+              "channel": None,
+              "duration": None,
+              "current_tier": 1,
+              "current_task": "Initializing...",
+              "error": None,
+              "success": False,
+              "output_file": None
+          }
+          
+          # Run the workflow
+          final_state = None
+          for output in app.stream(initial_state):
+              for node_name, node_state in output.items():
+                  print(f"\n>>> Completed node: {node_name}")
+                  final_state = node_state
+          
+          # Set output for next steps
+          if final_state and final_state.get("success"):
+              print(f"\n::set-output name=success::true")
+              print(f"::set-output name=transcript_path::{final_state['output_file']}")
+              print(f"::set-output name=tier::{final_state['current_tier']}")
+              
+              # Also save to GitHub Actions summary
+              with open(final_state['output_file'], 'r') as f:
+                  transcript = f.read()
+              
+              with open(os.environ['GITHUB_STEP_SUMMARY'], 'w') as f:
+                  f.write(f"## ✅ Transcript Extraction Successful\n\n")
+                  f.write(f"**Video:** {youtube_url}\n")
+                  f.write(f"**Method:** Tier {final_state['current_tier']}\n")
+                  f.write(f"**Length:** {len(transcript)} characters\n\n")
+                  f.write(f"### Transcript Preview\n\n")
+                  f.write(f"```\n{transcript[:500]}...\n```\n")
+          else:
+              print(f"\n::set-output name=success::false")
+              print(f"::error::Transcript extraction failed: {final_state.get('error')}")
+              sys.exit(1)
+          
+          PYTHON_SCRIPT
+      
+      - name: Upload transcript to Supabase
+        if: steps.transcript.outputs.success == 'true'
+        run: |
+          python << 'PYTHON_SCRIPT'
+          import os
+          from datetime import datetime
+          from supabase import create_client, Client
+          
+          # Initialize Supabase
+          supabase: Client = create_client(
+              os.environ['SUPABASE_URL'],
+              os.environ['SUPABASE_KEY']
+          )
+          
+          # Read transcript
+          transcript_path = "${{ steps.transcript.outputs.transcript_path }}"
+          with open(transcript_path, 'r') as f:
+              transcript_text = f.read()
+          
+          # Insert into insights table
+          data = {
+              "category": "youtube_transcript",
+              "title": f"YouTube Transcript - {datetime.now().strftime('%Y-%m-%d %H:%M')}",
+              "description": f"Extracted via Tier ${{ steps.transcript.outputs.tier }}",
+              "value": transcript_text,
+              "metadata": {
+                  "url": "${{ github.event.inputs.youtube_url }}",
+                  "tier": ${{ steps.transcript.outputs.tier }},
+                  "length": len(transcript_text),
+                  "extraction_date": datetime.now().isoformat()
+              }
+          }
+          
+          result = supabase.table('insights').insert(data).execute()
+          print(f"✅ Transcript saved to Supabase: {result.data[0]['id']}")
+          
+          PYTHON_SCRIPT
+      
+      - name: Upload transcript artifact
+        if: steps.transcript.outputs.success == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: youtube-transcript-${{ github.run_number }}
+          path: ${{ steps.transcript.outputs.transcript_path }}
+          retention-days: 30
+      
+      - name: Report metrics
+        if: always()
+        run: |
+          python << 'PYTHON_SCRIPT'
+          import os
+          from datetime import datetime
+          from supabase import create_client, Client
+          
+          supabase: Client = create_client(
+              os.environ['SUPABASE_URL'],
+              os.environ['SUPABASE_KEY']
+          )
+          
+          # Log to daily_metrics
+          metric_data = {
+              "metric_date": datetime.now().date().isoformat(),
+              "category": "youtube_agent_v8",
+              "metric_name": "transcript_extraction",
+              "value": 1 if "${{ steps.transcript.outputs.success }}" == "true" else 0,
+              "metadata": {
+                  "tier": "${{ steps.transcript.outputs.tier }}",
+                  "success": "${{ steps.transcript.outputs.success }}",
+                  "workflow_run": ${{ github.run_number }}
+              }
+          }
+          
+          supabase.table('daily_metrics').insert(metric_data).execute()
+          print("✅ Metrics logged")
+          
+          PYTHON_SCRIPT
