@@ -1,0 +1,549 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>2025 Year-In-Review | Ariel Shapira</title>
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/recharts@2.5.0/dist/Recharts.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #fff;
+            min-height: 100vh;
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 40px 20px;
+        }
+        
+        .header {
+            text-align: center;
+            margin-bottom: 60px;
+        }
+        
+        .header h1 {
+            font-size: 4rem;
+            font-weight: 800;
+            margin-bottom: 10px;
+            background: linear-gradient(45deg, #ffd700, #ffed4e);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        
+        .header .subtitle {
+            font-size: 1.5rem;
+            opacity: 0.9;
+        }
+        
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-bottom: 40px;
+        }
+        
+        .stat-card {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 15px;
+            padding: 30px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            transition: transform 0.3s ease;
+        }
+        
+        .stat-card:hover {
+            transform: translateY(-5px);
+            background: rgba(255, 255, 255, 0.15);
+        }
+        
+        .stat-card .number {
+            font-size: 3rem;
+            font-weight: 700;
+            margin-bottom: 10px;
+            color: #ffd700;
+        }
+        
+        .stat-card .label {
+            font-size: 1rem;
+            opacity: 0.8;
+        }
+        
+        .section {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 40px;
+            margin-bottom: 40px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        
+        .section-title {
+            font-size: 2rem;
+            margin-bottom: 30px;
+            color: #ffd700;
+        }
+        
+        .achievement-list {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+        
+        .achievement-item {
+            background: rgba(255, 255, 255, 0.05);
+            padding: 20px;
+            border-radius: 10px;
+            border-left: 4px solid #ffd700;
+        }
+        
+        .achievement-item .title {
+            font-size: 1.2rem;
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+        
+        .achievement-item .description {
+            opacity: 0.8;
+            line-height: 1.6;
+        }
+        
+        .chart-container {
+            background: rgba(255, 255, 255, 0.05);
+            padding: 30px;
+            border-radius: 15px;
+            margin-bottom: 30px;
+        }
+        
+        .timeline {
+            position: relative;
+            padding-left: 40px;
+        }
+        
+        .timeline-item {
+            position: relative;
+            padding: 20px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 10px;
+            margin-bottom: 20px;
+            border-left: 3px solid #ffd700;
+        }
+        
+        .timeline-item::before {
+            content: '';
+            position: absolute;
+            left: -10px;
+            top: 25px;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: #ffd700;
+            border: 3px solid #667eea;
+        }
+        
+        .timeline-date {
+            font-weight: 600;
+            color: #ffd700;
+            margin-bottom: 5px;
+        }
+        
+        .pattern-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+        }
+        
+        .pattern-card {
+            background: rgba(255, 255, 255, 0.05);
+            padding: 25px;
+            border-radius: 12px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        
+        .pattern-card.success {
+            border-left: 4px solid #10b981;
+        }
+        
+        .pattern-card.challenge {
+            border-left: 4px solid #ef4444;
+        }
+        
+        .pattern-card.growth {
+            border-left: 4px solid #3b82f6;
+        }
+        
+        .pattern-title {
+            font-size: 1.3rem;
+            margin-bottom: 15px;
+            font-weight: 600;
+        }
+        
+        .pattern-list {
+            list-style: none;
+        }
+        
+        .pattern-list li {
+            padding: 8px 0;
+            opacity: 0.9;
+            line-height: 1.5;
+        }
+        
+        .pattern-list li::before {
+            content: '→ ';
+            color: #ffd700;
+            font-weight: bold;
+        }
+        
+        .grade-badge {
+            display: inline-block;
+            padding: 15px 30px;
+            background: linear-gradient(45deg, #ffd700, #ffed4e);
+            color: #000;
+            font-size: 3rem;
+            font-weight: 800;
+            border-radius: 15px;
+            box-shadow: 0 8px 20px rgba(0,0,0,0.3);
+        }
+        
+        .recommendations {
+            background: linear-gradient(135deg, rgba(16, 185, 129, 0.2), rgba(59, 130, 246, 0.2));
+            padding: 30px;
+            border-radius: 15px;
+            border: 2px solid rgba(255, 255, 255, 0.2);
+        }
+        
+        .recommendations h3 {
+            color: #ffd700;
+            margin-bottom: 20px;
+            font-size: 1.5rem;
+        }
+        
+        .recommendation-item {
+            background: rgba(255, 255, 255, 0.05);
+            padding: 15px 20px;
+            margin-bottom: 15px;
+            border-radius: 8px;
+            border-left: 3px solid #10b981;
+        }
+        
+        @media (max-width: 768px) {
+            .header h1 {
+                font-size: 2.5rem;
+            }
+            
+            .stats-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .section {
+                padding: 20px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+    
+    <script type="text/babel">
+        const { LineChart, Line, BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } = Recharts;
+        
+        const App = () => {
+            // Data
+            const monthlyActivity = [
+                { month: 'Nov', conversations: 5 },
+                { month: 'Dec', conversations: 35 }
+            ];
+            
+            const domainBreakdown = [
+                { name: 'Business', value: 60, color: '#ffd700' },
+                { name: 'Family', value: 20, color: '#10b981' },
+                { name: 'Personal', value: 15, color: '#3b82f6' },
+                { name: 'Technical', value: 5, color: '#ef4444' }
+            ];
+            
+            const versionProgress = [
+                { version: 'V10', score: 70 },
+                { version: 'V11', score: 75 },
+                { version: 'V12', score: 78 },
+                { version: 'V13', score: 82 },
+                { version: 'V14', score: 85 },
+                { version: 'V15', score: 88 },
+                { version: 'V16.5', score: 92 }
+            ];
+            
+            const quarterlyMetrics = [
+                { quarter: 'Q4 2025', repos: 2, workflows: 100, deployments: 14, value: 350000 }
+            ];
+            
+            const achievements = [
+                {
+                    title: "BidDeed.AI Platform Launch (V16.5.0)",
+                    description: "Full conversational AI ecosystem with /agent, /map, and /chat interfaces. Smart Router V5 achieving 40-55% FREE tier processing. 12-stage Everest Ascent™ pipeline deployed to production."
+                },
+                {
+                    title: "ForecastEngine™ Suite (93.7 avg score)",
+                    description: "12 specialized engines including Lien ForecastEngine™ (97/100), Bid ForecastEngine™ (96/100), and Exit ForecastEngine™ (95/100). USPTO trademark application prepared for Jan 15, 2026 filing with projected 2,381x-7,143x ROI."
+                },
+                {
+                    title: "MCP Integration (Production Ready)",
+                    description: "Supabase MCP (92/100) and Cloudflare MCP (85/100) deployed with stages 9-12 enabled. Complete test workflow passed validation."
+                },
+                {
+                    title: "100x ROI Validated",
+                    description: "$300-400K annual internal value creation against $3.3K cost structure. 1 extra deal/quarter ($50K) + 1 avoided loss ($100K) + time savings ($150K/year)."
+                },
+                {
+                    title: "Autonomous Execution Model",
+                    description: "95%+ tasks executing with zero approval overhead. Claude AI Architect making autonomous decisions, Claude Code running 7-hour development sessions, LangGraph orchestrating multi-agent workflows."
+                }
+            ];
+            
+            const timeline = [
+                { date: 'Nov 30', event: 'brevard-bidder-scraper repository created' },
+                { date: 'Dec 3', event: 'V13.4.0 - BECA Scraper V2.0 deployed' },
+                { date: 'Dec 4', event: 'life-os repository created' },
+                { date: 'Dec 17', event: 'V14.0 - Legitimate sources pivot' },
+                { date: 'Dec 23', event: 'V15.0 - MCP integration' },
+                { date: 'Dec 24', event: 'V16.5.0 - Landing page LIVE' },
+                { date: 'Dec 26', event: 'Observability system deployed' },
+                { date: 'Dec 29', event: 'ForecastEngine™ suite completed (12 engines)' },
+                { date: 'Dec 31', event: '2025 Year-In-Review analysis' }
+            ];
+            
+            const successPatterns = [
+                "Autonomous execution (zero approval overhead)",
+                "Smart Router optimization (40-55% FREE tier)",
+                "Rapid iteration (V10→V16.5 in 2 months)",
+                "Data-driven decisions (XGBoost validation)",
+                "Skill-based architecture (14+ custom skills)"
+            ];
+            
+            const challengePatterns = [
+                "GitHub Actions failures (98% failure rate) 🔴",
+                "Network proxy restrictions",
+                "Manual SQL execution steps",
+                "Context window management",
+                "Incomplete data sources"
+            ];
+            
+            const growthPatterns = [
+                "Increasing sophistication (scrapers → orchestration)",
+                "Cost optimization focus (V1→V6 Smart Router)",
+                "IP protection awareness (ForecastEngine™)",
+                "Integration depth (MCP ecosystem)"
+            ];
+            
+            const recommendations2026 = [
+                "Fix GitHub Actions failures (investigate 98% root cause, target 95%+ success)",
+                "Complete checkpoint system (Supabase persistence, stage-level recovery)",
+                "USPTO trademark filing (Jan 15 deadline, $2.1K investment)",
+                "Commercial beta launch (internal → external, first 10 users)",
+                "Geographic expansion (1 → 10 FL counties)",
+                "Asset type expansion (foreclosures → 10 distressed types)"
+            ];
+            
+            return (
+                <div className="container">
+                    {/* Header */}
+                    <div className="header">
+                        <h1>2025</h1>
+                        <div className="subtitle">Year-In-Review: Ariel Shapira</div>
+                        <div style={{marginTop: '20px', opacity: 0.8}}>December 31, 2025</div>
+                    </div>
+                    
+                    {/* Key Stats */}
+                    <div className="stats-grid">
+                        <div className="stat-card">
+                            <div className="number">40+</div>
+                            <div className="label">Conversations Analyzed</div>
+                        </div>
+                        <div className="stat-card">
+                            <div className="number">V16.5</div>
+                            <div className="label">BidDeed.AI Version</div>
+                        </div>
+                        <div className="stat-card">
+                            <div className="number">100x</div>
+                            <div className="label">ROI ($300K / $3K)</div>
+                        </div>
+                        <div className="stat-card">
+                            <div className="number">93.7</div>
+                            <div className="label">ForecastEngine™ Avg Score</div>
+                        </div>
+                        <div className="stat-card">
+                            <div className="number">2</div>
+                            <div className="label">GitHub Repositories</div>
+                        </div>
+                        <div className="stat-card">
+                            <div className="number">95%+</div>
+                            <div className="label">Autonomous Execution</div>
+                        </div>
+                    </div>
+                    
+                    {/* Top Achievements */}
+                    <div className="section">
+                        <h2 className="section-title">🏆 Top 5 Achievements of 2025</h2>
+                        <div className="achievement-list">
+                            {achievements.map((achievement, index) => (
+                                <div key={index} className="achievement-item">
+                                    <div className="title">{index + 1}. {achievement.title}</div>
+                                    <div className="description">{achievement.description}</div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                    
+                    {/* Timeline */}
+                    <div className="section">
+                        <h2 className="section-title">📅 2025 Timeline</h2>
+                        <div className="timeline">
+                            {timeline.map((item, index) => (
+                                <div key={index} className="timeline-item">
+                                    <div className="timeline-date">{item.date}</div>
+                                    <div>{item.event}</div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                    
+                    {/* Conversation Activity Chart */}
+                    <div className="section">
+                        <h2 className="section-title">💬 Conversation Activity</h2>
+                        <div className="chart-container">
+                            <ResponsiveContainer width="100%" height={300}>
+                                <BarChart data={monthlyActivity}>
+                                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
+                                    <XAxis dataKey="month" stroke="#fff" />
+                                    <YAxis stroke="#fff" />
+                                    <Tooltip contentStyle={{backgroundColor: '#333', border: 'none', borderRadius: '8px'}} />
+                                    <Bar dataKey="conversations" fill="#ffd700" radius={[8, 8, 0, 0]} />
+                                </BarChart>
+                            </ResponsiveContainer>
+                        </div>
+                    </div>
+                    
+                    {/* Domain Breakdown */}
+                    <div className="section">
+                        <h2 className="section-title">📊 Domain Breakdown</h2>
+                        <div className="chart-container">
+                            <ResponsiveContainer width="100%" height={300}>
+                                <PieChart>
+                                    <Pie
+                                        data={domainBreakdown}
+                                        cx="50%"
+                                        cy="50%"
+                                        labelLine={false}
+                                        label={(entry) => `${entry.name}: ${entry.value}%`}
+                                        outerRadius={100}
+                                        fill="#8884d8"
+                                        dataKey="value"
+                                    >
+                                        {domainBreakdown.map((entry, index) => (
+                                            <Cell key={`cell-${index}`} fill={entry.color} />
+                                        ))}
+                                    </Pie>
+                                    <Tooltip contentStyle={{backgroundColor: '#333', border: 'none', borderRadius: '8px'}} />
+                                </PieChart>
+                            </ResponsiveContainer>
+                        </div>
+                    </div>
+                    
+                    {/* Version Evolution */}
+                    <div className="section">
+                        <h2 className="section-title">📈 Product Evolution (V10 → V16.5)</h2>
+                        <div className="chart-container">
+                            <ResponsiveContainer width="100%" height={300}>
+                                <LineChart data={versionProgress}>
+                                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
+                                    <XAxis dataKey="version" stroke="#fff" />
+                                    <YAxis stroke="#fff" />
+                                    <Tooltip contentStyle={{backgroundColor: '#333', border: 'none', borderRadius: '8px'}} />
+                                    <Line type="monotone" dataKey="score" stroke="#ffd700" strokeWidth={3} dot={{fill: '#ffd700', r: 6}} />
+                                </LineChart>
+                            </ResponsiveContainer>
+                        </div>
+                    </div>
+                    
+                    {/* Pattern Analysis */}
+                    <div className="section">
+                        <h2 className="section-title">🔍 Pattern Analysis</h2>
+                        <div className="pattern-grid">
+                            <div className="pattern-card success">
+                                <div className="pattern-title" style={{color: '#10b981'}}>✅ Success Patterns</div>
+                                <ul className="pattern-list">
+                                    {successPatterns.map((pattern, index) => (
+                                        <li key={index}>{pattern}</li>
+                                    ))}
+                                </ul>
+                            </div>
+                            <div className="pattern-card challenge">
+                                <div className="pattern-title" style={{color: '#ef4444'}}>⚠️ Challenge Patterns</div>
+                                <ul className="pattern-list">
+                                    {challengePatterns.map((pattern, index) => (
+                                        <li key={index}>{pattern}</li>
+                                    ))}
+                                </ul>
+                            </div>
+                            <div className="pattern-card growth">
+                                <div className="pattern-title" style={{color: '#3b82f6'}}>📊 Growth Patterns</div>
+                                <ul className="pattern-list">
+                                    {growthPatterns.map((pattern, index) => (
+                                        <li key={index}>{pattern}</li>
+                                    ))}
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    {/* Overall Grade */}
+                    <div className="section" style={{textAlign: 'center'}}>
+                        <h2 className="section-title">🎓 Overall 2025 Performance</h2>
+                        <div style={{marginBottom: '30px'}}>
+                            <div className="grade-badge">B</div>
+                        </div>
+                        <div style={{fontSize: '1.2rem', opacity: 0.9}}>
+                            Score: 76/100
+                        </div>
+                        <div style={{marginTop: '20px', opacity: 0.8}}>
+                            Outstanding value creation and technical execution, with critical workflow reliability improvements needed for 2026.
+                        </div>
+                    </div>
+                    
+                    {/* 2026 Recommendations */}
+                    <div className="section">
+                        <h2 className="section-title">🎯 2026 Priorities</h2>
+                        <div className="recommendations">
+                            <h3>Immediate Actions (Q1 2026)</h3>
+                            {recommendations2026.map((rec, index) => (
+                                <div key={index} className="recommendation-item">
+                                    {index + 1}. {rec}
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                    
+                    {/* Footer */}
+                    <div style={{textAlign: 'center', opacity: 0.6, marginTop: '60px'}}>
+                        <div>Generated by year-in-review-2025 skill</div>
+                        <div>Analysis engine: Claude Sonnet 4.5</div>
+                        <div>Data sources: Conversation history, GitHub API, Supabase, Life OS</div>
+                    </div>
+                </div>
+            );
+        };
+        
+        ReactDOM.render(<App />, document.getElementById('root'));
+    </script>
+</body>
+</html>
