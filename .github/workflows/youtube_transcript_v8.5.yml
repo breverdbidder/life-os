@@ -1,0 +1,283 @@
+name: YouTube Transcript V8.5 - Cloud-Optimized
+
+on:
+  workflow_dispatch:
+    inputs:
+      youtube_url:
+        description: 'YouTube URL to transcribe'
+        required: true
+        type: string
+      force_whisper:
+        description: 'Skip FREE tier and use Whisper directly'
+        required: false
+        type: boolean
+        default: true  # Default to Whisper on GitHub Actions
+
+env:
+  OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+  SUPABASE_URL: https://mocerqjnksmhcjzxrewo.supabase.co
+  SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+
+jobs:
+  transcript:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    
+    steps:
+      - name: Detect Environment
+        id: env_check
+        run: |
+          # GitHub Actions IPs are blocked by YouTube
+          # Skip to Whisper tier if in cloud environment
+          IS_CLOUD="true"
+          if [ "${{ github.event.inputs.force_whisper }}" == "true" ]; then
+            echo "skip_free_tier=true" >> $GITHUB_OUTPUT
+            echo "🌩️ Cloud environment detected - using Whisper tier"
+          else
+            echo "skip_free_tier=false" >> $GITHUB_OUTPUT
+            echo "🏠 Attempting FREE tier first"
+          fi
+      
+      - name: Install dependencies
+        run: |
+          pip install youtube-transcript-api openai yt-dlp supabase --break-system-packages
+          sudo apt-get update && sudo apt-get install -y ffmpeg
+      
+      - name: Extract Transcript (Whisper-First)
+        id: extract
+        run: |
+          python3 << 'EOF'
+          import re
+          import os
+          import sys
+          from datetime import datetime
+          
+          url = "${{ github.event.inputs.youtube_url }}"
+          video_id = re.search(r'(?:v=|/)([0-9A-Za-z_-]{11})', url).group(1)
+          skip_free = "${{ steps.env_check.outputs.skip_free_tier }}" == "true"
+          
+          print(f"Video ID: {video_id}")
+          print(f"Skip FREE tier: {skip_free}")
+          
+          success = False
+          tier_used = None
+          
+          # Tier 1: YouTube API (skip in cloud by default)
+          if not skip_free:
+              try:
+                  from youtube_transcript_api._api import YouTubeTranscriptApi
+                  
+                  print("\n🔄 Tier 1: YouTube Transcript API (FREE)...")
+                  api = YouTubeTranscriptApi()
+                  transcript_list = api.list(video_id)
+                  transcript_obj = list(transcript_list)[0]
+                  transcript_data = transcript_obj.fetch()
+                  full_text = ' '.join([entry['text'] for entry in transcript_data])
+                  full_text = re.sub(r'\s+', ' ', full_text).strip()
+                  
+                  output_path = f"/tmp/transcript_{video_id}.txt"
+                  with open(output_path, 'w') as f:
+                      f.write(full_text)
+                  
+                  print(f"✅ SUCCESS - Tier 1 (FREE)")
+                  print(f"Length: {len(full_text)} chars")
+                  
+                  success = True
+                  tier_used = 1
+                  
+              except Exception as e:
+                  print(f"⚠️ Tier 1 failed: {str(e)[:200]}")
+                  print("Falling back to Whisper tier...")
+          
+          # Tier 2: yt-dlp + Whisper (primary for cloud environments)
+          if not success:
+              try:
+                  import subprocess
+                  from openai import OpenAI
+                  
+                  print("\n🎤 Tier 2: yt-dlp + Whisper...")
+                  
+                  # Download audio
+                  audio_path = f"/tmp/audio_{video_id}.mp3"
+                  cmd = [
+                      "yt-dlp",
+                      "-f", "bestaudio",
+                      "--extract-audio",
+                      "--audio-format", "mp3",
+                      "--no-check-certificates",  # Bypass SSL issues
+                      "-o", audio_path.replace(".mp3", ".%(ext)s"),
+                      url
+                  ]
+                  
+                  print("Downloading audio...")
+                  result = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
+                  
+                  if result.returncode != 0:
+                      print(f"yt-dlp stderr: {result.stderr[:500]}")
+                      raise Exception(f"yt-dlp failed: {result.stderr[:200]}")
+                  
+                  print(f"Audio downloaded: {audio_path}")
+                  
+                  # Transcribe with Whisper
+                  print("Transcribing with Whisper...")
+                  client = OpenAI()
+                  with open(audio_path, "rb") as f:
+                      transcript_result = client.audio.transcriptions.create(
+                          model="whisper-1",
+                          file=f,
+                          response_format="text"
+                      )
+                  
+                  full_text = re.sub(r'\s+', ' ', transcript_result).strip()
+                  
+                  output_path = f"/tmp/transcript_{video_id}.txt"
+                  with open(output_path, 'w') as f:
+                      f.write(full_text)
+                  
+                  print(f"✅ SUCCESS - Tier 2 (Whisper)")
+                  print(f"Length: {len(full_text)} chars")
+                  print(f"Cost: ~${len(full_text)/4000 * 0.006:.3f}")  # Whisper pricing estimate
+                  
+                  # Cleanup
+                  if os.path.exists(audio_path):
+                      os.remove(audio_path)
+                  
+                  success = True
+                  tier_used = 2
+                  
+              except Exception as e2:
+                  print(f"❌ Tier 2 failed: {e2}")
+                  success = False
+          
+          # Set outputs
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
+              f.write(f"success={'true' if success else 'false'}\n")
+              if success:
+                  f.write(f"transcript_path={output_path}\n")
+                  f.write(f"tier={tier_used}\n")
+                  f.write(f"video_id={video_id}\n")
+          
+          if not success:
+              sys.exit(1)
+          
+          EOF
+      
+      - name: Generate Summary
+        if: steps.extract.outputs.success == 'true'
+        id: summary
+        run: |
+          python3 << 'EOF'
+          import os
+          from openai import OpenAI
+          
+          video_id = "${{ steps.extract.outputs.video_id }}"
+          transcript_path = "${{ steps.extract.outputs.transcript_path }}"
+          
+          with open(transcript_path, 'r') as f:
+              transcript = f.read()
+          
+          client = OpenAI()
+          response = client.chat.completions.create(
+              model="gpt-4o-mini",
+              messages=[{
+                  "role": "user",
+                  "content": f"""Provide a comprehensive summary of this YouTube video.
+
+Format:
+# Video Summary
+
+## Main Topics
+[2-3 sentences about core themes]
+
+## Key Points
+- [Point 1]
+- [Point 2]
+- [Point 3]
+- [Point 4]
+- [Point 5]
+
+## Conclusion
+[1-2 sentences wrapping up]
+
+## Technical Details
+- Transcript length: {len(transcript)} characters
+- Words: ~{len(transcript.split())} words
+
+Transcript:
+{transcript[:8000]}"""
+              }],
+              max_tokens=1500
+          )
+          
+          summary = response.choices[0].message.content
+          
+          summary_path = f"/tmp/summary_{video_id}.md"
+          with open(summary_path, 'w') as f:
+              f.write(f"# YouTube Transcript V8.5\n\n")
+              f.write(f"**Video ID:** {video_id}\n")
+              f.write(f"**URL:** ${{ github.event.inputs.youtube_url }}\n")
+              f.write(f"**Method:** Tier ${{ steps.extract.outputs.tier }}\n")
+              f.write(f"**Status:** ✅ SUCCESS\n\n")
+              f.write(f"---\n\n")
+              f.write(summary)
+          
+          print(f"Summary generated: {summary_path}")
+          
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
+              f.write(f"summary_path={summary_path}\n")
+          
+          EOF
+      
+      - name: Upload to Supabase
+        if: steps.extract.outputs.success == 'true'
+        run: |
+          python3 << 'EOF'
+          import os
+          from datetime import datetime
+          from supabase import create_client
+          
+          supabase = create_client(
+              os.environ['SUPABASE_URL'],
+              os.environ['SUPABASE_KEY']
+          )
+          
+          transcript_path = "${{ steps.extract.outputs.transcript_path }}"
+          summary_path = "${{ steps.summary.outputs.summary_path }}"
+          
+          with open(transcript_path, 'r') as f:
+              transcript = f.read()
+          
+          with open(summary_path, 'r') as f:
+              summary = f.read()
+          
+          data = {
+              "category": "youtube_transcript_v8.5",
+              "title": f"YouTube - ${{ steps.extract.outputs.video_id }}",
+              "description": f"Tier ${{ steps.extract.outputs.tier }} (Cloud-Optimized)",
+              "value": transcript,
+              "metadata": {
+                  "url": "${{ github.event.inputs.youtube_url }}",
+                  "video_id": "${{ steps.extract.outputs.video_id }}",
+                  "tier": "${{ steps.extract.outputs.tier }}",
+                  "summary": summary,
+                  "length": len(transcript),
+                  "cloud_optimized": True,
+                  "timestamp": datetime.now().isoformat()
+              }
+          }
+          
+          result = supabase.table('insights').insert(data).execute()
+          print(f"✅ Saved to Supabase: {result.data[0]['id']}")
+          
+          EOF
+      
+      - name: Upload artifacts
+        if: steps.extract.outputs.success == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: youtube-transcript-${{ steps.extract.outputs.video_id }}
+          path: |
+            ${{ steps.extract.outputs.transcript_path }}
+            ${{ steps.summary.outputs.summary_path }}
+          retention-days: 30
+
