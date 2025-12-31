@@ -1,0 +1,882 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Shapira Family 2026 Goals</title>
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Crimson+Pro:wght@400;600;700&family=Work+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    :root {
+      --navy: #1A2B4A;
+      --gold: #D4AF37;
+      --sage: #8B9D83;
+      --cream: #F5F3ED;
+      --rust: #C65D3B;
+      --teal: #3A7D7D;
+      --slate: #4A5568;
+      --white: #FFFFFF;
+      --light-gold: #F0E5C9;
+      --shadow: rgba(26, 43, 74, 0.15);
+    }
+
+    body {
+      font-family: 'Work Sans', sans-serif;
+      background: linear-gradient(135deg, var(--cream) 0%, var(--light-gold) 100%);
+      color: var(--navy);
+      min-height: 100vh;
+      padding: 0;
+      overflow-x: hidden;
+    }
+
+    .app-container {
+      max-width: 1400px;
+      margin: 0 auto;
+      padding: 2rem;
+    }
+
+    .header {
+      text-align: center;
+      margin-bottom: 3rem;
+      position: relative;
+    }
+
+    .header::before {
+      content: '';
+      position: absolute;
+      top: -10px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 120px;
+      height: 4px;
+      background: linear-gradient(90deg, var(--gold) 0%, var(--rust) 100%);
+      border-radius: 2px;
+    }
+
+    .header h1 {
+      font-family: 'Crimson Pro', serif;
+      font-size: 3.5rem;
+      font-weight: 700;
+      color: var(--navy);
+      margin-bottom: 0.5rem;
+      margin-top: 1.5rem;
+      letter-spacing: -0.02em;
+    }
+
+    .header p {
+      font-size: 1.1rem;
+      color: var(--slate);
+      font-weight: 400;
+    }
+
+    .user-selector {
+      display: flex;
+      gap: 1rem;
+      justify-content: center;
+      margin-bottom: 2.5rem;
+      flex-wrap: wrap;
+    }
+
+    .user-button {
+      padding: 1rem 2rem;
+      border: 2px solid var(--navy);
+      background: var(--white);
+      color: var(--navy);
+      font-family: 'Work Sans', sans-serif;
+      font-size: 1rem;
+      font-weight: 600;
+      border-radius: 12px;
+      cursor: pointer;
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .user-button::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: -100%;
+      width: 100%;
+      height: 100%;
+      background: linear-gradient(90deg, transparent, rgba(212, 175, 55, 0.3), transparent);
+      transition: left 0.5s;
+    }
+
+    .user-button:hover::before {
+      left: 100%;
+    }
+
+    .user-button:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 20px var(--shadow);
+    }
+
+    .user-button.active {
+      background: var(--navy);
+      color: var(--white);
+      box-shadow: 0 4px 12px var(--shadow);
+    }
+
+    .stats-bar {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 1.5rem;
+      margin-bottom: 3rem;
+    }
+
+    .stat-card {
+      background: var(--white);
+      padding: 1.5rem;
+      border-radius: 16px;
+      box-shadow: 0 4px 12px var(--shadow);
+      border-left: 4px solid var(--gold);
+      transition: transform 0.3s ease;
+    }
+
+    .stat-card:hover {
+      transform: translateX(4px);
+    }
+
+    .stat-label {
+      font-size: 0.9rem;
+      color: var(--slate);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      font-weight: 600;
+    }
+
+    .stat-value {
+      font-size: 2.5rem;
+      font-weight: 700;
+      color: var(--navy);
+      font-family: 'Crimson Pro', serif;
+      margin-top: 0.5rem;
+    }
+
+    .categories-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+      gap: 2rem;
+      margin-bottom: 3rem;
+    }
+
+    .category-card {
+      background: var(--white);
+      border-radius: 20px;
+      padding: 2rem;
+      box-shadow: 0 8px 24px var(--shadow);
+      border-top: 6px solid var(--navy);
+      transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .category-card::after {
+      content: '';
+      position: absolute;
+      top: 0;
+      right: 0;
+      width: 100px;
+      height: 100px;
+      background: radial-gradient(circle, var(--gold) 0%, transparent 70%);
+      opacity: 0.1;
+      pointer-events: none;
+    }
+
+    .category-card:hover {
+      transform: translateY(-8px);
+      box-shadow: 0 16px 40px var(--shadow);
+    }
+
+    .category-card.business { border-top-color: var(--navy); }
+    .category-card.family { border-top-color: var(--rust); }
+    .category-card.swimming { border-top-color: var(--teal); }
+    .category-card.health { border-top-color: var(--sage); }
+    .category-card.development { border-top-color: var(--gold); }
+    .category-card.lifestyle { border-top-color: var(--slate); }
+
+    .category-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 1.5rem;
+    }
+
+    .category-title {
+      font-family: 'Crimson Pro', serif;
+      font-size: 1.8rem;
+      font-weight: 700;
+      color: var(--navy);
+    }
+
+    .category-icon {
+      font-size: 2rem;
+      opacity: 0.6;
+    }
+
+    .subcategories {
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+
+    .subcategory {
+      background: var(--cream);
+      padding: 1rem;
+      border-radius: 12px;
+      border-left: 3px solid var(--gold);
+      transition: all 0.3s ease;
+    }
+
+    .subcategory:hover {
+      background: var(--light-gold);
+      border-left-width: 5px;
+    }
+
+    .subcategory-title {
+      font-weight: 600;
+      color: var(--navy);
+      margin-bottom: 0.5rem;
+      font-size: 1.1rem;
+    }
+
+    .goals-list {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+      margin-top: 0.75rem;
+    }
+
+    .goal-item {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      padding: 0.5rem;
+      background: var(--white);
+      border-radius: 8px;
+      font-size: 0.95rem;
+      transition: background 0.2s ease;
+    }
+
+    .goal-item:hover {
+      background: var(--light-gold);
+    }
+
+    .goal-status {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+
+    .goal-status.complete { background: var(--sage); }
+    .goal-status.progress { background: var(--gold); }
+    .goal-status.pending { background: var(--slate); opacity: 0.3; }
+    .goal-status.blocked { background: var(--rust); }
+
+    .goal-text {
+      flex: 1;
+      color: var(--navy);
+    }
+
+    .add-goal-btn {
+      margin-top: 1rem;
+      padding: 0.75rem 1.5rem;
+      background: var(--navy);
+      color: var(--white);
+      border: none;
+      border-radius: 8px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      font-family: 'Work Sans', sans-serif;
+      width: 100%;
+    }
+
+    .add-goal-btn:hover {
+      background: var(--slate);
+      transform: scale(1.02);
+    }
+
+    .modal-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(26, 43, 74, 0.8);
+      backdrop-filter: blur(8px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+      animation: fadeIn 0.3s ease;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+
+    .modal {
+      background: var(--white);
+      padding: 2.5rem;
+      border-radius: 20px;
+      max-width: 600px;
+      width: 90%;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+      animation: slideUp 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    @keyframes slideUp {
+      from {
+        opacity: 0;
+        transform: translateY(20px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    .modal h2 {
+      font-family: 'Crimson Pro', serif;
+      font-size: 2rem;
+      color: var(--navy);
+      margin-bottom: 1.5rem;
+    }
+
+    .form-group {
+      margin-bottom: 1.5rem;
+    }
+
+    .form-label {
+      display: block;
+      font-weight: 600;
+      color: var(--navy);
+      margin-bottom: 0.5rem;
+    }
+
+    .form-input,
+    .form-select,
+    .form-textarea {
+      width: 100%;
+      padding: 0.875rem;
+      border: 2px solid var(--cream);
+      border-radius: 8px;
+      font-family: 'Work Sans', sans-serif;
+      font-size: 1rem;
+      transition: border-color 0.3s ease;
+    }
+
+    .form-input:focus,
+    .form-select:focus,
+    .form-textarea:focus {
+      outline: none;
+      border-color: var(--gold);
+    }
+
+    .form-textarea {
+      resize: vertical;
+      min-height: 100px;
+    }
+
+    .modal-buttons {
+      display: flex;
+      gap: 1rem;
+      margin-top: 2rem;
+    }
+
+    .btn {
+      flex: 1;
+      padding: 1rem;
+      border: none;
+      border-radius: 8px;
+      font-weight: 600;
+      font-size: 1rem;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      font-family: 'Work Sans', sans-serif;
+    }
+
+    .btn-primary {
+      background: var(--navy);
+      color: var(--white);
+    }
+
+    .btn-primary:hover {
+      background: var(--slate);
+      transform: translateY(-2px);
+    }
+
+    .btn-secondary {
+      background: var(--cream);
+      color: var(--navy);
+    }
+
+    .btn-secondary:hover {
+      background: var(--light-gold);
+    }
+
+    .empty-state {
+      text-align: center;
+      padding: 2rem;
+      color: var(--slate);
+      font-style: italic;
+    }
+
+    .loading {
+      text-align: center;
+      padding: 3rem;
+      font-size: 1.2rem;
+      color: var(--slate);
+    }
+
+    .progress-bar {
+      height: 8px;
+      background: var(--cream);
+      border-radius: 4px;
+      overflow: hidden;
+      margin-top: 0.5rem;
+    }
+
+    .progress-fill {
+      height: 100%;
+      background: linear-gradient(90deg, var(--sage) 0%, var(--teal) 100%);
+      transition: width 0.5s ease;
+    }
+
+    .owner-badge {
+      display: inline-block;
+      padding: 0.25rem 0.75rem;
+      background: var(--light-gold);
+      color: var(--navy);
+      border-radius: 12px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      margin-top: 0.5rem;
+    }
+
+    @media (max-width: 768px) {
+      .header h1 {
+        font-size: 2.5rem;
+      }
+
+      .categories-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .user-selector {
+        flex-direction: column;
+      }
+
+      .user-button {
+        width: 100%;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect } = React;
+
+    const CATEGORIES = {
+      business: {
+        title: "Business & Financial",
+        icon: "💼",
+        color: "navy",
+        owner: "Ariel",
+        subcategories: [
+          { name: "BidDeed.AI Platform", goals: [] },
+          { name: "Real Estate Investment", goals: [] },
+          { name: "Everest Capital USA Growth", goals: [] },
+          { name: "Insurance Agencies (Mariam-led)", goals: [], owner: "Mariam" }
+        ]
+      },
+      family: {
+        title: "Family & Relationships",
+        icon: "❤️",
+        color: "rust",
+        owner: "Ariel & Mariam",
+        subcategories: [
+          { name: "Marriage & Partnership", goals: [] },
+          { name: "Parenting Michael", goals: [] },
+          { name: "Extended Family", goals: [] },
+          { name: "Community & Orthodox Life", goals: [] }
+        ]
+      },
+      swimming: {
+        title: "Michael's D1 Swimming",
+        icon: "🏊",
+        color: "teal",
+        owner: "Michael",
+        subcategories: [
+          { name: "Competition Performance", goals: [] },
+          { name: "Recruiting & College", goals: [] },
+          { name: "Training & Nutrition", goals: [] },
+          { name: "Academic Performance", goals: [] }
+        ]
+      },
+      health: {
+        title: "Health & Wellness",
+        icon: "🌿",
+        color: "sage",
+        owner: "All",
+        subcategories: [
+          { name: "Ariel's Health", goals: [], owner: "Ariel" },
+          { name: "Mariam's Health", goals: [], owner: "Mariam" },
+          { name: "Michael's Health", goals: [], owner: "Michael" },
+          { name: "Family Wellness", goals: [] }
+        ]
+      },
+      development: {
+        title: "Personal Development",
+        icon: "📚",
+        color: "gold",
+        owner: "All",
+        subcategories: [
+          { name: "Ariel's Learning", goals: [], owner: "Ariel" },
+          { name: "Mariam's Growth", goals: [], owner: "Mariam" },
+          { name: "Michael's Development", goals: [], owner: "Michael" },
+          { name: "Shared Learning", goals: [] }
+        ]
+      },
+      lifestyle: {
+        title: "Home & Lifestyle",
+        icon: "🏡",
+        color: "slate",
+        owner: "All",
+        subcategories: [
+          { name: "Living Environment", goals: [] },
+          { name: "Financial Management", goals: [] },
+          { name: "Time Management", goals: [] }
+        ]
+      }
+    };
+
+    const USERS = ["Ariel", "Mariam", "Michael"];
+    const STATUSES = ["pending", "progress", "complete", "blocked"];
+
+    function App() {
+      const [currentUser, setCurrentUser] = useState(null);
+      const [goals, setGoals] = useState({});
+      const [loading, setLoading] = useState(true);
+      const [showModal, setShowModal] = useState(false);
+      const [modalData, setModalData] = useState({ category: "", subcategory: "" });
+
+      useEffect(() => {
+        loadGoals();
+      }, []);
+
+      const loadGoals = async () => {
+        try {
+          const result = await window.storage.get('shapira-family-goals-2026', true);
+          if (result && result.value) {
+            setGoals(JSON.parse(result.value));
+          }
+        } catch (error) {
+          console.log('No existing goals found, starting fresh');
+        } finally {
+          setLoading(false);
+        }
+      };
+
+      const saveGoals = async (updatedGoals) => {
+        try {
+          await window.storage.set('shapira-family-goals-2026', JSON.stringify(updatedGoals), true);
+          setGoals(updatedGoals);
+        } catch (error) {
+          console.error('Error saving goals:', error);
+          alert('Failed to save goals. Please try again.');
+        }
+      };
+
+      const addGoal = (category, subcategory, goalText, targetDate, status = "pending") => {
+        const goalId = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+        const newGoal = {
+          id: goalId,
+          text: goalText,
+          status,
+          targetDate,
+          addedBy: currentUser,
+          addedAt: new Date().toISOString(),
+          updates: []
+        };
+
+        const updatedGoals = { ...goals };
+        if (!updatedGoals[category]) updatedGoals[category] = {};
+        if (!updatedGoals[category][subcategory]) updatedGoals[category][subcategory] = [];
+        updatedGoals[category][subcategory].push(newGoal);
+
+        saveGoals(updatedGoals);
+        setShowModal(false);
+      };
+
+      const updateGoalStatus = async (category, subcategory, goalId, newStatus) => {
+        const updatedGoals = { ...goals };
+        const goalIndex = updatedGoals[category][subcategory].findIndex(g => g.id === goalId);
+        
+        if (goalIndex !== -1) {
+          updatedGoals[category][subcategory][goalIndex].status = newStatus;
+          updatedGoals[category][subcategory][goalIndex].updates.push({
+            user: currentUser,
+            timestamp: new Date().toISOString(),
+            action: `Status changed to ${newStatus}`
+          });
+          
+          await saveGoals(updatedGoals);
+        }
+      };
+
+      const getStats = () => {
+        let total = 0, complete = 0, inProgress = 0, blocked = 0;
+        
+        Object.values(goals).forEach(category => {
+          Object.values(category).forEach(subcategory => {
+            total += subcategory.length;
+            subcategory.forEach(goal => {
+              if (goal.status === 'complete') complete++;
+              if (goal.status === 'progress') inProgress++;
+              if (goal.status === 'blocked') blocked++;
+            });
+          });
+        });
+
+        return { total, complete, inProgress, blocked, completion: total ? Math.round((complete / total) * 100) : 0 };
+      };
+
+      const stats = getStats();
+
+      if (loading) {
+        return <div className="loading">Loading Shapira Family Goals...</div>;
+      }
+
+      if (!currentUser) {
+        return (
+          <div className="app-container">
+            <div className="header">
+              <h1>Shapira Family 2026 Goals</h1>
+              <p>Choose your profile to continue</p>
+            </div>
+            <div className="user-selector">
+              {USERS.map(user => (
+                <button
+                  key={user}
+                  className="user-button"
+                  onClick={() => setCurrentUser(user)}
+                >
+                  {user} Shapira
+                </button>
+              ))}
+            </div>
+          </div>
+        );
+      }
+
+      return (
+        <div className="app-container">
+          <div className="header">
+            <h1>Shapira Family 2026 Goals</h1>
+            <p>Welcome back, {currentUser}!</p>
+          </div>
+
+          <div className="user-selector">
+            {USERS.map(user => (
+              <button
+                key={user}
+                className={`user-button ${currentUser === user ? 'active' : ''}`}
+                onClick={() => setCurrentUser(user)}
+              >
+                {user}
+              </button>
+            ))}
+          </div>
+
+          <div className="stats-bar">
+            <div className="stat-card">
+              <div className="stat-label">Total Goals</div>
+              <div className="stat-value">{stats.total}</div>
+            </div>
+            <div className="stat-card">
+              <div className="stat-label">Completed</div>
+              <div className="stat-value">{stats.complete}</div>
+            </div>
+            <div className="stat-card">
+              <div className="stat-label">In Progress</div>
+              <div className="stat-value">{stats.inProgress}</div>
+            </div>
+            <div className="stat-card">
+              <div className="stat-label">Completion</div>
+              <div className="stat-value">{stats.completion}%</div>
+              <div className="progress-bar">
+                <div className="progress-fill" style={{ width: `${stats.completion}%` }}></div>
+              </div>
+            </div>
+          </div>
+
+          <div className="categories-grid">
+            {Object.entries(CATEGORIES).map(([categoryKey, category]) => {
+              const categoryGoals = goals[categoryKey] || {};
+              
+              return (
+                <div key={categoryKey} className={`category-card ${category.color}`}>
+                  <div className="category-header">
+                    <div>
+                      <div className="category-title">{category.title}</div>
+                      <div className="owner-badge">Owner: {category.owner}</div>
+                    </div>
+                    <div className="category-icon">{category.icon}</div>
+                  </div>
+
+                  <div className="subcategories">
+                    {category.subcategories.map((sub, idx) => {
+                      const subGoals = categoryGoals[sub.name] || [];
+                      
+                      return (
+                        <div key={idx} className="subcategory">
+                          <div className="subcategory-title">{sub.name}</div>
+                          {sub.owner && <div className="owner-badge" style={{ fontSize: '0.75rem' }}>{sub.owner}</div>}
+                          
+                          {subGoals.length > 0 ? (
+                            <div className="goals-list">
+                              {subGoals.map(goal => (
+                                <div key={goal.id} className="goal-item">
+                                  <div 
+                                    className={`goal-status ${goal.status}`}
+                                    onClick={() => {
+                                      const newStatus = STATUSES[(STATUSES.indexOf(goal.status) + 1) % STATUSES.length];
+                                      updateGoalStatus(categoryKey, sub.name, goal.id, newStatus);
+                                    }}
+                                    style={{ cursor: 'pointer' }}
+                                    title={`Click to change status (current: ${goal.status})`}
+                                  />
+                                  <div className="goal-text">{goal.text}</div>
+                                </div>
+                              ))}
+                            </div>
+                          ) : (
+                            <div className="empty-state">No goals yet</div>
+                          )}
+                          
+                          <button
+                            className="add-goal-btn"
+                            onClick={() => {
+                              setModalData({ category: categoryKey, subcategory: sub.name });
+                              setShowModal(true);
+                            }}
+                          >
+                            + Add Goal
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {showModal && (
+            <AddGoalModal
+              categoryKey={modalData.category}
+              subcategory={modalData.subcategory}
+              onClose={() => setShowModal(false)}
+              onSubmit={addGoal}
+            />
+          )}
+        </div>
+      );
+    }
+
+    function AddGoalModal({ categoryKey, subcategory, onClose, onSubmit }) {
+      const [goalText, setGoalText] = useState('');
+      const [targetDate, setTargetDate] = useState('');
+      const [status, setStatus] = useState('pending');
+
+      const handleSubmit = (e) => {
+        e.preventDefault();
+        if (goalText.trim()) {
+          onSubmit(categoryKey, subcategory, goalText, targetDate, status);
+          setGoalText('');
+          setTargetDate('');
+          setStatus('pending');
+        }
+      };
+
+      return (
+        <div className="modal-overlay" onClick={onClose}>
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <h2>Add New Goal</h2>
+            <p style={{ color: 'var(--slate)', marginBottom: '1.5rem' }}>
+              {CATEGORIES[categoryKey].title} → {subcategory}
+            </p>
+            
+            <form onSubmit={handleSubmit}>
+              <div className="form-group">
+                <label className="form-label">Goal Description</label>
+                <textarea
+                  className="form-textarea"
+                  value={goalText}
+                  onChange={(e) => setGoalText(e.target.value)}
+                  placeholder="Enter your goal..."
+                  required
+                />
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Target Date</label>
+                <input
+                  type="date"
+                  className="form-input"
+                  value={targetDate}
+                  onChange={(e) => setTargetDate(e.target.value)}
+                  min="2026-01-01"
+                  max="2026-12-31"
+                />
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Initial Status</label>
+                <select
+                  className="form-select"
+                  value={status}
+                  onChange={(e) => setStatus(e.target.value)}
+                >
+                  <option value="pending">Pending</option>
+                  <option value="progress">In Progress</option>
+                  <option value="complete">Complete</option>
+                  <option value="blocked">Blocked</option>
+                </select>
+              </div>
+
+              <div className="modal-buttons">
+                <button type="button" className="btn btn-secondary" onClick={onClose}>
+                  Cancel
+                </button>
+                <button type="submit" className="btn btn-primary">
+                  Add Goal
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      );
+    }
+
+    ReactDOM.render(<App />, document.getElementById('root'));
+  </script>
+</body>
+</html>
