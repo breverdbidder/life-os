@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>WhatsApp Hub - Chat Viewer</title>
+    <style>
+        body { font-family: Arial; margin: 0; padding: 0; background: #f0f0f0; }
+        .header { background: #667eea; color: white; padding: 20px; }
+        .container { max-width: 1200px; margin: 0 auto; }
+        .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; padding: 20px; }
+        .stat-card { background: white; padding: 20px; border-radius: 10px; text-align: center; }
+        .stat-value { font-size: 32px; font-weight: bold; color: #667eea; }
+        .stat-label { color: #666; margin-top: 5px; }
+        .content { display: grid; grid-template-columns: 300px 1fr; gap: 20px; padding: 20px; }
+        .sidebar { background: white; padding: 20px; border-radius: 10px; height: fit-content; }
+        .main { background: white; padding: 20px; border-radius: 10px; }
+        .message { padding: 15px; border-bottom: 1px solid #eee; }
+        .message:hover { background: #f8f9ff; }
+        .sender { font-weight: bold; color: #667eea; }
+        .timestamp { color: #999; font-size: 12px; }
+        .text { margin-top: 8px; }
+        .link { color: #1976d2; text-decoration: underline; cursor: pointer; }
+        .filter { margin-bottom: 15px; }
+        .filter label { display: block; margin-bottom: 5px; color: #666; font-size: 14px; }
+        .filter select, .filter input { width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 5px; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="container">
+            <h1>📱 WhatsApp Hub - Chat Viewer</h1>
+            <p id="groupName">Loading...</p>
+        </div>
+    </div>
+    
+    <div class="container">
+        <div class="stats">
+            <div class="stat-card">
+                <div class="stat-value" id="totalMessages">0</div>
+                <div class="stat-label">Messages</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="totalLinks">0</div>
+                <div class="stat-label">Links</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="totalAttachments">0</div>
+                <div class="stat-label">Attachments</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="totalSenders">0</div>
+                <div class="stat-label">Participants</div>
+            </div>
+        </div>
+        
+        <div class="content">
+            <div class="sidebar">
+                <h3>Filters</h3>
+                <div class="filter">
+                    <label>Sender</label>
+                    <select id="senderFilter" onchange="applyFilters()">
+                        <option value="">All senders</option>
+                    </select>
+                </div>
+                <div class="filter">
+                    <label>Message Type</label>
+                    <select id="typeFilter" onchange="applyFilters()">
+                        <option value="">All types</option>
+                        <option value="text">Text</option>
+                        <option value="image">Image</option>
+                        <option value="video">Video</option>
+                        <option value="link">Link</option>
+                    </select>
+                </div>
+                <div class="filter">
+                    <label>Search</label>
+                    <input type="text" id="searchInput" placeholder="Search messages..." oninput="applyFilters()">
+                </div>
+            </div>
+            
+            <div class="main">
+                <h3>Messages</h3>
+                <div id="messagesList">Loading...</div>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        let allMessages = [];
+        let allLinks = [];
+        let allSenders = new Set();
+        
+        async function loadData() {
+            try {
+                // Fetch from Supabase
+                const res = await fetch('/api/latest-export');
+                const data = await res.json();
+                
+                allMessages = data.messages;
+                allLinks = data.links;
+                allSenders = new Set(data.messages.map(m => m.sender_name));
+                
+                document.getElementById('groupName').textContent = data.group_name;
+                document.getElementById('totalMessages').textContent = data.messages.length;
+                document.getElementById('totalLinks').textContent = data.links.length;
+                document.getElementById('totalAttachments').textContent = data.attachments.length;
+                document.getElementById('totalSenders').textContent = allSenders.size;
+                
+                // Populate sender filter
+                const senderFilter = document.getElementById('senderFilter');
+                [...allSenders].sort().forEach(sender => {
+                    const opt = document.createElement('option');
+                    opt.value = sender;
+                    opt.textContent = sender;
+                    senderFilter.appendChild(opt);
+                });
+                
+                renderMessages(allMessages);
+            } catch (err) {
+                document.getElementById('messagesList').innerHTML = '❌ Error loading data: ' + err.message;
+            }
+        }
+        
+        function renderMessages(messages) {
+            const html = messages.map(m => `
+                <div class="message">
+                    <div class="sender">${m.sender_name}</div>
+                    <div class="timestamp">${new Date(m.message_timestamp).toLocaleString()}</div>
+                    <div class="text">${formatText(m.message_text)}</div>
+                </div>
+            `).join('');
+            document.getElementById('messagesList').innerHTML = html || '<p>No messages to display</p>';
+        }
+        
+        function formatText(text) {
+            // Convert URLs to clickable links
+            return text.replace(/(https?:\/\/[^\s]+)/g, '<a href="$1" class="link" target="_blank">$1</a>');
+        }
+        
+        function applyFilters() {
+            const senderFilter = document.getElementById('senderFilter').value;
+            const typeFilter = document.getElementById('typeFilter').value;
+            const searchTerm = document.getElementById('searchInput').value.toLowerCase();
+            
+            const filtered = allMessages.filter(m => {
+                if (senderFilter && m.sender_name !== senderFilter) return false;
+                if (typeFilter && m.message_type !== typeFilter) return false;
+                if (searchTerm && !m.message_text.toLowerCase().includes(searchTerm)) return false;
+                return true;
+            });
+            
+            renderMessages(filtered);
+        }
+        
+        loadData();
+    </script>
+</body>
+</html>
