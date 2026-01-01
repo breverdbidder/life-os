@@ -1,0 +1,173 @@
+name: WhatsApp Hub - Main Processor
+
+on:
+  workflow_dispatch:
+    inputs:
+      group_name:
+        description: 'WhatsApp group name'
+        required: true
+        type: string
+      export_file_path:
+        description: 'Path to uploaded .txt export file'
+        required: true
+        type: string
+      export_media_folder:
+        description: 'Path to media folder from export'
+        required: false
+        type: string
+        default: ''
+
+jobs:
+  # Stage 1: Parse messages and metadata
+  parse_export:
+    runs-on: ubuntu-latest
+    outputs:
+      group_id: ${{ steps.parse.outputs.group_id }}
+      message_count: ${{ steps.parse.outputs.message_count }}
+      attachment_count: ${{ steps.parse.outputs.attachment_count }}
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      
+      - name: Install dependencies
+        run: |
+          pip install supabase httpx openpyxl pypdf pillow anthropic beautifulsoup4 pytesseract
+      
+      - name: Run Parser Agent
+        id: parse
+        run: |
+          python whatsapp_hub/agents/parser_agent.py \
+            "${{ inputs.export_file_path }}" \
+            "${{ inputs.group_name }}"
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+  
+  # Stage 2: Extract links
+  extract_links:
+    needs: parse_export
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      
+      - name: Install dependencies
+        run: |
+          pip install supabase httpx beautifulsoup4
+      
+      - name: Run Link Extractor Agent
+        run: |
+          python whatsapp_hub/agents/link_extractor_agent.py \
+            "${{ needs.parse_export.outputs.group_id }}"
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+  
+  # Stage 3: Process media attachments
+  process_media:
+    needs: parse_export
+    runs-on: ubuntu-latest
+    if: ${{ inputs.export_media_folder != '' }}
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      
+      - name: Install dependencies
+        run: |
+          pip install supabase pillow
+      
+      - name: Run Media Processor Agent
+        run: |
+          python whatsapp_hub/agents/media_processor_agent.py \
+            "${{ inputs.export_media_folder }}" \
+            "${{ needs.parse_export.outputs.group_id }}"
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+  
+  # Stage 4: Trigger attachment analysis pipeline
+  trigger_analysis:
+    needs: [parse_export, process_media]
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Trigger Attachment Analysis Pipeline
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            await github.rest.actions.createWorkflowDispatch({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              workflow_id: 'whatsapp_attachment_pipeline.yml',
+              ref: 'main',
+              inputs: {
+                group_id: '${{ needs.parse_export.outputs.group_id }}'
+              }
+            });
+  
+  # Stage 5: Generate summary
+  generate_summary:
+    needs: [parse_export, extract_links, process_media]
+    runs-on: ubuntu-latest
+    if: always()
+    
+    steps:
+      - name: Generate Processing Summary
+        run: |
+          echo "📱 WhatsApp Hub - Processing Complete"
+          echo ""
+          echo "Group: ${{ inputs.group_name }}"
+          echo "Group ID: ${{ needs.parse_export.outputs.group_id }}"
+          echo "Messages: ${{ needs.parse_export.outputs.message_count }}"
+          echo "Attachments: ${{ needs.parse_export.outputs.attachment_count }}"
+          echo ""
+          echo "✅ Parsing: Complete"
+          echo "✅ Link extraction: Complete"
+          echo "✅ Media processing: ${{ needs.process_media.result }}"
+          echo "🚀 Attachment analysis pipeline: Triggered"
+      
+      - name: Log to Supabase
+        run: |
+          python -c "
+          from supabase import create_client
+          import os
+          from datetime import datetime
+          
+          supabase = create_client(
+            os.environ['SUPABASE_URL'],
+            os.environ['SUPABASE_KEY']
+          )
+          
+          supabase.table('deployment_log').insert({
+            'deployment_type': 'whatsapp_processing',
+            'status': 'complete',
+            'details': {
+              'group_name': '${{ inputs.group_name }}',
+              'group_id': '${{ needs.parse_export.outputs.group_id }}',
+              'messages': ${{ needs.parse_export.outputs.message_count }},
+              'attachments': ${{ needs.parse_export.outputs.attachment_count }}
+            }
+          }).execute()
+          "
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
