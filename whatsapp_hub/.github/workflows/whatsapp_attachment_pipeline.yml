@@ -1,0 +1,176 @@
+name: WhatsApp Hub - Attachment Processing Pipeline
+
+on:
+  workflow_dispatch:
+    inputs:
+      group_id:
+        description: 'WhatsApp group ID'
+        required: true
+        type: string
+
+jobs:
+  # Get unprocessed attachments
+  get_attachments:
+    runs-on: ubuntu-latest
+    outputs:
+      attachments: ${{ steps.fetch.outputs.attachments }}
+      count: ${{ steps.fetch.outputs.count }}
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      
+      - name: Install dependencies
+        run: pip install supabase
+      
+      - name: Fetch Unprocessed Attachments
+        id: fetch
+        run: |
+          python -c "
+          from supabase import create_client
+          import os
+          import json
+          
+          supabase = create_client(
+            os.environ['SUPABASE_URL'],
+            os.environ['SUPABASE_KEY']
+          )
+          
+          # Get attachments without analysis
+          result = supabase.table('whatsapp_attachments')\
+            .select('id, filename, file_type')\
+            .eq('download_status', 'downloaded')\
+            .execute()
+          
+          # Filter for attachments without analysis
+          attachments_to_process = []
+          for att in result.data:
+            analysis = supabase.table('attachment_analysis')\
+              .select('id')\
+              .eq('attachment_id', att['id'])\
+              .execute()
+            
+            if not analysis.data:
+              attachments_to_process.append(att)
+          
+          print(f'attachments={json.dumps(attachments_to_process)}')
+          print(f'count={len(attachments_to_process)}')
+          
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
+            f.write(f'attachments={json.dumps(attachments_to_process)}\n')
+            f.write(f'count={len(attachments_to_process)}\n')
+          "
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+  
+  # Analyze and route attachments (parallel processing)
+  analyze_and_route:
+    needs: get_attachments
+    if: ${{ needs.get_attachments.outputs.count > 0 }}
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        attachment: ${{ fromJson(needs.get_attachments.outputs.attachments) }}
+      max-parallel: 5  # Process 5 attachments concurrently
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      
+      - name: Install dependencies
+        run: |
+          pip install supabase anthropic httpx openpyxl pypdf pillow pytesseract beautifulsoup4
+      
+      - name: Analyze Attachment
+        id: analyze
+        run: |
+          python whatsapp_hub/agents/attachment_analyzer_agent.py \
+            "${{ matrix.attachment.id }}"
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+      
+      - name: Route to Skill
+        id: route
+        run: |
+          python whatsapp_hub/agents/skill_router_agent.py \
+            "${{ matrix.attachment.id }}"
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  
+  # Generate processing report
+  generate_report:
+    needs: [get_attachments, analyze_and_route]
+    runs-on: ubuntu-latest
+    if: always()
+    
+    steps:
+      - name: Generate Report
+        run: |
+          echo "📊 Attachment Processing Report"
+          echo ""
+          echo "Total attachments processed: ${{ needs.get_attachments.outputs.count }}"
+          echo "Analysis status: ${{ needs.analyze_and_route.result }}"
+          echo ""
+          echo "View routing dashboard: https://life-os-whatsapp-hub.pages.dev/routing-dashboard"
+      
+      - name: Log Metrics
+        run: |
+          python -c "
+          from supabase import create_client
+          import os
+          from datetime import datetime
+          
+          supabase = create_client(
+            os.environ['SUPABASE_URL'],
+            os.environ['SUPABASE_KEY']
+          )
+          
+          # Get routing statistics
+          stats = supabase.table('routing_decisions')\
+            .select('action, priority, ecosystem_target')\
+            .execute()
+          
+          actions = {}
+          priorities = {}
+          ecosystems = {}
+          
+          for decision in stats.data:
+            actions[decision['action']] = actions.get(decision['action'], 0) + 1
+            priorities[decision['priority']] = priorities.get(decision['priority'], 0) + 1
+            if decision['ecosystem_target']:
+              ecosystems[decision['ecosystem_target']] = ecosystems.get(decision['ecosystem_target'], 0) + 1
+          
+          print('📈 Routing Statistics:')
+          print(f'Actions: {actions}')
+          print(f'Priorities: {priorities}')
+          print(f'Ecosystems: {ecosystems}')
+          
+          # Log to insights
+          supabase.table('insights').insert({
+            'insight_type': 'attachment_processing',
+            'data': {
+              'processed_count': ${{ needs.get_attachments.outputs.count }},
+              'actions': actions,
+              'priorities': priorities,
+              'ecosystems': ecosystems
+            }
+          }).execute()
+          "
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
