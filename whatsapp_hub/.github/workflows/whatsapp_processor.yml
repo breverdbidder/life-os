@@ -1,0 +1,94 @@
+name: WhatsApp Hub Processor
+
+on:
+  workflow_dispatch:
+    inputs:
+      export_file:
+        description: 'Path to WhatsApp export .txt file'
+        required: true
+        type: string
+      media_folder:
+        description: 'Path to media folder (optional)'
+        required: false
+        type: string
+      group_name_override:
+        description: 'Override extracted group name (optional)'
+        required: false
+        type: string
+      fetch_metadata:
+        description: 'Fetch link metadata'
+        required: false
+        type: boolean
+        default: true
+  
+  # Can also be triggered by file upload events (future enhancement)
+  repository_dispatch:
+    types: [process-whatsapp-export]
+
+env:
+  SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+  SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+  ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+
+jobs:
+  process-whatsapp-export:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+      
+      - name: Install dependencies
+        run: |
+          pip install --break-system-packages \
+            langgraph \
+            supabase \
+            httpx \
+            pillow \
+            anthropic
+      
+      - name: Run LangGraph Orchestrator
+        run: |
+          python whatsapp_hub/orchestrator.py \
+            --export-file "${{ github.event.inputs.export_file }}" \
+            --media-folder "${{ github.event.inputs.media_folder }}" \
+            --group-name "${{ github.event.inputs.group_name_override }}" \
+            --fetch-metadata ${{ github.event.inputs.fetch_metadata }}
+      
+      - name: Upload processing logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: processing-logs
+          path: |
+            /tmp/whatsapp_processing_*.log
+            /tmp/whatsapp_processing_*.json
+          retention-days: 30
+      
+      - name: Update Supabase on failure
+        if: failure()
+        run: |
+          python -c "
+          import os
+          from supabase import create_client
+          client = create_client(os.getenv('SUPABASE_URL'), os.getenv('SUPABASE_KEY'))
+          client.table('whatsapp_processing_logs').insert({
+              'agent_name': 'workflow',
+              'stage': 'failed',
+              'error_message': 'GitHub Actions workflow failed',
+              'metadata': {'export_file': '${{ github.event.inputs.export_file }}'}
+          }).execute()
+          "
+      
+      - name: Notify completion
+        if: success()
+        run: |
+          echo "✅ WhatsApp export processed successfully"
+          echo "Check Supabase tables: whatsapp_groups, whatsapp_messages, whatsapp_links, whatsapp_attachments"
