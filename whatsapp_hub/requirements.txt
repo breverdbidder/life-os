@@ -1,0 +1,11 @@
+# WhatsApp Hub Dependencies
+# Install: pip install --break-system-packages -r requirements.txt
+
+langgraph>=0.2.0
+supabase>=2.0.0
+httpx>=0.27.0
+pillow>=10.0.0
+anthropic>=0.40.0
+
+# Optional for enhanced features
+python-magic>=0.4.27
