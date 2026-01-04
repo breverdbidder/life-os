@@ -17,9 +17,36 @@ from dataclasses import dataclass, asdict
 import logging
 
 # Observability imports (from observability LIVE Dec 26)
-from structured_logger import StructuredLogger
-from metrics import track_metric
-from error_tracker import track_error
+# Optional imports - fall back to standard logging if not available
+try:
+    from structured_logger import StructuredLogger
+    from metrics import track_metric
+    from error_tracker import track_error
+    OBSERVABILITY_AVAILABLE = True
+except ImportError:
+    # Fallback for standalone testing
+    OBSERVABILITY_AVAILABLE = False
+    logging.basicConfig(level=logging.INFO)
+    
+    class StructuredLogger:
+        def __init__(self, component, correlation_id=None):
+            self.component = component
+            self.correlation_id = correlation_id
+        
+        def info(self, event, **kwargs):
+            logging.info(f"[{self.component}] {event}: {kwargs}")
+        
+        def warning(self, event, **kwargs):
+            logging.warning(f"[{self.component}] {event}: {kwargs}")
+        
+        def error(self, event, **kwargs):
+            logging.error(f"[{self.component}] {event}: {kwargs}")
+    
+    def track_metric(category, metric_name, value, correlation_id=None):
+        logging.info(f"METRIC [{category}] {metric_name}={value}")
+    
+    def track_error(component, error_type, error_message, correlation_id=None):
+        logging.error(f"ERROR [{component}] {error_type}: {error_message}")
 
 # State management
 from typing_extensions import TypedDict
