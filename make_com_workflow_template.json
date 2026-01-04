@@ -1,0 +1,248 @@
+{
+  "name": "Life OS ADHD Intervention Monitor",
+  "description": "Watches Life OS RSS feed for ABANDONED/BLOCKED tasks and sends Discord notifications with Supabase logging",
+  "version": "1.0.0",
+  "scenario": {
+    "modules": [
+      {
+        "id": 1,
+        "module": "rss:WatchRSSFeed",
+        "version": 2,
+        "name": "Watch Life OS RSS Feed",
+        "parameters": {
+          "url": "https://life-os-aiy.pages.dev/rss.xml",
+          "maxResults": 20,
+          "outputType": "items"
+        },
+        "schedule": {
+          "interval": 30,
+          "unit": "minutes"
+        },
+        "mapper": {},
+        "metadata": {
+          "designer": {
+            "x": 0,
+            "y": 0
+          }
+        }
+      },
+      {
+        "id": 2,
+        "module": "builtin:BasicFilter",
+        "version": 1,
+        "name": "Filter Business Tasks Only",
+        "parameters": {},
+        "filter": {
+          "name": "Business Domain Only",
+          "conditions": [
+            [
+              {
+                "a": "{{1.category}}",
+                "b": "BUSINESS",
+                "o": "text:equal"
+              }
+            ]
+          ]
+        },
+        "mapper": {},
+        "metadata": {
+          "designer": {
+            "x": 300,
+            "y": 0
+          },
+          "restore": {
+            "conditions": {
+              "items": [
+                null
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": 3,
+        "module": "discord:SendWebhookMessage",
+        "version": 1,
+        "name": "Send Discord Alert",
+        "parameters": {
+          "webhook": "YOUR_DISCORD_WEBHOOK_URL_HERE"
+        },
+        "mapper": {
+          "content": "🚨 **ADHD Intervention Required**\n\n**Task:** {{1.title}}\n\n**Details:**\n{{1.description}}\n\n**Action Required:** @ariel Please address this abandoned task\n\n**Direct Link:** {{1.link}}\n\n**Time:** {{formatDate(now; \"YYYY-MM-DD HH:mm\")}} EST"
+        },
+        "metadata": {
+          "designer": {
+            "x": 600,
+            "y": 0
+          },
+          "restore": {
+            "webhook": {
+              "label": "Life OS Alerts"
+            }
+          }
+        }
+      },
+      {
+        "id": 4,
+        "module": "http:ActionSendData",
+        "version": 3,
+        "name": "Log to Supabase Interventions Table",
+        "parameters": {
+          "handleErrors": false,
+          "useQuerystring": false,
+          "shareCookies": false
+        },
+        "mapper": {
+          "url": "https://mocerqjnksmhcjzxrewo.supabase.co/rest/v1/life_os_interventions",
+          "method": "post",
+          "headers": [
+            {
+              "name": "apikey",
+              "value": "YOUR_SUPABASE_KEY_HERE"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer YOUR_SUPABASE_KEY_HERE"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Prefer",
+              "value": "return=representation"
+            }
+          ],
+          "qs": [],
+          "bodyType": "raw",
+          "parseResponse": true,
+          "timeout": 30000,
+          "body": "{\n  \"task_id\": \"{{substring(1.guid; 7)}}\",\n  \"intervention_type\": \"RSS_ALERT\",\n  \"task_status\": \"{{substring(1.title; 4; 13)}}\",\n  \"task_description\": \"{{1.title}}\",\n  \"domain\": \"{{1.category}}\",\n  \"triggered_at\": \"{{formatDate(now; \"YYYY-MM-DDTHH:mm:ss\")}}\",\n  \"alert_sent\": true,\n  \"resolution_status\": \"OPEN\"\n}"
+        },
+        "metadata": {
+          "designer": {
+            "x": 900,
+            "y": 0
+          },
+          "restore": {
+            "method": {
+              "label": "POST"
+            },
+            "headers": {},
+            "qs": {},
+            "bodyType": {
+              "label": "Raw"
+            }
+          }
+        }
+      },
+      {
+        "id": 5,
+        "module": "builtin:BasicAggregator",
+        "version": 1,
+        "name": "Count Daily Interventions",
+        "parameters": {
+          "feeder": 1
+        },
+        "mapper": {
+          "aggregatedFields": [
+            {
+              "function": "count",
+              "label": "intervention_count"
+            }
+          ]
+        },
+        "metadata": {
+          "designer": {
+            "x": 600,
+            "y": 300
+          }
+        }
+      },
+      {
+        "id": 6,
+        "module": "builtin:BasicFilter",
+        "version": 1,
+        "name": "Alert if >3 Abandonments Today",
+        "parameters": {},
+        "filter": {
+          "name": "High Abandonment Rate",
+          "conditions": [
+            [
+              {
+                "a": "{{5.intervention_count}}",
+                "b": "3",
+                "o": "number:greater"
+              }
+            ]
+          ]
+        },
+        "mapper": {},
+        "metadata": {
+          "designer": {
+            "x": 900,
+            "y": 300
+          }
+        }
+      },
+      {
+        "id": 7,
+        "module": "discord:SendWebhookMessage",
+        "version": 1,
+        "name": "Send High Abandonment Alert",
+        "parameters": {
+          "webhook": "YOUR_DISCORD_WEBHOOK_URL_HERE"
+        },
+        "mapper": {
+          "content": "⚠️ **HIGH ABANDONMENT ALERT**\n\n@ariel You've abandoned **{{5.intervention_count}} tasks** today.\n\n**Pattern Detection:** This indicates potential ADHD overwhelm or task clarity issues.\n\n**Recommended Actions:**\n1. Review task complexity ratings\n2. Break down large tasks into micro-commits\n3. Consider body doubling for next task\n4. Check focus score and energy levels\n\n**Time:** {{formatDate(now; \"YYYY-MM-DD HH:mm\")}} EST"
+        },
+        "metadata": {
+          "designer": {
+            "x": 1200,
+            "y": 300
+          }
+        }
+      }
+    ],
+    "connections": [
+      {
+        "source": 1,
+        "target": 2
+      },
+      {
+        "source": 2,
+        "target": 3
+      },
+      {
+        "source": 3,
+        "target": 4
+      },
+      {
+        "source": 1,
+        "target": 5
+      },
+      {
+        "source": 5,
+        "target": 6
+      },
+      {
+        "source": 6,
+        "target": 7
+      }
+    ]
+  },
+  "setup_instructions": {
+    "step_1": "Create Discord webhook in your #accountability channel",
+    "step_2": "Replace YOUR_DISCORD_WEBHOOK_URL_HERE with your webhook URL (2 places)",
+    "step_3": "Replace YOUR_SUPABASE_KEY_HERE with your Supabase service role key (2 places)",
+    "step_4": "Import this JSON into Make.com via Import Blueprint",
+    "step_5": "Activate the scenario",
+    "step_6": "Test with manual RSS trigger first"
+  },
+  "free_tier_limits": {
+    "operations_per_month": 1000,
+    "estimated_usage": "720 operations/month (30min checks = 48/day × 30 days)",
+    "buffer": "280 operations remaining for extra workflows"
+  },
+  "cost": "$0/month on Make.com free tier"
+}
