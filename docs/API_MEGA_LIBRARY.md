@@ -2,8 +2,8 @@
 
 **Source Repository:** [cporter202/API-mega-list](https://github.com/cporter202/API-mega-list)  
 **Total APIs:** 10,498 across 18 categories  
-**Last Updated:** December 13, 2025 (V14.5.1 - Claude Security Review + LangGraph)  
-**Curated by:** Ariel Shapira, Everest Capital of Brevard LLC
+**Last Updated:** January 4, 2026 (V14.6.0 - LLM Architecture Patterns + Firecrawl Agent)  
+**Curated by:** Ariel Shapira, Everest Capital USA
 
 ---
 
@@ -109,6 +109,114 @@ Disposition → Archive
 - `src/langgraph/nodes/` - Individual stage implementations
 - `.github/workflows/langgraph_orchestrator.yml` - GitHub Actions workflow
 - SQLite checkpoints for state persistence
+
+---
+
+## 🧠 LLM ARCHITECTURE PATTERNS - Modern AI System Design
+
+**Source:** [AI Engineering - 8 LLM Architectures Clearly Explained](https://www.aiengineering.com)  
+**Key Insight:** Modern LLM systems combine multiple architectural patterns optimized for different goals: reasoning depth, cost, latency, multimodality, or action execution.
+
+### The 8 Architecture Types
+
+| Architecture | Design Approach | Best Use Cases | Trade-offs |
+|--------------|----------------|----------------|------------|
+| **GPT (Generative Pretrained Transformer)** | Decoder-only with causal masking | Conversational AI, code generation, summarization | Baseline - no special optimization |
+| **MoE (Mixture of Experts)** | Sparse routing to expert networks | Large-scale multilingual, cost-sensitive high-throughput | Complexity in routing logic |
+| **LRM (Large Reasoning Model)** | Chain-of-thought supervision | Math reasoning, code debugging, scientific analysis, agent planning | Higher latency, verbosity |
+| **VLM (Vision-Language Model)** | Visual + text alignment | Document understanding, visual Q&A, multimodal agents | Larger model size |
+| **SLM (Small Language Model)** | Distillation, quantization, pruning | Mobile apps, on-device inference, edge/IoT | Reduced capability vs large models |
+| **LAM (Large Action Model)** | Structured output for tool calls | Autonomous agents, API automation, software workflows, robotics | Requires tool ecosystem |
+| **HLM (Hierarchical Language Model)** | High-level planning + low-level execution | Long-running workflows, multi-turn agents, project planning | More complex architecture |
+| **LCM (Large Concept Model)** | Graph-based concept reasoning | Scientific reasoning, knowledge synthesis | Research-stage only |
+
+### BidDeed.AI Architecture Mapping
+
+**Currently Deployed:**
+- ✅ **MoE-style routing**: Smart Router V7.1 (Gemini FREE → DeepSeek ULTRA_CHEAP → Claude PREMIUM)
+- ✅ **LRM**: DeepSeek V3.2 for Lien Priority analysis (chain-of-thought reasoning)
+- ✅ **LAM**: All 12 ForecastEngines generate structured JSON for BID/REVIEW/SKIP decisions
+- ✅ **HLM**: The Everest Ascent™ 12-stage pipeline (Discovery/Scraping → ML/Decision)
+- ✅ **GPT baseline**: Gemini Flash (general tasks), Claude (complex reasoning)
+
+**Validation of Design:**
+- 73% FREE tier success = effective task-to-architecture routing
+- ForecastEngines (Lien 97, Bid 96, Exit 95) = specialized models vs one-size-fits-all
+- Smart Router = multi-architecture orchestration in production
+
+**Potential Upgrades:**
+- 🔄 **VLM**: BCPAO photo analysis (currently just fetching images)
+- 🔄 **SLM**: Mobile edge deployment for auction monitoring
+- 🔄 **LCM**: Future research for complex legal reasoning
+
+### Key Takeaway
+No single architecture fits all tasks. Production AI systems require multi-architecture orchestration - exactly what BidDeed.AI's Smart Router implements.
+
+---
+
+## 🧠 LLM ARCHITECTURE PATTERNS - AI Engineering Insights
+
+**Source:** [AI Engineering - 8 LLM Architectures Clearly Explained](https://www.aieng.dev/)  
+**Last Updated:** January 2026  
+**Key Insight:** Modern LLMs aren't a single model type - they combine multiple architectural patterns optimized for different goals.
+
+### The 8 Core Architectures
+
+| Architecture | Design Pattern | Best For | BidDeed.AI Usage |
+|--------------|----------------|----------|------------------|
+| **GPT (Generative Pretrained Transformer)** | Decoder-only with causal attention | Conversational AI, code generation, general tasks | Gemini Flash baseline, Claude for complex reasoning |
+| **MoE (Mixture of Experts)** | Sparse routing to expert networks | Large-scale models, cost-sensitive high throughput | ✅ Smart Router V7.1 (route by complexity) |
+| **LRM (Large Reasoning Model)** | Chain-of-thought supervision | Math, code debugging, scientific analysis, planning | ✅ DeepSeek V3.2 for Lien Priority analysis |
+| **VLM (Vision-Language Model)** | Visual + text encoder alignment | Document understanding, visual Q&A, multimodal agents | 🔄 Potential: BCPAO photo analysis |
+| **SLM (Small Language Model)** | Distillation, quantization, pruning | Mobile apps, edge/IoT, on-device inference | 🔄 Potential: Mobile auction monitoring |
+| **LAM (Large Action Model)** | Structured outputs for tool calls | Autonomous agents, API automation, workflows | ✅ All 12 ForecastEngines (JSON decisions) |
+| **HLM (Hierarchical Language Model)** | High-level planning + low-level execution | Long workflows, multi-turn agents, project planning | ✅ Everest Ascent™ 12-stage pipeline |
+| **LCM (Large Concept Model)** | Graph-based concept reasoning | Scientific reasoning, knowledge synthesis | 🔬 Research phase (not production ready) |
+
+### BidDeed.AI Multi-Architecture Strategy
+
+**Current Implementation:**
+- **MoE-style routing**: Smart Router V7.1 matches architecture to task complexity
+- **LRM**: DeepSeek for reasoning-heavy Lien Priority (chain-of-thought)
+- **LAM**: ForecastEngines generate structured JSON (BID/REVIEW/SKIP)
+- **HLM**: 12-stage pipeline separates discovery (low) from decisions (high)
+- **GPT baseline**: Gemini FREE for general-purpose, Claude for complex
+
+**Key Metrics:**
+- 73% FREE tier processing (effective routing)
+- ForecastEngine scores: Lien 97, Bid 96, Exit 95 (specialized models)
+- 40-55% cost savings via architecture-task matching
+
+**Architectural Principle:**  
+_"No single architecture fits all tasks"_ - BidDeed.AI validates this with multi-model orchestration achieving 100x ROI.
+
+### Future Architecture Opportunities
+
+1. **VLM Integration**: BCPAO photo analysis for property condition scoring
+2. **SLM Deployment**: On-device mobile app for real-time auction monitoring
+3. **LCM Research**: Graph-based lien priority reasoning (when production-ready)
+
+---
+
+## 🕷️ WEB SCRAPING & DATA EXTRACTION
+
+### AI-Powered Web Agents
+
+| Tool | Description | Pricing | Use Case |
+|------|-------------|---------|----------|
+| **Firecrawl `/agent` Endpoint** | Natural language web search & extraction (no URLs needed) | 1,000 free credits (code: AIENGINEERING) | Market research, competitive analysis, data collection |
+| [AI Web Agent](https://apify.com/apify/ai-web-agent) | Browser automation with natural language | Apify pricing | Form filling, navigation |
+| [AI Web Scraper - Crawl4AI](https://apify.com/raizen/ai-web-scraper) | LLM-optimized scraping | Apify pricing | Training data collection |
+
+**Firecrawl Agent Endpoint - Key Features:**
+- **No URL required**: Describe what you need, agent finds and extracts
+- **Use cases**: "Find all foreclosure auctions in Brevard County next week"
+- **Integration potential**: Replace RealForeclose scraping complexity
+- **Offer**: 1,000 free credits with code `AIENGINEERING`
+- **Priority**: 🔄 EVALUATE (assess vs current RealForeclose scraper)
+
+**BidDeed.AI Consideration:**  
+Current RealForeclose scraper has 12 regex patterns + anti-detection. Firecrawl might simplify but needs cost/reliability comparison.
 
 ---
 
@@ -794,6 +902,11 @@ npx cap sync
 - **Pricing:** $16/mo = 3,000 credits (1 credit/page, 5 for stealth)
 - **Self-host:** Available but NO Fire-engine (anti-bot is cloud-only)
 - **Integration:** LangChain native, LLM-ready markdown output
+- **NEW: `/agent` endpoint** - Web data search/extraction without URLs
+  - **How it works:** Describe what you need, Firecrawl finds and extracts it
+  - **Use cases:** Market research, competitive analysis, data collection
+  - **Offer:** 1,000 free credits with code "AIENGINEERING"
+  - **BidDeed.AI potential:** Automated plaintiff research, competitor monitoring
 
 ### Browserless Details
 
