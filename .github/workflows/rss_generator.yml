@@ -1,0 +1,92 @@
+name: Life OS RSS Feed Generator
+
+on:
+  # Run every 30 minutes
+  schedule:
+    - cron: '*/30 * * * *'
+  
+  # Allow manual trigger
+  workflow_dispatch:
+  
+  # Run on push to main (for testing)
+  push:
+    branches:
+      - main
+    paths:
+      - 'life_os_rss_exporter.py'
+      - '.github/workflows/rss_generator.yml'
+
+jobs:
+  generate-rss:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      
+      - name: Install dependencies
+        run: |
+          pip install requests
+      
+      - name: Generate RSS feed
+        env:
+          SUPABASE_URL: https://mocerqjnksmhcjzxrewo.supabase.co
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+        run: |
+          python life_os_rss_exporter.py
+      
+      - name: Verify RSS file exists
+        run: |
+          if [ ! -f public/rss.xml ]; then
+            echo "❌ ERROR: RSS file not generated"
+            exit 1
+          fi
+          echo "✅ RSS file verified"
+          ls -lh public/rss.xml
+      
+      - name: Commit and push RSS feed
+        run: |
+          git config --global user.name "Life OS RSS Bot"
+          git config --global user.email "ariel@everestcapitalusa.com"
+          
+          # Add files
+          git add public/rss.xml public/rss_summary.json
+          
+          # Only commit if there are changes
+          if git diff --staged --quiet; then
+            echo "No changes to RSS feed"
+          else
+            git commit -m "🤖 Auto-update RSS feed - $(date -u +'%Y-%m-%d %H:%M UTC')"
+            git push
+            echo "✅ RSS feed pushed to repository"
+          fi
+      
+      - name: Summary
+        run: |
+          echo "## Life OS RSS Feed Update" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Generated:** $(date -u +'%Y-%m-%d %H:%M UTC')" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          if [ -f public/rss_summary.json ]; then
+            TASK_COUNT=$(cat public/rss_summary.json | python3 -c "import sys,json; print(json.load(sys.stdin).get('task_count', 0))")
+            echo "**Intervention Tasks:** $TASK_COUNT" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Feed URL:** https://life-os-aiy.pages.dev/rss.xml" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "✅ RSS feed successfully updated and deployed" >> $GITHUB_STEP_SUMMARY
+
+      - name: Notify on failure
+        if: failure()
+        run: |
+          echo "❌ RSS generation failed!"
+          echo "Check logs for details"
