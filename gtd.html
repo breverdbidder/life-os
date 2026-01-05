@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GTD System - Life OS</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
+        .chat-message { animation: slideIn 0.3s ease-out; }
+        @keyframes slideIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        .loading-dots::after { content: '...'; animation: dots 1.5s steps(4, end) infinite; }
+        @keyframes dots { 0%, 20% { content: '.'; } 40% { content: '..'; } 60%, 100% { content: '...'; } }
+    </style>
+</head>
+<body class="bg-gray-50">
+    <!-- Header -->
+    <div class="bg-gradient-to-r from-blue-600 to-indigo-700 text-white py-4 px-6 shadow-lg">
+        <div class="max-w-6xl mx-auto flex justify-between items-center">
+            <div>
+                <h1 class="text-2xl font-bold">🎯 GTD System</h1>
+                <p class="text-blue-100 text-sm">Your AI-Powered Getting Things Done Companion</p>
+            </div>
+            <div class="flex gap-4 items-center">
+                <button onclick="showHealth()" class="bg-white/20 hover:bg-white/30 px-4 py-2 rounded-lg text-sm font-medium transition">
+                    System Health
+                </button>
+                <a href="/" class="text-blue-100 hover:text-white text-sm">← Back to Life OS</a>
+            </div>
+        </div>
+    </div>
+
+    <div class="max-w-6xl mx-auto p-6">
+        <!-- Quick Actions Bar -->
+        <div class="bg-white rounded-lg shadow-md p-4 mb-6">
+            <div class="flex gap-2 flex-wrap">
+                <button onclick="quickCommand('brain dump')" class="bg-purple-100 hover:bg-purple-200 text-purple-800 px-4 py-2 rounded-lg text-sm font-medium transition">
+                    🧠 Brain Dump
+                </button>
+                <button onclick="quickCommand('process inbox')" class="bg-blue-100 hover:bg-blue-200 text-blue-800 px-4 py-2 rounded-lg text-sm font-medium transition">
+                    📥 Process Inbox
+                </button>
+                <button onclick="quickCommand('what should I do now')" class="bg-green-100 hover:bg-green-200 text-green-800 px-4 py-2 rounded-lg text-sm font-medium transition">
+                    ⚡ What's Next?
+                </button>
+                <button onclick="quickCommand('weekly review')" class="bg-orange-100 hover:bg-orange-200 text-orange-800 px-4 py-2 rounded-lg text-sm font-medium transition">
+                    🔄 Weekly Review
+                </button>
+                <button onclick="quickCommand('show my lists')" class="bg-teal-100 hover:bg-teal-200 text-teal-800 px-4 py-2 rounded-lg text-sm font-medium transition">
+                    📋 Show Lists
+                </button>
+            </div>
+        </div>
+
+        <!-- Chat Interface -->
+        <div class="bg-white rounded-lg shadow-md overflow-hidden">
+            <div id="chatMessages" class="p-6 space-y-4 h-[600px] overflow-y-auto">
+                <!-- Welcome Message -->
+                <div class="chat-message bg-gradient-to-r from-blue-50 to-indigo-50 p-6 rounded-lg border border-blue-200">
+                    <div class="flex items-start gap-3">
+                        <div class="text-3xl">🎯</div>
+                        <div>
+                            <h3 class="font-bold text-lg text-gray-900 mb-2">Welcome to Your GTD System!</h3>
+                            <p class="text-gray-700 mb-3">I'm your personal Getting Things Done coach. I'll help you capture, clarify, organize, review, and engage with your tasks and projects.</p>
+                            <div class="bg-white p-4 rounded-lg border border-blue-200 mt-3">
+                                <p class="font-semibold text-gray-900 mb-2">Quick Start Commands:</p>
+                                <ul class="text-sm text-gray-700 space-y-1">
+                                    <li>• <strong>"Brain dump"</strong> - Empty your mind completely</li>
+                                    <li>• <strong>"Process inbox"</strong> - Clarify captured items</li>
+                                    <li>• <strong>"What should I do now?"</strong> - Get next action</li>
+                                    <li>• <strong>"Weekly review"</strong> - Maintain system health</li>
+                                    <li>• <strong>"I'm at my computer"</strong> - Show @computer actions</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Input Area -->
+            <div class="border-t border-gray-200 p-4">
+                <form onsubmit="sendMessage(event)" class="flex gap-2">
+                    <input 
+                        type="text" 
+                        id="userInput" 
+                        placeholder="Type a command or tell me what's on your mind..." 
+                        class="flex-1 px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        autocomplete="off"
+                    />
+                    <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-medium transition">
+                        Send
+                    </button>
+                </form>
+            </div>
+        </div>
+
+        <!-- System Stats (initially hidden) -->
+        <div id="healthPanel" class="mt-6 bg-white rounded-lg shadow-md p-6 hidden">
+            <h3 class="text-xl font-bold mb-4">📊 System Health</h3>
+            <div id="healthStats" class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <!-- Will be populated dynamically -->
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Configuration
+        const SUPABASE_URL = 'https://mocerqjnksmhcjzxrewo.supabase.co';
+        const SUPABASE_KEY = 'YOUR_SUPABASE_ANON_KEY'; // TODO: Replace with actual key
+        const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+        // Initialize
+        let conversationHistory = [];
+
+        // GTD System Prompt
+        const GTD_SYSTEM_PROMPT = `You are a GTD (Getting Things Done) expert and coach for Ariel Shapira's Life OS system. You help him manage tasks across 4 domains: BUSINESS (BidDeed.AI/foreclosures), MICHAEL (son's D1 swimming), FAMILY (Orthodox observance), and PERSONAL.
+
+KEY CONTEXT:
+- Ariel has ADHD - track task abandonment, offer micro-commitments
+- Dual timezone: Florida EST / Israel IST
+- Shabbat observance: Friday sundown to Saturday evening (no work)
+- Direct communication style, no softening
+
+GTD METHODOLOGY:
+1. CAPTURE: Collect everything with natural language
+2. CLARIFY: Process inbox items (actionable? project? delegate? 2-min rule?)
+3. ORGANIZE: Route to correct list (@computer, @phone, @home, @office, @errands, @pool, etc.)
+4. REVIEW: Daily (5min) and Weekly (60-90min) reviews
+5. ENGAGE: Recommend actions based on context, time, energy, priority
+
+COMMANDS YOU HANDLE:
+- "brain dump" → Guided capture session
+- "process inbox" → Clarify unprocessed items
+- "what should I do now" → Recommend next action
+- "weekly review" → Full system review
+- "I'm at [context]" → Show actions for that context
+- "add project: [name]" → Create new project
+- "complete: [task]" → Mark task done
+- "waiting for: [what] from [who]" → Track delegated items
+
+DATABASE INTEGRATION:
+- You have access to Supabase tables: gtd_inbox, gtd_next_actions, gtd_projects, gtd_waiting_for, gtd_someday, gtd_calendar, gtd_reference
+- When user captures items, add to gtd_inbox
+- When clarifying, move items to appropriate tables
+- Query current state before recommending actions
+- Update completion status when tasks are done
+
+ADHD OPTIMIZATION:
+- Detect context switches → Intervene with "Still on [task]?"
+- Suggest micro-commitments → "Just step 1: [tiny action]"
+- Track energy levels → Match tasks to current energy
+- Use contexts to reduce decision fatigue
+
+RESPONSE STYLE:
+- Direct, action-oriented (no fluff)
+- Use emojis for visual clarity
+- Concrete next actions, not vague suggestions
+- Call out patterns: "3rd time this week you've skipped this..."
+- Celebrate completions: "✅ Done. Streak: X days"
+
+You are NOT just answering questions. You are ACTIVELY managing Ariel's GTD system, making decisions about what goes where, tracking state, and guiding him through workflows.`;
+
+        async function sendMessage(e) {
+            e.preventDefault();
+            const input = document.getElementById('userInput');
+            const message = input.value.trim();
+            if (!message) return;
+
+            // Add user message to chat
+            addMessage(message, 'user');
+            input.value = '';
+
+            // Add to conversation history
+            conversationHistory.push({
+                role: 'user',
+                content: message
+            });
+
+            // Show loading
+            const loadingId = addMessage('Thinking<span class="loading-dots"></span>', 'assistant', true);
+
+            try {
+                // Call Claude API
+                const response = await fetch('https://api.anthropic.com/v1/messages', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'x-api-key': 'YOUR_ANTHROPIC_API_KEY', // TODO: Replace with actual key
+                        'anthropic-version': '2023-06-01'
+                    },
+                    body: JSON.stringify({
+                        model: 'claude-sonnet-4-20250514',
+                        max_tokens: 4000,
+                        system: GTD_SYSTEM_PROMPT,
+                        messages: conversationHistory
+                    })
+                });
+
+                const data = await response.json();
+                const assistantMessage = data.content[0].text;
+
+                // Remove loading message
+                document.getElementById(loadingId).remove();
+
+                // Add assistant response
+                addMessage(assistantMessage, 'assistant');
+
+                // Add to conversation history
+                conversationHistory.push({
+                    role: 'assistant',
+                    content: assistantMessage
+                });
+
+                // Process any database operations mentioned in response
+                await processGTDActions(message, assistantMessage);
+
+            } catch (error) {
+                console.error('Error:', error);
+                document.getElementById(loadingId).remove();
+                addMessage('❌ Error connecting to AI. Please try again.', 'system');
+            }
+        }
+
+        async function processGTDActions(userMessage, assistantResponse) {
+            // Parse assistant response for database operations
+            // This is a simplified version - expand based on actual command patterns
+            
+            // Example: If capturing to inbox
+            if (userMessage.toLowerCase().includes('capture') || assistantResponse.includes('added to inbox')) {
+                // Extract captured items and add to database
+                // Implementation depends on response format
+            }
+
+            // Example: If completing a task
+            if (userMessage.toLowerCase().includes('complete') || userMessage.toLowerCase().includes('done')) {
+                // Mark task as complete in database
+                // Implementation depends on task identification
+            }
+        }
+
+        function addMessage(content, role, isLoading = false) {
+            const messagesDiv = document.getElementById('chatMessages');
+            const messageId = 'msg-' + Date.now();
+            
+            const roleStyles = {
+                user: 'bg-blue-100 border-blue-200 text-gray-900',
+                assistant: 'bg-gray-100 border-gray-200 text-gray-900',
+                system: 'bg-red-50 border-red-200 text-red-900'
+            };
+
+            const roleIcons = {
+                user: '👤',
+                assistant: '🎯',
+                system: '⚠️'
+            };
+
+            const messageHTML = `
+                <div id="${messageId}" class="chat-message ${roleStyles[role]} p-4 rounded-lg border">
+                    <div class="flex items-start gap-3">
+                        <div class="text-2xl">${roleIcons[role]}</div>
+                        <div class="flex-1 prose prose-sm max-w-none">
+                            ${content}
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            messagesDiv.insertAdjacentHTML('beforeend', messageHTML);
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+            
+            return messageId;
+        }
+
+        function quickCommand(command) {
+            document.getElementById('userInput').value = command;
+            sendMessage(new Event('submit'));
+        }
+
+        async function showHealth() {
+            const panel = document.getElementById('healthPanel');
+            const statsDiv = document.getElementById('healthStats');
+            
+            // Query health view
+            const { data, error } = await supabase
+                .from('v_gtd_health')
+                .select('*')
+                .single();
+
+            if (error) {
+                console.error('Error fetching health:', error);
+                return;
+            }
+
+            const stats = [
+                { label: 'Inbox Items', value: data.inbox_count, color: data.inbox_count > 0 ? 'red' : 'green' },
+                { label: 'Active Actions', value: data.active_actions, color: 'blue' },
+                { label: 'Active Projects', value: data.active_projects, color: 'purple' },
+                { label: 'Waiting For', value: data.active_waiting, color: 'orange' }
+            ];
+
+            const lastWeekly = data.last_weekly_review ? new Date(data.last_weekly_review).toLocaleDateString() : 'Never';
+            const weeklyStatus = data.last_weekly_review && (Date.now() - new Date(data.last_weekly_review) < 7 * 24 * 60 * 60 * 1000);
+
+            statsDiv.innerHTML = stats.map(stat => `
+                <div class="text-center p-4 bg-${stat.color}-50 rounded-lg border border-${stat.color}-200">
+                    <div class="text-3xl font-bold text-${stat.color}-600">${stat.value}</div>
+                    <div class="text-sm text-${stat.color}-800 font-medium">${stat.label}</div>
+                </div>
+            `).join('') + `
+                <div class="col-span-2 text-center p-4 bg-gray-50 rounded-lg border border-gray-200">
+                    <div class="text-sm text-gray-600">Last Weekly Review</div>
+                    <div class="text-lg font-bold ${weeklyStatus ? 'text-green-600' : 'text-red-600'}">${lastWeekly}</div>
+                </div>
+            `;
+
+            panel.classList.toggle('hidden');
+        }
+
+        // Auto-focus input on load
+        document.getElementById('userInput').focus();
+    </script>
+</body>
+</html>
