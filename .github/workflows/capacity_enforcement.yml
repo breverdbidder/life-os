@@ -1,0 +1,92 @@
+name: Capacity Enforcement
+
+on:
+  schedule:
+    # Run every 6 hours to check for violations
+    - cron: '0 */6 * * *'
+  workflow_dispatch:
+    inputs:
+      tokens_used:
+        description: 'Tokens used in conversation'
+        required: true
+        type: number
+      claimed_limitation:
+        description: 'Did Claude claim space/token limitations?'
+        required: true
+        type: boolean
+
+jobs:
+  check_capacity:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      
+      - name: Install dependencies
+        run: |
+          pip install httpx
+      
+      - name: Run capacity enforcement check
+        env:
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+        run: |
+          python capacity_enforcement.py
+      
+      - name: Check for violations
+        if: github.event_name == 'workflow_dispatch'
+        env:
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+          TOKENS_USED: ${{ github.event.inputs.tokens_used }}
+          CLAIMED_LIMITATION: ${{ github.event.inputs.claimed_limitation }}
+        run: |
+          python << 'PYTHON_SCRIPT'
+          import os
+          import json
+          from capacity_enforcement import CapacityEnforcement
+
+          enforcer = CapacityEnforcement()
+          
+          tokens_used = int(os.environ['TOKENS_USED'])
+          claimed_limitation = os.environ['CLAIMED_LIMITATION'].lower() == 'true'
+          
+          result = enforcer.check_compliance(tokens_used, claimed_limitation)
+          
+          print(json.dumps(result, indent=2))
+          
+          # Log to Supabase
+          if enforcer.log_to_supabase(result):
+              print("\n✅ Logged to Supabase")
+          else:
+              print("\n❌ Failed to log to Supabase")
+          
+          # Alert if violation
+          if result['is_violation']:
+              print(f"\n🚨 VIOLATION DETECTED: {result['violation_severity']}")
+              print(f"   Used {result['usage_percent']}% but claimed limitations")
+              print(f"   Threshold: {result['threshold_percent']}%")
+              exit(1)  # Fail the workflow
+          else:
+              print("\n✅ No violation - Capacity usage honest")
+          PYTHON_SCRIPT
+      
+      - name: Get violation summary
+        if: always()
+        env:
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+        run: |
+          python << 'PYTHON_SCRIPT'
+          from capacity_enforcement import CapacityEnforcement
+          import json
+
+          enforcer = CapacityEnforcement()
+          summary = enforcer.get_violation_summary()
+          
+          print("\n📊 VIOLATION SUMMARY")
+          print(json.dumps(summary, indent=2))
+          PYTHON_SCRIPT
