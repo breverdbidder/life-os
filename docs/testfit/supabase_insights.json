@@ -1,0 +1,92 @@
+[
+  {
+    "timestamp": "2026-01-09T12:25:41.979018",
+    "category": "competitive_intelligence",
+    "source": "testfit_analysis",
+    "system": "biddeed_ai",
+    "insight_type": "enhancement_plan",
+    "title": "BidDeed.AI Pipeline Improvements from TestFit",
+    "summary": "Transform from single-path to multi-scenario exploration. Key improvements: Stage 8 (Generative Bid Strategy - 100 scenarios), Stage 4 (Interactive Lien Scenarios), Stage 10 (Interactive HTML Reports)",
+    "investment": "$58K, 29 weeks",
+    "roi": "+400%",
+    "priority": "HIGH",
+    "status": "planned",
+    "github_url": "https://github.com/breverdbidder/brevard-bidder-scraper/blob/main/docs/enhancements/BidDeed_Pipeline_Improvements.md",
+    "next_steps": "Start Stage 8 (Generative Bid Strategy Engine)",
+    "tags": [
+      "testfit",
+      "generative-intelligence",
+      "multi-scenario",
+      "foreclosure"
+    ]
+  },
+  {
+    "timestamp": "2026-01-09T12:25:41.979031",
+    "category": "competitive_intelligence",
+    "source": "testfit_analysis",
+    "system": "spd",
+    "insight_type": "enhancement_plan",
+    "title": "SPD Pipeline Improvements from TestFit",
+    "summary": "Clone TestFit's generative design core (1,000 layouts in 60 seconds) + add automated permitting. Key improvement: Stage 4 (Generative Design Engine) - THIS IS THE PRODUCT",
+    "investment": "$129K, 43 weeks",
+    "roi": "+815%",
+    "priority": "CRITICAL",
+    "status": "planned",
+    "github_url": "https://github.com/breverdbidder/spd-site-plan-dev/blob/main/docs/enhancements/SPD_Pipeline_Improvements.md",
+    "competitive_advantage": "TestFit doesn't do permitting - SPD will",
+    "next_steps": "Start Stage 4 (Generative Design Engine) - 12 weeks",
+    "tags": [
+      "testfit",
+      "direct-competitor",
+      "generative-design",
+      "site-planning",
+      "$22M-market"
+    ]
+  },
+  {
+    "timestamp": "2026-01-09T12:25:41.979033",
+    "category": "competitive_intelligence",
+    "source": "testfit_analysis",
+    "system": "zoning_analyst",
+    "insight_type": "enhancement_plan",
+    "title": "Zoning Analyst Enhancements from TestFit",
+    "summary": "Real-time compliance validation (<1 second) + generative scenarios (1,000 designs). Transform from static scraper to interactive compliance system. 75% Firecrawl cost savings.",
+    "investment": "$24K, 12 weeks",
+    "roi": "+525%",
+    "cost_savings": "$4,488/year (Firecrawl reduction)",
+    "priority": "HIGH",
+    "status": "planned",
+    "github_url": "https://github.com/breverdbidder/spd-site-plan-dev/blob/main/docs/enhancements/Zoning_Analyst_Enhancements.md",
+    "relationship": "Foundation for SPD Stage 2",
+    "next_steps": "Phase 1: Real-time validator (4 weeks)",
+    "tags": [
+      "testfit",
+      "real-time-validation",
+      "zoning",
+      "firecrawl-optimization"
+    ]
+  },
+  {
+    "timestamp": "2026-01-09T12:25:41.979036",
+    "category": "competitive_intelligence",
+    "source": "testfit_analysis",
+    "system": "all_systems",
+    "insight_type": "strategic_plan",
+    "title": "Master Summary: Three Systems TestFit Enhancement",
+    "summary": "Complete competitive intelligence \u2192 implementation cycle for 3 agentic AI systems. TestFit's lesson: Generative Intelligence beats single recommendations. Generate 1,000 options, let users explore.",
+    "total_investment": "$211K, 22 months",
+    "total_roi": "+1,740%",
+    "total_value": "$8.25M (5 years)",
+    "recommended_approach": "Sequential: BidDeed.AI (7mo) \u2192 Zoning Analyst (3mo) \u2192 SPD (12mo)",
+    "priority": "STRATEGIC",
+    "status": "planned",
+    "github_url": "https://github.com/breverdbidder/life-os/blob/main/docs/testfit/MASTER_SUMMARY.md",
+    "break_even": "Month 16",
+    "tags": [
+      "testfit",
+      "master-plan",
+      "three-systems",
+      "strategic"
+    ]
+  }
+]
