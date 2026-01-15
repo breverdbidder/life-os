@@ -675,3 +675,53 @@ jobs:
 **Next Auto-Update:** January 19, 2026 (Weekly)  
 **Next Manual Review:** February 1, 2026 (Monthly)  
 **Maintained by:** Claude AI Architect + ecosyste.ms API automation
+
+---
+
+## 21. 📚 BOOK PUBLISHING & MARKETING (20+ Repositories)
+
+### Amazon KDP Tools
+
+| Repository | Stars | Description | Integration Status |
+|------------|-------|-------------|-------------------|
+| **BrahimAkar/Amazon-KDP-Automater** | - | Automate KDP book uploads | 🔄 EVALUATE |
+| **b7011343/kdp-gpt** | 13 | AI book generator using ChatGPT | 🔄 EVALUATE |
+| **shenzhuxi/amazon-kdp-keywords** | 3 | Keywords management for KDP | 🔄 EVALUATE |
+| **drkameleon/kdp-pricegen** | 4 | Auto-generate price points | 🔄 EVALUATE |
+| **ZphillipsSr/infinite-publisher** | 0 | AI-powered writing + KDP formatting | CONDITIONAL |
+| **TufayelLUS/Image-To-KDP-Ready-PDF** | 1 | Convert images to KDP-ready PDF | CONDITIONAL |
+| **multiplicit-com/Office2KDP** | 1 | KDP templates for MS Office | CONDITIONAL |
+
+### eBook Generation & Publishing
+
+| Repository | Stars | Description | Integration Status |
+|------------|-------|-------------|-------------------|
+| **jgm/pandoc** | 33K+ | Universal document converter | ✅ ADOPT |
+| **pressbooks/pressbooks** | 1K+ | WordPress book publishing | CONDITIONAL |
+| **sile-typesetter/casile** | - | Multi-format book output | 🔄 EVALUATE |
+| **aorfanos/bookbinder** | - | Markdown to book formats | CONDITIONAL |
+| **sylvainSUPINTERNET/kdp-gen** | 8 | Kindle ebook generator | 🔄 EVALUATE |
+
+### Self-Publishing Tools
+
+| Repository | Stars | Description | Integration Status |
+|------------|-------|-------------|-------------------|
+| **jiuguangw/dayone2latex** | 10 | Journal to LaTeX book | CONDITIONAL |
+| **mattrichmo/PoemWriter** | 3 | AI poem book generator | CONDITIONAL |
+| **NexusTools/BookCreatorTool** | - | AI book generation | 🔄 EVALUATE |
+
+### Marketing & Analytics
+
+| Repository | Stars | Description | Integration Status |
+|------------|-------|-------------|-------------------|
+| **Author-Central-Scrapers** | - | Amazon author data | RESEARCH |
+| **book-ranking-trackers** | - | BSR monitoring | RESEARCH |
+
+### Custom BidDeed.AI Book Marketing Skills
+
+| Skill | Location | Purpose |
+|-------|----------|---------|
+| **amazon-bestseller-launch** | life-os/skills/ | Complete #1 bestseller launch system |
+| **kdp-listing-optimizer** | life-os/skills/ | Listing conversion optimization |
+| **arc-campaign-manager** | life-os/skills/ | ARC reviewer campaign management |
+
