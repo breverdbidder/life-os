@@ -1,11 +1,11 @@
 ---
 name: smart-router
-description: Multi-tier LLM routing for cost optimization in the BidDeed.AI ecosystem. Routes tasks to appropriate model tier based on complexity, achieving 40-55% FREE tier processing. Use when making API calls, selecting models, implementing chat interfaces, or optimizing AI costs. Tiers: FREE (gemini-2.5-flash 1M context), ULTRA_CHEAP (deepseek-v3.2), CHEAP, STANDARD, PREMIUM (claude-sonnet-4), ULTRA (claude-opus-4.5).
+description: Multi-tier LLM routing for cost optimization in the BidDeed.AI ecosystem. Routes tasks to appropriate model tier based on complexity, achieving 90% FREE tier processing. Use when making API calls, selecting models, implementing chat interfaces, or optimizing AI costs. Tiers: FREE (gemini-2.5-flash 1M context), ULTRA_CHEAP (deepseek-v3.2), CHEAP, STANDARD, PREMIUM (claude-sonnet-4), ULTRA (claude-opus-4.5).
 ---
 
 # Smart Router V5
 
-Multi-tier LLM routing achieving 40-55% FREE tier processing through intelligent task classification.
+Multi-tier LLM routing achieving 90% FREE tier processing through intelligent task classification.
 
 ## Model Tiers
 
@@ -55,7 +55,7 @@ def route_task(task: dict) -> str:
 
 ## Task Classification
 
-### FREE Tier Tasks (Target: 40-55%)
+### FREE Tier Tasks (Target: 90%)
 - Chat/conversation
 - Simple Q&A
 - Text summarization
@@ -117,7 +117,8 @@ VALUES (CURRENT_DATE, 'FREE', 1, 5000, 0.00);
 
 | Metric | Target | Measurement |
 |--------|--------|-------------|
-| FREE tier % | 40-55% | `free_calls / total_calls` |
+| FREE tier % | 90% | `free_calls / total_calls` |
 | Avg cost/call | <$0.01 | `total_cost / total_calls` |
 | Monthly spend | <$100 | Sum of all tiers |
 | Paid tier savings | 25% | vs. STANDARD-only baseline |
+
