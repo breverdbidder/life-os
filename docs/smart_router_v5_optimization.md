@@ -4,7 +4,7 @@
 **Last Updated:** December 21, 2025  
 **Version:** 5.0  
 **Author:** Ariel Shapira, Everest Capital USA  
-**Achievement:** 70%+ FREE tier processing (up from 40-55% in V4)
+**Achievement:** 70%+ FREE tier processing (up from 90% in V4)
 
 ---
 
@@ -16,7 +16,7 @@ Smart Router V5 achieves **70%+ FREE tier processing** by strategically routing 
 
 | Metric | V4 (Baseline) | V5 (Current) | Improvement |
 |--------|---------------|--------------|-------------|
-| **FREE Tier %** | 40-55% | 70%+ | +27-75% relative |
+| **FREE Tier %** | 90% | 70%+ | +27-75% relative |
 | **Monthly API Cost** | $100-150 | $50-75 | -50% |
 | **Annual Savings** | - | $900-1,200 | - |
 | **Cost per Property** | $0.12 | $0.05 | -58% |
@@ -265,11 +265,11 @@ TOTAL ANNUAL COST: $1.94 × 12 = $23.28/year
 
 ## Cost Comparison: V4 vs V5
 
-### V4 (40-55% FREE tier)
+### V4 (90% FREE tier)
 
 ```
 Model Distribution:
-- FREE (Gemini 2.0 Flash): 40-55%
+- FREE (Gemini 2.0 Flash): 90%
 - ULTRA_CHEAP (DeepSeek V2.5): 20-25%
 - BUDGET (Claude Haiku 4.5): 10-15%
 - SMART (Claude Sonnet 3.5): 10-15%
