@@ -231,7 +231,7 @@ All conditions exceeded:
 
 **Already Built:**
 - ✅ 12-stage pipeline (Discovery → Archive)
-- ✅ Smart Router V5 (40-55% FREE tier)
+- ✅ Smart Router V5 (90% FREE tier)
 - ✅ XGBoost ML models (64.4% accuracy)
 - ✅ BECA verification scraper
 - ✅ Lien priority analysis (detects HOA scenarios)
