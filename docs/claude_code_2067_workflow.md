@@ -19,7 +19,7 @@
 **Use for:**
 - Daily burn rate against $200/mo Max subscription
 - Model breakdown (Opus vs Sonnet usage)
-- Optimize Smart Router V5 FREE tier targeting (40-55% goal)
+- Optimize Smart Router V5 FREE tier targeting (90% goal)
 
 **Recommended:** Check /stats at end of each session, log to Supabase `daily_metrics` if significant.
 
