@@ -44,7 +44,7 @@ This framework defines the 10 core principles that guide all architectural decis
 **Why It Matters**: System delivers $300-400K/year value from ~$3.3K/year cost. This 100x ROI requires aggressive cost optimization at the LLM routing layer.
 
 **Adherence Criteria**:
-- [x] Smart Router routes 40-55% of requests to FREE tier (Gemini 2.5 Flash)
+- [x] Smart Router routes 90% of requests to FREE tier (Gemini 2.5 Flash)
 - [x] ULTRA_CHEAP tier (DeepSeek V3.2, $0.28/1M) handles 80% of paid calls
 - [x] QUALITY tier (Opus 4.5) used for <5% of calls (critical decisions only)
 - [x] Monthly API cost stays under $300
