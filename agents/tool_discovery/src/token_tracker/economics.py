@@ -226,7 +226,7 @@ async def get_smart_router_metrics(days: int = 7) -> dict:
                 "ULTRA_CHEAP (deepseek-v3.2)": f"{len(cheap_tier) / total * 100:.1f}%",
                 "PAID (claude/gpt)": f"{len(paid_tier) / total * 100:.1f}%"
             },
-            "target": "40-55% FREE tier",
+            "target": "90% FREE tier",
             "total_cost": sum(r["cost_usd"] or 0 for r in records),
             "free_tier_tokens": sum(r["total_tokens"] for r in free_tier),
             "paid_tier_cost": sum(r["cost_usd"] or 0 for r in paid_tier)
