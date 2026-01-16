@@ -95,7 +95,7 @@ BIDDEED_TOOLS = [
     # Smart Router
     {
         "tool_name": "smart_router_v5",
-        "tool_description": "Route LLM requests to optimal model based on task complexity. FREE: gemini-2.5-flash (1M context), ULTRA_CHEAP: deepseek-v3.2, PAID: claude-sonnet-4-5. Target 40-55% FREE tier.",
+        "tool_description": "Route LLM requests to optimal model based on task complexity. FREE: gemini-2.5-flash (1M context), ULTRA_CHEAP: deepseek-v3.2, PAID: claude-sonnet-4-5. Target 90% FREE tier.",
         "mcp_server_name": "biddeed-router",
         "category": "infrastructure"
     },
