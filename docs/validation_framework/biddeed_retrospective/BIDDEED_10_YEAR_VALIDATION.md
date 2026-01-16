@@ -281,7 +281,7 @@ The "MVP" was already built. For 10 years. And battle-tested on $10M+ in deal va
 **Tech Stack:**
 - GitHub + Supabase + Cloudflare Pages + GitHub Actions
 - Python + LangGraph for orchestration
-- Smart Router V5 (Gemini 2.5 Flash FREE tier → 40-55% cost savings)
+- Smart Router V5 (Gemini 2.5 Flash FREE tier → 90% cost savings)
 
 ---
 
