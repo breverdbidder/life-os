@@ -170,7 +170,7 @@ base64 -d propertyonion_prd.b64 > propertyonion_prd.md
 
 ### From brevard-bidder-scraper (75% code reuse)
 - BECA scraper patterns (12 regex, anti-detection)
-- Smart Router (40-55% FREE tier)
+- Smart Router (90% FREE tier)
 - Checkpoint recovery system
 - ForecastEngine™ evaluation
 - XGBoost ML predictions
