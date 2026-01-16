@@ -97,7 +97,7 @@ These interfaces already serve the same purpose as the Real Estate Agent (user-f
 | Component | Real Estate Agent | BidDeed.AI Current |
 |-----------|-------------------|-------------------|
 | **Orchestration** | n8n: $20-50/mo | GitHub Actions: $0 (included) |
-| **AI Model** | Gemini API: $X/mo | Smart Router V5: FREE tier 40-55% |
+| **AI Model** | Gemini API: $X/mo | Smart Router V5: FREE tier 90% |
 | **APIs** | RapidAPI: $50/mo | Custom scrapers: $0 |
 | **Hosting** | n8n server: $20/mo | Cloudflare Pages: $0 |
 | **Total** | **$90-120/month** | **~$10/month** |
