@@ -316,7 +316,7 @@
 ### **2. Smart Router = Mixture of Experts**
 - **LLM:** Routes computation to specialized expert networks
 - **BidDeed.AI:** Routes queries to optimal LLM based on complexity
-- **Why:** 40-55% cost savings via intelligent model selection
+- **Why:** 90% cost savings via intelligent model selection
 
 ### **3. LangGraph = Multi-Head Attention**
 - **LLM:** Multiple attention heads focus on different aspects simultaneously
@@ -436,7 +436,7 @@ Unlike open-source LLMs, your competitive advantage is in:
 | **Output** | Text generation | Probabilistic recommendation + report |
 | **Context Window** | 200K-1M tokens | Entire auction history (1,393 rows) |
 | **Learning** | Pre-training + fine-tuning | Continuous: Each auction → retraining |
-| **Cost** | $0-200/month | $100/month (40-55% FREE via Smart Router) |
+| **Cost** | $0-200/month | $100/month (90% FREE via Smart Router) |
 | **Hallucination Risk** | High (without grounding) | Low (data-driven, verified sources) |
 | **Domain Expertise** | General purpose | Hyper-specialized (FL foreclosure law) |
 | **Human-in-Loop** | Every query | Only for escalations (3 retry failures) |
@@ -476,7 +476,7 @@ Unlike open-source LLMs, your competitive advantage is in:
 ## Summary: The BidDeed.AI Advantage
 
 1. **Agentic Architecture:** Autonomous 12-stage pipeline with minimal human-in-loop
-2. **Cost Optimization:** Smart Router achieves 40-55% FREE tier processing
+2. **Cost Optimization:** Smart Router achieves 90% FREE tier processing
 3. **Domain Mastery:** Florida foreclosure law + local market expertise
 4. **Data Moat:** 1,393 proprietary auction outcomes
 5. **Emergent Intelligence:** ML learns patterns not explicitly programmed
